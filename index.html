@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<title>Reaction Caller</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --accent: #4f8cff;
+    --accent-down: #3a6fd6;
+    --danger: #ff4f5e;
+    --danger-down: #d93d4a;
+    --text: #f2f3f5;
+    --muted: #9aa1ab;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    overscroll-behavior: none;
+    user-select: none;
+  }
+
+  #app {
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: max(20px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right))
+              max(20px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+  }
+
+  .screen {
+    width: 100%;
+    max-width: 440px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: clamp(16px, 4vh, 32px);
+  }
+
+  .hidden { display: none !important; }
+
+  h1 {
+    font-size: clamp(1.6rem, 6vw, 2.2rem);
+    margin: 0;
+    text-align: center;
+  }
+
+  .subtitle {
+    color: var(--muted);
+    font-size: clamp(0.85rem, 3vw, 1rem);
+    text-align: center;
+    margin: -8px 0 0;
+  }
+
+  .panel {
+    background: var(--panel);
+    border-radius: 16px;
+    padding: clamp(16px, 4vw, 24px);
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .field label {
+    font-size: 0.9rem;
+    color: var(--muted);
+  }
+
+  .field input[type="number"] {
+    background: #0f1115;
+    border: 1px solid #2a2e38;
+    border-radius: 10px;
+    color: var(--text);
+    font-size: 1.1rem;
+    padding: 12px 14px;
+    width: 100%;
+  }
+
+  .field input[type="number"]:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  .range-row {
+    display: flex;
+    gap: 12px;
+  }
+
+  .range-row .field { flex: 1; }
+
+  .error {
+    color: var(--danger);
+    font-size: 0.85rem;
+    min-height: 1.1em;
+    text-align: center;
+  }
+
+  button {
+    border: none;
+    border-radius: 14px;
+    font-size: clamp(1rem, 4vw, 1.2rem);
+    font-weight: 600;
+    padding: clamp(14px, 4vw, 18px) 24px;
+    width: 100%;
+    cursor: pointer;
+    color: #fff;
+    transition: transform 0.08s ease;
+  }
+
+  button:active { transform: scale(0.97); }
+
+  #startBtn { background: var(--accent); }
+  #startBtn:active { background: var(--accent-down); }
+
+  #stopBtn { background: var(--danger); }
+  #stopBtn:active { background: var(--danger-down); }
+
+  #gameScreen {
+    height: 100%;
+    justify-content: space-between;
+    min-height: 70vh;
+    min-height: 70dvh;
+  }
+
+  .word-stage {
+    flex: 1;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #word {
+    font-size: clamp(3rem, 16vw, 6rem);
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    opacity: 0;
+    transform: scale(0.85);
+    transition: opacity 0.12s ease, transform 0.12s ease;
+  }
+
+  #word.show {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  .word-left { color: #4f8cff; }
+  .word-right { color: #4fd87c; }
+  .word-up { color: #ffd24f; }
+  .word-back { color: #ff7a4f; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div id="startScreen" class="screen">
+    <h1>Reaction Caller</h1>
+    <p class="subtitle">A voice randomly calls Left, Right, Up, or Back. React fast.</p>
+
+    <div class="panel">
+      <div class="range-row">
+        <div class="field">
+          <label for="minMs">Min delay (ms)</label>
+          <input type="number" id="minMs" value="1000" min="100" step="100">
+        </div>
+        <div class="field">
+          <label for="maxMs">Max delay (ms)</label>
+          <input type="number" id="maxMs" value="3000" min="100" step="100">
+        </div>
+      </div>
+      <div class="error" id="rangeError"></div>
+    </div>
+
+    <button id="startBtn">Start</button>
+  </div>
+
+  <div id="gameScreen" class="screen hidden">
+    <div class="word-stage">
+      <div id="word">&nbsp;</div>
+    </div>
+    <button id="stopBtn">Stop</button>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  const WORDS = ["Left", "Right", "Up", "Back"];
+  const WORD_CLASS = { Left: "word-left", Right: "word-right", Up: "word-up", Back: "word-back" };
+
+  const startScreen = document.getElementById("startScreen");
+  const gameScreen = document.getElementById("gameScreen");
+  const startBtn = document.getElementById("startBtn");
+  const stopBtn = document.getElementById("stopBtn");
+  const minMsInput = document.getElementById("minMs");
+  const maxMsInput = document.getElementById("maxMs");
+  const rangeError = document.getElementById("rangeError");
+  const wordEl = document.getElementById("word");
+
+  let timerId = null;
+  let voices = [];
+  let wakeLock = null;
+
+  let keepAwakeVideo = null;
+
+  function startVideoKeepAwake() {
+    if (keepAwakeVideo) {
+      keepAwakeVideo.play().catch(() => {});
+      return;
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = 2;
+    canvas.height = 2;
+    const ctx = canvas.getContext("2d");
+    ctx.fillRect(0, 0, 2, 2);
+    const stream = canvas.captureStream(1);
+
+    const video = document.createElement("video");
+    video.muted = true;
+    video.playsInline = true;
+    video.setAttribute("playsinline", "");
+    video.style.position = "fixed";
+    video.style.width = "1px";
+    video.style.height = "1px";
+    video.style.opacity = "0.01";
+    video.style.pointerEvents = "none";
+    video.srcObject = stream;
+    document.body.appendChild(video);
+
+    keepAwakeVideo = video;
+    video.play().catch(() => {});
+  }
+
+  function stopVideoKeepAwake() {
+    if (keepAwakeVideo) {
+      keepAwakeVideo.pause();
+    }
+  }
+
+  async function acquireWakeLock() {
+    if ("wakeLock" in navigator) {
+      try {
+        wakeLock = await navigator.wakeLock.request("screen");
+        return;
+      } catch (e) {
+        wakeLock = null;
+      }
+    }
+    startVideoKeepAwake();
+  }
+
+  function releaseWakeLock() {
+    if (wakeLock) {
+      wakeLock.release().catch(() => {});
+      wakeLock = null;
+    }
+    stopVideoKeepAwake();
+  }
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && timerId !== null && !wakeLock) {
+      acquireWakeLock();
+    }
+  });
+
+  function loadVoices() {
+    voices = window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
+  }
+  if (window.speechSynthesis) {
+    loadVoices();
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+  }
+
+  function pickVoice() {
+    return voices.find(v => v.lang && v.lang.startsWith("en")) || voices[0] || null;
+  }
+
+  function speak(text) {
+    if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(text);
+    const voice = pickVoice();
+    if (voice) utter.voice = voice;
+    utter.rate = 1;
+    utter.pitch = 1;
+    window.speechSynthesis.speak(utter);
+  }
+
+  function validateRange() {
+    const min = parseInt(minMsInput.value, 10);
+    const max = parseInt(maxMsInput.value, 10);
+    if (isNaN(min) || isNaN(max) || min < 100 || max < 100) {
+      rangeError.textContent = "Enter values of at least 100ms.";
+      return null;
+    }
+    if (min > max) {
+      rangeError.textContent = "Min delay must not exceed max delay.";
+      return null;
+    }
+    rangeError.textContent = "";
+    return { min, max };
+  }
+
+  function randomDelay(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+  }
+
+  function showWord(text) {
+    wordEl.textContent = text;
+    wordEl.className = WORD_CLASS[text] || "";
+    wordEl.classList.remove("show");
+    requestAnimationFrame(() => wordEl.classList.add("show"));
+  }
+
+  function scheduleNext(min, max) {
+    timerId = setTimeout(() => {
+      const word = WORDS[Math.floor(Math.random() * WORDS.length)];
+      showWord(word);
+      speak(word);
+      scheduleNext(min, max);
+    }, randomDelay(min, max));
+  }
+
+  function primeSpeech() {
+    if (!window.speechSynthesis) return;
+    const primer = new SpeechSynthesisUtterance(" ");
+    primer.volume = 0;
+    window.speechSynthesis.speak(primer);
+  }
+
+  function startGame() {
+    const range = validateRange();
+    if (!range) return;
+
+    primeSpeech();
+    acquireWakeLock();
+
+    startScreen.classList.add("hidden");
+    gameScreen.classList.remove("hidden");
+    wordEl.textContent = " ";
+    wordEl.className = "";
+
+    scheduleNext(range.min, range.max);
+  }
+
+  function stopGame() {
+    if (timerId !== null) {
+      clearTimeout(timerId);
+      timerId = null;
+    }
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+    releaseWakeLock();
+
+    gameScreen.classList.add("hidden");
+    startScreen.classList.remove("hidden");
+  }
+
+  startBtn.addEventListener("click", startGame);
+  stopBtn.addEventListener("click", stopGame);
+})();
+</script>
+</body>
+</html>
