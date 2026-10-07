@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Speech Rate Test</title>
+<style>
+  :root { --bg: #0f1115; --panel: #171a21; --text: #f2f3f5; --muted: #9aa1ab; --accent: #4f8cff; }
+  body { margin: 0; padding: 16px; background: var(--bg); color: var(--text);
+         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  h1 { font-size: 1.3rem; margin: 0 0 12px; }
+  p, label { color: var(--muted); font-size: 0.9rem; }
+  select, button { width: 100%; font-size: 1rem; padding: 12px; border-radius: 10px; margin: 6px 0; }
+  select { background: var(--panel); color: var(--text); border: 1px solid #2a2e38; }
+  button { background: var(--accent); color: #fff; border: none; font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: 6px 4px; border-bottom: 1px solid #2a2e38; font-size: 0.9rem; }
+  #verdict { margin-top: 12px; font-weight: 600; }
+</style>
+</head>
+<body>
+<h1>Speech rate test</h1>
+<p>Says "lay up center side" at rates 0.75, 1, 1.25, 1.6 and 2, timing each from onstart to onend. If the rate works, the times should shrink as the rate goes up (at 2 roughly half the time at 1).</p>
+
+<label for="voice">Voice (the first entry is the one the app uses)</label>
+<select id="voice"></select>
+<button id="run">Run test</button>
+
+<table>
+  <thead><tr><th>Rate</th><th>Measured ms</th><th>vs rate 1</th></tr></thead>
+  <tbody id="rows"></tbody>
+</table>
+<div id="verdict"></div>
+
+<script>
+(function () {
+  const RATES = [0.75, 1, 1.25, 1.6, 2];
+  const TEXT = "lay up center side";
+  const voiceSelect = document.getElementById("voice");
+  const rows = document.getElementById("rows");
+  const verdict = document.getElementById("verdict");
+  let voices = [];
+
+  // Same pick as the app: first English voice, else the first voice.
+  function appVoice() {
+    return voices.find(v => v.lang && v.lang.startsWith("en")) || voices[0] || null;
+  }
+
+  function fillVoices() {
+    voices = speechSynthesis.getVoices();
+    const app = appVoice();
+    voiceSelect.innerHTML = "";
+    const ordered = app ? [app].concat(voices.filter(v => v !== app)) : voices;
+    ordered.forEach((v, i) => {
+      const opt = document.createElement("option");
+      opt.value = v.voiceURI;
+      opt.textContent = (i === 0 ? "[app] " : "") + v.name + " (" + v.lang + ")" + (v.localService ? "" : " [network]");
+      voiceSelect.appendChild(opt);
+    });
+    const def = document.createElement("option");
+    def.value = "";
+    def.textContent = "Browser default (no voice set)";
+    voiceSelect.appendChild(def);
+  }
+
+  if (!window.speechSynthesis) {
+    verdict.textContent = "This browser has no speech synthesis.";
+    return;
+  }
+  fillVoices();
+  speechSynthesis.onvoiceschanged = fillVoices;
+
+  function speakTimed(rate, voice) {
+    return new Promise(resolve => {
+      const u = new SpeechSynthesisUtterance(TEXT);
+      if (voice) u.voice = voice;
+      u.rate = rate;
+      let t0 = null;
+      const timeout = setTimeout(() => resolve(null), 8000);
+      u.onstart = () => { t0 = performance.now(); };
+      u.onend = () => { clearTimeout(timeout); resolve(t0 === null ? null : performance.now() - t0); };
+      u.onerror = () => { clearTimeout(timeout); resolve(null); };
+      speechSynthesis.speak(u);
+    });
+  }
+
+  document.getElementById("run").addEventListener("click", async () => {
+    speechSynthesis.cancel();
+    rows.innerHTML = "";
+    verdict.textContent = "Running…";
+    const voice = voices.find(v => v.voiceURI === voiceSelect.value) || null;
+    const results = [];
+    for (const rate of RATES) {
+      results.push({ rate, ms: await speakTimed(rate, voice) });
+      await new Promise(r => setTimeout(r, 250));
+    }
+    const base = results.find(r => r.rate === 1).ms;
+    results.forEach(r => {
+      const tr = document.createElement("tr");
+      const ratio = r.ms && base ? (r.ms / base).toFixed(2) + "x" : "-";
+      tr.innerHTML = "<td>" + r.rate + "</td><td>" + (r.ms ? Math.round(r.ms) : "no events") + "</td><td>" + ratio + "</td>";
+      rows.appendChild(tr);
+    });
+    const fast = results.find(r => r.rate === 2).ms;
+    if (!base || !fast) verdict.textContent = "The voice did not report start/end events, so timing could not be measured. Listen instead.";
+    else if (fast / base > 0.85) verdict.textContent = "This voice is IGNORING the rate (rate 2 is barely faster than rate 1). Try another voice.";
+    else verdict.textContent = "This voice respects the rate (rate 2 takes " + Math.round(fast / base * 100) + "% as long as rate 1).";
+  });
+})();
+</script>
+</body>
+</html>
