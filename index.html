@@ -192,6 +192,84 @@
     letter-spacing: 0.18em;
   }
 
+  .panel-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin: 0;
+  }
+
+  details.advanced summary {
+    cursor: pointer;
+    color: var(--muted);
+    font-size: 0.95rem;
+  }
+
+  .advanced-body {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-top: 14px;
+  }
+
+  .field-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .weight-title {
+    color: var(--muted);
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin: 0 0 8px;
+  }
+
+  .countdown {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .countdown.idle { visibility: hidden; }
+
+  .countdown-track {
+    flex: 1;
+    height: 10px;
+    background: #2a2e38;
+    border-radius: 999px;
+    overflow: hidden;
+  }
+
+  .countdown-fill {
+    height: 100%;
+    background: var(--accent);
+    transform: scaleX(0);
+    transform-origin: left center;
+  }
+
+  .countdown-text {
+    min-width: 3.5em;
+    text-align: right;
+    color: var(--muted);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Multi-word offense phrases: smaller and allowed to wrap so they fit at 320px. */
+  #word.long {
+    font-size: clamp(2rem, 10vw, 3.75rem);
+    line-height: 1.05;
+    text-align: center;
+    max-width: 100%;
+    overflow-wrap: break-word;
+  }
+
+  .word-read { color: var(--text); }
+  .word-center { color: #c47bff; }
+  .word-cut { color: #ff4f5e; }
+  .word-layup { color: #ffd24f; }
+
   .word-left { color: #4f8cff; }
   .word-right { color: #4fd87c; }
   .word-up { color: #ffd24f; }
@@ -224,6 +302,62 @@
       <div class="error" id="rangeError"></div>
     </div>
 
+    <div class="panel hidden" id="offensePanel">
+      <div class="range-row">
+        <div class="field">
+          <label for="driveMinMs">Min drive window (ms)</label>
+          <input type="number" id="driveMinMs" min="600" step="100" data-setting="driveMinMs">
+        </div>
+        <div class="field">
+          <label for="driveMaxMs">Max drive window (ms)</label>
+          <input type="number" id="driveMaxMs" min="600" step="100" data-setting="driveMaxMs">
+        </div>
+      </div>
+      <div class="error" id="driveError"></div>
+
+      <details class="advanced" id="advanced">
+        <summary>Advanced</summary>
+        <div class="advanced-body">
+          <div class="field-grid">
+            <div class="field">
+              <label for="resetPauseMs">Reset pause (ms)</label>
+              <input type="number" id="resetPauseMs" min="0" step="100" data-setting="resetPauseMs">
+            </div>
+            <div class="field">
+              <label for="minGapMs">Min gap (ms)</label>
+              <input type="number" id="minGapMs" min="0" step="10" data-setting="minGapMs">
+            </div>
+            <div class="field">
+              <label for="baseRate">Base speech rate</label>
+              <input type="number" id="baseRate" min="0.5" max="2" step="0.05" inputmode="decimal" data-setting="baseRate">
+            </div>
+            <div class="field">
+              <label for="maxRate">Max speech rate</label>
+              <input type="number" id="maxRate" min="0.5" max="2" step="0.05" inputmode="decimal" data-setting="maxRate">
+            </div>
+            <div class="field">
+              <label for="finisherBufferMs">Finisher buffer (ms)</label>
+              <input type="number" id="finisherBufferMs" min="0" step="10" data-setting="finisherBufferMs">
+            </div>
+            <div class="field">
+              <label for="speechLeadMs">Speech lead (ms)</label>
+              <input type="number" id="speechLeadMs" min="0" step="10" data-setting="speechLeadMs">
+            </div>
+            <div class="field">
+              <label for="maxCutOffsPerDrive">Max cut offs per drive</label>
+              <input type="number" id="maxCutOffsPerDrive" min="0" max="3" step="1" data-setting="maxCutOffsPerDrive">
+            </div>
+            <div class="field">
+              <label for="maxLayUpsPerDrive">Max lay ups per drive</label>
+              <input type="number" id="maxLayUpsPerDrive" min="0" max="5" step="1" data-setting="maxLayUpsPerDrive">
+            </div>
+          </div>
+          <div id="weightTables"></div>
+          <div class="error" id="advancedError"></div>
+        </div>
+      </details>
+    </div>
+
     <button id="startBtn">Start</button>
   </div>
 
@@ -232,15 +366,338 @@
     <div class="word-stage">
       <div id="word">&nbsp;</div>
     </div>
+    <div class="countdown idle hidden" id="countdown">
+      <div class="countdown-track"><div class="countdown-fill" id="countdownFill"></div></div>
+      <div class="countdown-text" id="countdownText">0.0 s</div>
+    </div>
     <button id="stopBtn">Stop</button>
   </div>
 
 </div>
 
 <script>
+// Offense-mode planner. Pure functions only (no DOM, no timers), so the
+// ?selftest=1 simulation can exercise exactly the code the game uses.
+const OffensePlanner = (function () {
+  "use strict";
+
+  // ===================================================================
+  // OFFENSE_DEFAULTS: every tunable offense number lives here.
+  // The start screen shows these as defaults; saved values override them.
+  // The read dwell (wait after READ before a drive starts) is NOT here:
+  // it comes from the shared Min/Max read time fields (1000-3000 ms).
+  // ===================================================================
+  const OFFENSE_DEFAULTS = {
+    // Drive window D (ms). Picked uniformly in this range each time LEFT/RIGHT is called.
+    driveMinMs: 1400,
+    driveMaxMs: 2000,
+
+    // Wait after a drive ends before READ is called again (ms).
+    resetPauseMs: 1000,
+
+    // Speech rate. A whole drive is spoken at one rate: baseRate, raised
+    // toward maxRate only when the planned calls would not fit otherwise.
+    baseRate: 1.25,
+    maxRate: 1.6,
+
+    // Minimum silence between two calls in a drive (ms).
+    minGapMs: 120,
+
+    // The finisher must finish being spoken this long before D ends (ms).
+    finisherBufferMs: 0,
+
+    // Speak each call this much early to offset TTS startup latency (ms).
+    speechLeadMs: 0,
+
+    // Caps per drive. A pick that would exceed a cap is not allowed.
+    maxCutOffsPerDrive: 3,
+    maxLayUpsPerDrive: 2,
+
+    // Pick weights (any non-negative numbers). Normalized at pick time,
+    // after illegal and non-fitting choices have been removed.
+    startWeights: { LEFT: 50, RIGHT: 50 },
+    afterDriveOrCutOffWeights: {
+      CUT_OFF: 20, LAY_UP: 20, LAY_UP_LEFT_SIDE: 20, LAY_UP_RIGHT_SIDE: 20, LAY_UP_CENTER_SIDE: 20,
+    },
+    afterLayUpWeights: { CUT_OFF: 25, LEFT_SIDE: 25, RIGHT_SIDE: 25, CENTER_SIDE: 25 },
+
+    // Phrases. display = shown on screen; spoken = sent to the voice (fix
+    // pronunciation here); estMs = rough spoken length at rate 1.0.
+    // Measured lengths, once learned on a device, replace estMs.
+    phrases: {
+      READ:               { display: "READ",               spoken: "read",               estMs: 350 },
+      LEFT:               { display: "LEFT",               spoken: "left",               estMs: 350 },
+      RIGHT:              { display: "RIGHT",              spoken: "right",              estMs: 350 },
+      CUT_OFF:            { display: "CUT OFF",            spoken: "cut off",            estMs: 450 },
+      LAY_UP:             { display: "LAY UP",             spoken: "lay up",             estMs: 450 },
+      LEFT_SIDE:          { display: "LEFT SIDE",          spoken: "left side",          estMs: 650 },
+      RIGHT_SIDE:         { display: "RIGHT SIDE",         spoken: "right side",         estMs: 650 },
+      CENTER_SIDE:        { display: "CENTER SIDE",        spoken: "center side",        estMs: 750 },
+      LAY_UP_LEFT_SIDE:   { display: "LAY UP LEFT SIDE",   spoken: "lay up left side",   estMs: 1000 },
+      LAY_UP_RIGHT_SIDE:  { display: "LAY UP RIGHT SIDE",  spoken: "lay up right side",  estMs: 1000 },
+      LAY_UP_CENTER_SIDE: { display: "LAY UP CENTER SIDE", spoken: "lay up center side", estMs: 1100 },
+    },
+  };
+
+  // ---- State machine (structure, not tuning) ----
+
+  const AFTER_DRIVE = ["CUT_OFF", "LAY_UP", "LAY_UP_LEFT_SIDE", "LAY_UP_RIGHT_SIDE", "LAY_UP_CENTER_SIDE"];
+  const AFTER_LAY_UP = ["CUT_OFF", "LEFT_SIDE", "RIGHT_SIDE", "CENTER_SIDE"];
+
+  const NEXT = {
+    READ: ["LEFT", "RIGHT"],
+    LEFT: AFTER_DRIVE,
+    RIGHT: AFTER_DRIVE,
+    CUT_OFF: AFTER_DRIVE,
+    LAY_UP: AFTER_LAY_UP,
+  };
+
+  const LONG_FINISHERS = ["LAY_UP_LEFT_SIDE", "LAY_UP_RIGHT_SIDE", "LAY_UP_CENTER_SIDE"];
+  const SHORT_FINISHERS = ["LEFT_SIDE", "RIGHT_SIDE", "CENTER_SIDE"];
+  const FINISHERS = new Set(LONG_FINISHERS.concat(SHORT_FINISHERS));
+
+  const WEIGHT_TABLES = ["startWeights", "afterDriveOrCutOffWeights", "afterLayUpWeights"];
+
+  function weightTableKey(state) {
+    if (state === "READ") return "startWeights";
+    if (state === "LAY_UP") return "afterLayUpWeights";
+    return "afterDriveOrCutOffWeights";
+  }
+
+  function cloneSettings(s) {
+    return JSON.parse(JSON.stringify(s));
+  }
+
+  // Per-phrase spoken length at rate 1.0: learned value when present, else the estimate.
+  function durationsFor(s, learned) {
+    const dur = {};
+    Object.keys(s.phrases).forEach(id => {
+      const l = learned && learned[id];
+      dur[id] = typeof l === "number" && l > 0 ? l : s.phrases[id].estMs;
+    });
+    return dur;
+  }
+
+  function randomInt(min, max, rng) {
+    return Math.floor(rng() * (max - min + 1)) + min;
+  }
+
+  function sumOf(ids, map) {
+    let total = 0;
+    ids.forEach(id => { total += map[id]; });
+    return total;
+  }
+
+  function cheapest(ids, dur) {
+    let best = null;
+    ids.forEach(id => {
+      if (best === null || dur[id] < dur[best]) best = id;
+    });
+    return best;
+  }
+
+  function cheapestFinisherAfter(state, dur) {
+    return cheapest(NEXT[state].filter(id => FINISHERS.has(id)), dur);
+  }
+
+  // The single speech rate a call sequence needs inside window D, or null if it
+  // cannot fit at maxRate.
+  function fitRate(ids, D, s, dur) {
+    const avail = D - s.finisherBufferMs;
+    const gaps = (ids.length - 1) * s.minGapMs;
+    if (avail <= gaps) return null;
+    const rate = Math.max(s.baseRate, sumOf(ids, dur) / (avail - gaps));
+    return rate <= s.maxRate + 1e-9 ? rate : null;
+  }
+
+  // Smallest drive window in which a sequence fits at maxRate.
+  function minWindowFor(ids, s, dur) {
+    return sumOf(ids, dur) / s.maxRate + (ids.length - 1) * s.minGapMs + s.finisherBufferMs;
+  }
+
+  function pickWeighted(ids, weights, rng) {
+    let total = 0;
+    ids.forEach(id => { total += weights[id] || 0; });
+    if (!(total > 0)) return null;
+    let r = rng() * total;
+    for (const id of ids) {
+      r -= weights[id] || 0;
+      if (r < 0) return id;
+    }
+    // Float rounding: return the last id with a positive weight.
+    for (let i = ids.length - 1; i >= 0; i--) {
+      if ((weights[ids[i]] || 0) > 0) return ids[i];
+    }
+    return null;
+  }
+
+  // Lay out a call sequence inside D. Times are ms relative to the LEFT/RIGHT call.
+  function scheduleCalls(ids, D, rate, s, dur) {
+    const avail = D - s.finisherBufferMs;
+    const calls = ids.map(id => ({ id, startMs: 0, durMs: dur[id] / rate }));
+    const last = calls[calls.length - 1];
+    last.startMs = avail - last.durMs;
+
+    const middle = calls.slice(1, -1);
+    let used = 0;
+    middle.forEach(c => { used += c.durMs; });
+    const gap = (last.startMs - calls[0].durMs - used) / (middle.length + 1);
+    let t = calls[0].durMs;
+    middle.forEach(c => {
+      t += gap;
+      c.startMs = t;
+      t += c.durMs;
+    });
+    return calls;
+  }
+
+  // Plan one drive: { D, rate, calls: [{ id, startMs, durMs }] }.
+  // onPick(state, legal, survivors, pick) is an optional hook for the self-test.
+  function planDrive(s, dur, rng, onPick) {
+    rng = rng || Math.random;
+    const D = randomInt(s.driveMinMs, s.driveMaxMs, rng);
+    const path = [];
+    const counts = { CUT_OFF: 0, LAY_UP: 0 };
+    let state = "READ";
+
+    for (;;) {
+      const legal = NEXT[state];
+      const survivors = legal.filter(id => {
+        if (id === "CUT_OFF" && counts.CUT_OFF >= s.maxCutOffsPerDrive) return false;
+        if (id === "LAY_UP" && counts.LAY_UP >= s.maxLayUpsPerDrive) return false;
+        const seq = path.concat(id);
+        if (!FINISHERS.has(id)) seq.push(cheapestFinisherAfter(id, dur));
+        return fitRate(seq, D, s, dur) !== null;
+      });
+      if (survivors.length === 0) {
+        throw new Error("No call fits after " + state + " in a " + D + " ms drive");
+      }
+
+      let pick = pickWeighted(survivors, s[weightTableKey(state)], rng);
+      if (pick === null) {
+        // Every survivor has weight 0: fall back to the cheapest fitting finisher
+        // (or the cheapest drive direction when choosing LEFT/RIGHT).
+        const finishers = survivors.filter(id => FINISHERS.has(id));
+        pick = cheapest(finishers.length ? finishers : survivors, dur);
+      }
+      if (onPick) onPick(state, legal, survivors, pick);
+
+      path.push(pick);
+      if (pick in counts) counts[pick]++;
+      state = pick;
+      if (FINISHERS.has(pick)) break;
+    }
+
+    const rate = fitRate(path, D, s, dur);
+    return { D, rate, calls: scheduleCalls(path, D, rate, s, dur) };
+  }
+
+  // The shortest possible drive: cheapest LEFT/RIGHT plus its cheapest finisher.
+  function shortestDrive(dur) {
+    const start = cheapest(NEXT.READ, dur);
+    return [start, cheapestFinisherAfter(start, dur)];
+  }
+
+  function isWhole(n) {
+    return Number.isInteger(n);
+  }
+
+  function isNonNegative(n) {
+    return typeof n === "number" && isFinite(n) && n >= 0;
+  }
+
+  const WEIGHT_TABLE_NAMES = {
+    startWeights: "Start weights",
+    afterDriveOrCutOffWeights: "After LEFT / RIGHT / CUT OFF weights",
+    afterLayUpWeights: "After LAY UP weights",
+  };
+
+  // Offense settings check. Returns null, or { field: "drive" | "advanced", message }.
+  // The shared Min/Max read time fields are validated separately.
+  function validateOffense(s, dur) {
+    const drive = message => ({ field: "drive", message });
+    const advanced = message => ({ field: "advanced", message });
+
+    if (!isWhole(s.driveMinMs) || s.driveMinMs < 600) {
+      return drive("Min drive window must be a whole number of at least 600 ms.");
+    }
+    if (!isWhole(s.driveMaxMs) || s.driveMaxMs < s.driveMinMs) {
+      return drive("Min drive window must not exceed max drive window.");
+    }
+    if (!isNonNegative(s.resetPauseMs)) return advanced("Reset pause must be 0 ms or more.");
+    if (!(s.baseRate >= 0.5 && s.baseRate <= 2) || !(s.maxRate >= 0.5 && s.maxRate <= 2)) {
+      return advanced("Speech rates must be between 0.5 and 2.0.");
+    }
+    if (s.baseRate > s.maxRate) return advanced("Base speech rate must not exceed max speech rate.");
+    if (!isNonNegative(s.minGapMs)) return advanced("Min gap must be 0 ms or more.");
+    if (!isNonNegative(s.finisherBufferMs)) return advanced("Finisher buffer must be 0 ms or more.");
+    if (!isNonNegative(s.speechLeadMs)) return advanced("Speech lead must be 0 ms or more.");
+    if (!isWhole(s.maxCutOffsPerDrive) || s.maxCutOffsPerDrive < 0 || s.maxCutOffsPerDrive > 3) {
+      return advanced("Max cut offs per drive must be a whole number from 0 to 3.");
+    }
+    if (!isWhole(s.maxLayUpsPerDrive) || s.maxLayUpsPerDrive < 0 || s.maxLayUpsPerDrive > 5) {
+      return advanced("Max lay ups per drive must be a whole number from 0 to 5.");
+    }
+    for (const key of WEIGHT_TABLES) {
+      const table = s[key];
+      const ids = Object.keys(table);
+      if (!ids.every(id => isNonNegative(table[id]))) {
+        return advanced(WEIGHT_TABLE_NAMES[key] + ": every weight must be a number of 0 or more.");
+      }
+      if (!(sumOf(ids, table) > 0)) {
+        return advanced(WEIGHT_TABLE_NAMES[key] + " must add up to more than 0.");
+      }
+    }
+
+    const shortest = shortestDrive(dur);
+    if (fitRate(shortest, s.driveMinMs, s, dur) === null) {
+      const need = Math.ceil(minWindowFor(shortest, s, dur));
+      const names = shortest.map(id => s.phrases[id].display).join(" + ");
+      return drive("The shortest drive (" + names + ") needs a window of at least " + need +
+        " ms at max speech rate " + s.maxRate + ". Raise the min drive window or the max speech rate.");
+    }
+    return null;
+  }
+
+  return {
+    OFFENSE_DEFAULTS,
+    NEXT,
+    FINISHERS,
+    LONG_FINISHERS,
+    SHORT_FINISHERS,
+    WEIGHT_TABLES,
+    cloneSettings,
+    durationsFor,
+    fitRate,
+    minWindowFor,
+    planDrive,
+    validateOffense,
+  };
+})();
+</script>
+<script>
 (function () {
   const WORDS = ["Left", "Right", "Up", "Back"];
   const WORD_CLASS = { Left: "word-left", Right: "word-right", Up: "word-up", Back: "word-back" };
+
+  const P = OffensePlanner;
+  const OFFENSE_DEFAULTS = P.OFFENSE_DEFAULTS;
+
+  // Offense colors by meaning: side named -> that side's color.
+  const PHRASE_CLASS = {
+    READ: "word-read",
+    LEFT: "word-left", LEFT_SIDE: "word-left", LAY_UP_LEFT_SIDE: "word-left",
+    RIGHT: "word-right", RIGHT_SIDE: "word-right", LAY_UP_RIGHT_SIDE: "word-right",
+    CENTER_SIDE: "word-center", LAY_UP_CENTER_SIDE: "word-center",
+    CUT_OFF: "word-cut",
+    LAY_UP: "word-layup",
+  };
+
+  const WEIGHT_TABLE_TITLES = {
+    startWeights: "Start weights (after READ)",
+    afterDriveOrCutOffWeights: "Weights after LEFT / RIGHT / CUT OFF",
+    afterLayUpWeights: "Weights after LAY UP",
+  };
 
   const startScreen = document.getElementById("startScreen");
   const gameScreen = document.getElementById("gameScreen");
@@ -255,8 +712,17 @@
   const maxMsLabel = document.getElementById("maxMsLabel");
   const modeLabel = document.getElementById("modeLabel");
   const modeButtons = document.querySelectorAll(".segmented button");
+  const offensePanel = document.getElementById("offensePanel");
+  const driveError = document.getElementById("driveError");
+  const advancedEl = document.getElementById("advanced");
+  const advancedError = document.getElementById("advancedError");
+  const weightTablesEl = document.getElementById("weightTables");
+  const countdownEl = document.getElementById("countdown");
+  const countdownFill = document.getElementById("countdownFill");
+  const countdownText = document.getElementById("countdownText");
 
   const STORAGE_MODE = "reactionCaller.mode";
+  const STORAGE_SETTINGS = "reactionCaller.settings";
 
   let voices = [];
   let selectedMode = "defense";
@@ -304,6 +770,7 @@
   }
 
   function validateRange() {
+    const offense = selectedMode === "offense";
     const min = parseInt(minMsInput.value, 10);
     const max = parseInt(maxMsInput.value, 10);
     if (isNaN(min) || isNaN(max) || min < 100 || max < 100) {
@@ -311,7 +778,9 @@
       return null;
     }
     if (min > max) {
-      rangeError.textContent = "Min delay must not exceed max delay.";
+      rangeError.textContent = offense
+        ? "Min read time must not exceed max read time."
+        : "Min delay must not exceed max delay.";
       return null;
     }
     rangeError.textContent = "";
@@ -363,12 +832,182 @@
     },
   };
 
-  // ---- Offense mode ----
+  // ---- Offense mode: READ -> LEFT/RIGHT -> CUT OFF / LAY UP ... -> finisher ----
+
+  function renderCountdown(remainingMs, totalMs) {
+    countdownFill.style.transform = "scaleX(" + (totalMs > 0 ? remainingMs / totalMs : 0) + ")";
+    countdownText.textContent = (remainingMs / 1000).toFixed(1) + " s";
+  }
 
   const offenseMode = {
-    start() {},
-    stop() {},
+    settings: null,
+    timers: [],
+    rafId: null,
+
+    start(settings) {
+      this.settings = settings;
+      countdownEl.classList.remove("hidden");
+      this.callRead();
+    },
+
+    // Every timer goes through here so Stop can clear all of them.
+    later(fn, delayMs) {
+      const id = setTimeout(() => {
+        this.timers = this.timers.filter(t => t !== id);
+        fn();
+      }, Math.max(0, delayMs));
+      this.timers.push(id);
+    },
+
+    say(id, rate) {
+      const phrase = this.settings.phrases[id];
+      const long = phrase.display.length > 7 ? " long" : "";
+      showWord(phrase.display, PHRASE_CLASS[id] + long);
+      speak(phrase.spoken, { rate, cancel: false });
+    },
+
+    callRead() {
+      const s = this.settings;
+      countdownEl.classList.add("idle");
+      this.say("READ", s.baseRate);
+      this.later(() => this.startDrive(), randomDelay(s.readMinMs, s.readMaxMs));
+    },
+
+    startDrive() {
+      const s = this.settings;
+      const plan = P.planDrive(s, P.durationsFor(s, null), Math.random);
+
+      // Drive clock: t = 0 is when LEFT/RIGHT should be heard. Every call is
+      // spoken speechLeadMs before its planned time to cover TTS start-up.
+      const driveStart = performance.now() + s.speechLeadMs;
+      const at = ms => driveStart + ms - s.speechLeadMs - performance.now();
+
+      this.say(plan.calls[0].id, plan.rate);
+      plan.calls.slice(1).forEach(call => {
+        this.later(() => this.say(call.id, plan.rate), at(call.startMs));
+      });
+
+      this.runCountdown(driveStart, plan.D);
+      this.later(() => this.endDrive(plan.D), driveStart + plan.D - performance.now());
+    },
+
+    runCountdown(driveStart, D) {
+      countdownEl.classList.remove("idle");
+      const tick = () => {
+        const remaining = Math.min(D, Math.max(0, driveStart + D - performance.now()));
+        renderCountdown(remaining, D);
+        this.rafId = remaining > 0 ? requestAnimationFrame(tick) : null;
+      };
+      tick();
+    },
+
+    endDrive(D) {
+      this.stopCountdown();
+      renderCountdown(0, D);
+      this.later(() => this.callRead(), this.settings.resetPauseMs);
+    },
+
+    stopCountdown() {
+      if (this.rafId !== null) {
+        cancelAnimationFrame(this.rafId);
+        this.rafId = null;
+      }
+    },
+
+    stop() {
+      this.timers.forEach(clearTimeout);
+      this.timers = [];
+      this.stopCountdown();
+      countdownEl.classList.add("hidden", "idle");
+    },
   };
+
+  // ---- Offense settings form ----
+
+  function buildWeightTables() {
+    P.WEIGHT_TABLES.forEach(table => {
+      const section = document.createElement("div");
+      const title = document.createElement("p");
+      title.className = "weight-title";
+      title.textContent = WEIGHT_TABLE_TITLES[table];
+      const grid = document.createElement("div");
+      grid.className = "field-grid";
+      Object.keys(OFFENSE_DEFAULTS[table]).forEach(id => {
+        const inputId = "w-" + table + "-" + id;
+        const field = document.createElement("div");
+        field.className = "field";
+        const label = document.createElement("label");
+        label.htmlFor = inputId;
+        label.textContent = OFFENSE_DEFAULTS.phrases[id].display;
+        const input = document.createElement("input");
+        input.type = "number";
+        input.id = inputId;
+        input.min = "0";
+        input.step = "1";
+        input.dataset.weightTable = table;
+        input.dataset.weightId = id;
+        field.append(label, input);
+        grid.appendChild(field);
+      });
+      section.append(title, grid);
+      weightTablesEl.appendChild(section);
+    });
+  }
+
+  function parseNumber(value) {
+    return String(value).trim() === "" ? NaN : Number(value);
+  }
+
+  function settingInputs() {
+    return offensePanel.querySelectorAll("input[data-setting]");
+  }
+
+  function weightInputs() {
+    return offensePanel.querySelectorAll("input[data-weight-table]");
+  }
+
+  function fillOffenseDefaults() {
+    settingInputs().forEach(input => { input.value = OFFENSE_DEFAULTS[input.dataset.setting]; });
+    weightInputs().forEach(input => {
+      input.value = OFFENSE_DEFAULTS[input.dataset.weightTable][input.dataset.weightId];
+    });
+  }
+
+  function readOffenseSettings(range) {
+    const s = P.cloneSettings(OFFENSE_DEFAULTS);
+    settingInputs().forEach(input => { s[input.dataset.setting] = parseNumber(input.value); });
+    weightInputs().forEach(input => {
+      s[input.dataset.weightTable][input.dataset.weightId] = parseNumber(input.value);
+    });
+    s.readMinMs = range.min;
+    s.readMaxMs = range.max;
+    return s;
+  }
+
+  // ---- Persistence: mode, shared Min/Max fields and offense settings only ----
+
+  function persistedInputs() {
+    return [minMsInput, maxMsInput].concat(Array.from(settingInputs()), Array.from(weightInputs()));
+  }
+
+  function saveSettings() {
+    const values = {};
+    persistedInputs().forEach(input => { values[input.id] = input.value; });
+    storageSet(STORAGE_SETTINGS, JSON.stringify(values));
+  }
+
+  function loadSettings() {
+    let values = null;
+    try {
+      values = JSON.parse(storageGet(STORAGE_SETTINGS));
+    } catch (e) {}
+    if (!values || typeof values !== "object") return;
+    persistedInputs().forEach(input => {
+      if (typeof values[input.id] === "string") input.value = values[input.id];
+    });
+  }
+
+  // ---- Modes ----
 
   const MODES = {
     defense: {
@@ -381,11 +1020,17 @@
     offense: {
       mode: offenseMode,
       label: "OFFENSE",
-      subtitle: "Read, drive, react to the defense, and finish before the clock runs out.",
+      subtitle: "Read the court, drive, react to the defense, and finish before the clock runs out.",
       minLabel: "Min read time (ms)",
       maxLabel: "Max read time (ms)",
     },
   };
+
+  function clearErrors() {
+    rangeError.textContent = "";
+    driveError.textContent = "";
+    advancedError.textContent = "";
+  }
 
   function selectMode(name) {
     if (!MODES[name]) name = "defense";
@@ -395,15 +1040,28 @@
     subtitleEl.textContent = info.subtitle;
     minMsLabel.textContent = info.minLabel;
     maxMsLabel.textContent = info.maxLabel;
-    rangeError.textContent = "";
+    offensePanel.classList.toggle("hidden", name !== "offense");
+    clearErrors();
   }
 
   function startGame() {
+    clearErrors();
     const range = validateRange();
     if (!range) return;
+
+    let settings = range;
     if (selectedMode === "offense") {
-      rangeError.textContent = "Offense mode is not available yet.";
-      return;
+      settings = readOffenseSettings(range);
+      const error = P.validateOffense(settings, P.durationsFor(settings, null));
+      if (error) {
+        if (error.field === "advanced") {
+          advancedEl.open = true;
+          advancedError.textContent = error.message;
+        } else {
+          driveError.textContent = error.message;
+        }
+        return;
+      }
     }
 
     primeSpeech();
@@ -411,11 +1069,11 @@
     startScreen.classList.add("hidden");
     gameScreen.classList.remove("hidden");
     modeLabel.textContent = MODES[selectedMode].label;
-    wordEl.textContent = " ";
+    wordEl.textContent = " ";
     wordEl.className = "";
 
     activeMode = MODES[selectedMode].mode;
-    activeMode.start(range);
+    activeMode.start(settings);
   }
 
   function stopGame() {
@@ -428,6 +1086,11 @@
     gameScreen.classList.add("hidden");
     startScreen.classList.remove("hidden");
   }
+
+  buildWeightTables();
+  fillOffenseDefaults();
+  loadSettings();
+  persistedInputs().forEach(input => input.addEventListener("input", saveSettings));
 
   modeButtons.forEach(btn => btn.addEventListener("click", () => {
     selectMode(btn.dataset.mode);
