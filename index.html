@@ -162,6 +162,36 @@
     transform: scale(1);
   }
 
+  .segmented {
+    display: flex;
+    gap: 4px;
+    width: 100%;
+    padding: 4px;
+    background: var(--panel);
+    border-radius: 14px;
+  }
+
+  .segmented button {
+    flex: 1;
+    background: transparent;
+    color: var(--muted);
+    font-size: 1rem;
+    padding: 10px 12px;
+    border-radius: 10px;
+  }
+
+  .segmented button[aria-pressed="true"] {
+    background: #2a2e38;
+    color: var(--text);
+  }
+
+  .mode-label {
+    color: var(--muted);
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+  }
+
   .word-left { color: #4f8cff; }
   .word-right { color: #4fd87c; }
   .word-up { color: #ffd24f; }
@@ -172,17 +202,22 @@
 <div id="app">
 
   <div id="startScreen" class="screen">
+    <div class="segmented" role="group" aria-label="Mode">
+      <button type="button" data-mode="defense" aria-pressed="true">Defense</button>
+      <button type="button" data-mode="offense" aria-pressed="false">Offense</button>
+    </div>
+
     <h1>Reaction Caller</h1>
-    <p class="subtitle">A voice randomly calls Left, Right, Up, or Back. React fast.</p>
+    <p class="subtitle" id="subtitle">A voice randomly calls Left, Right, Up, or Back. React fast.</p>
 
     <div class="panel">
       <div class="range-row">
         <div class="field">
-          <label for="minMs">Min delay (ms)</label>
+          <label for="minMs" id="minMsLabel">Min delay (ms)</label>
           <input type="number" id="minMs" value="1000" min="100" step="100">
         </div>
         <div class="field">
-          <label for="maxMs">Max delay (ms)</label>
+          <label for="maxMs" id="maxMsLabel">Max delay (ms)</label>
           <input type="number" id="maxMs" value="3000" min="100" step="100">
         </div>
       </div>
@@ -193,6 +228,7 @@
   </div>
 
   <div id="gameScreen" class="screen hidden">
+    <div class="mode-label" id="modeLabel">DEFENSE</div>
     <div class="word-stage">
       <div id="word">&nbsp;</div>
     </div>
@@ -214,9 +250,31 @@
   const maxMsInput = document.getElementById("maxMs");
   const rangeError = document.getElementById("rangeError");
   const wordEl = document.getElementById("word");
+  const subtitleEl = document.getElementById("subtitle");
+  const minMsLabel = document.getElementById("minMsLabel");
+  const maxMsLabel = document.getElementById("maxMsLabel");
+  const modeLabel = document.getElementById("modeLabel");
+  const modeButtons = document.querySelectorAll(".segmented button");
 
-  let timerId = null;
+  const STORAGE_MODE = "reactionCaller.mode";
+
   let voices = [];
+  let selectedMode = "defense";
+  let activeMode = null;
+
+  function storageGet(key) {
+    try {
+      return window.localStorage.getItem(key);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function storageSet(key, value) {
+    try {
+      window.localStorage.setItem(key, value);
+    } catch (e) {}
+  }
 
   function loadVoices() {
     voices = window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
@@ -230,15 +288,19 @@
     return voices.find(v => v.lang && v.lang.startsWith("en")) || voices[0] || null;
   }
 
-  function speak(text) {
-    if (!window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
+  // Defense cancels before every call (newest call always wins). Offense passes
+  // cancel: false so calls queue instead of clipping; it only cancels on Stop.
+  function speak(text, options) {
+    const opts = options || {};
+    if (!window.speechSynthesis) return null;
+    if (opts.cancel !== false) window.speechSynthesis.cancel();
     const utter = new SpeechSynthesisUtterance(text);
     const voice = pickVoice();
     if (voice) utter.voice = voice;
-    utter.rate = 1;
+    utter.rate = opts.rate || 1;
     utter.pitch = 1;
     window.speechSynthesis.speak(utter);
+    return utter;
   }
 
   function validateRange() {
@@ -260,21 +322,12 @@
     return Math.floor(Math.random() * (max - min + 1)) + min;
   }
 
-  function showWord(text) {
+  function showWord(text, className) {
     wordEl.textContent = text;
-    wordEl.className = WORD_CLASS[text] || "";
+    wordEl.className = className || "";
     wordEl.classList.remove("show");
     void wordEl.offsetWidth;
     wordEl.classList.add("show");
-  }
-
-  function scheduleNext(min, max) {
-    timerId = setTimeout(() => {
-      const word = WORDS[Math.floor(Math.random() * WORDS.length)];
-      showWord(word);
-      speak(word);
-      scheduleNext(min, max);
-    }, randomDelay(min, max));
   }
 
   function primeSpeech() {
@@ -284,30 +337,103 @@
     window.speechSynthesis.speak(primer);
   }
 
+  // ---- Defense mode: random Left / Right / Up / Back ----
+
+  const defenseMode = {
+    timerId: null,
+
+    start(settings) {
+      this.scheduleNext(settings.min, settings.max);
+    },
+
+    scheduleNext(min, max) {
+      this.timerId = setTimeout(() => {
+        const word = WORDS[Math.floor(Math.random() * WORDS.length)];
+        showWord(word, WORD_CLASS[word]);
+        speak(word);
+        this.scheduleNext(min, max);
+      }, randomDelay(min, max));
+    },
+
+    stop() {
+      if (this.timerId !== null) {
+        clearTimeout(this.timerId);
+        this.timerId = null;
+      }
+    },
+  };
+
+  // ---- Offense mode ----
+
+  const offenseMode = {
+    start() {},
+    stop() {},
+  };
+
+  const MODES = {
+    defense: {
+      mode: defenseMode,
+      label: "DEFENSE",
+      subtitle: "A voice randomly calls Left, Right, Up, or Back. React fast.",
+      minLabel: "Min delay (ms)",
+      maxLabel: "Max delay (ms)",
+    },
+    offense: {
+      mode: offenseMode,
+      label: "OFFENSE",
+      subtitle: "Read, drive, react to the defense, and finish before the clock runs out.",
+      minLabel: "Min read time (ms)",
+      maxLabel: "Max read time (ms)",
+    },
+  };
+
+  function selectMode(name) {
+    if (!MODES[name]) name = "defense";
+    selectedMode = name;
+    const info = MODES[name];
+    modeButtons.forEach(btn => btn.setAttribute("aria-pressed", String(btn.dataset.mode === name)));
+    subtitleEl.textContent = info.subtitle;
+    minMsLabel.textContent = info.minLabel;
+    maxMsLabel.textContent = info.maxLabel;
+    rangeError.textContent = "";
+  }
+
   function startGame() {
     const range = validateRange();
     if (!range) return;
+    if (selectedMode === "offense") {
+      rangeError.textContent = "Offense mode is not available yet.";
+      return;
+    }
 
     primeSpeech();
 
     startScreen.classList.add("hidden");
     gameScreen.classList.remove("hidden");
-    wordEl.textContent = " ";
+    modeLabel.textContent = MODES[selectedMode].label;
+    wordEl.textContent = " ";
     wordEl.className = "";
 
-    scheduleNext(range.min, range.max);
+    activeMode = MODES[selectedMode].mode;
+    activeMode.start(range);
   }
 
   function stopGame() {
-    if (timerId !== null) {
-      clearTimeout(timerId);
-      timerId = null;
+    if (activeMode) {
+      activeMode.stop();
+      activeMode = null;
     }
     if (window.speechSynthesis) window.speechSynthesis.cancel();
 
     gameScreen.classList.add("hidden");
     startScreen.classList.remove("hidden");
   }
+
+  modeButtons.forEach(btn => btn.addEventListener("click", () => {
+    selectMode(btn.dataset.mode);
+    storageSet(STORAGE_MODE, selectedMode);
+  }));
+  selectMode(storageGet(STORAGE_MODE));
 
   startBtn.addEventListener("click", startGame);
   stopBtn.addEventListener("click", stopGame);
