@@ -659,6 +659,146 @@ const OffensePlanner = (function () {
     return null;
   }
 
+  // ---- Self-test support (only called from ?selftest=1) ----
+
+  // Minimum drive window needed at maxRate for 0-3 cut-offs and each finisher.
+  function fitTable(s, dur) {
+    const start = NEXT.READ.reduce((a, b) => (dur[b] < dur[a] ? b : a));
+    const rows = [];
+    for (let cutOffs = 0; cutOffs <= 3; cutOffs++) {
+      LONG_FINISHERS.concat(SHORT_FINISHERS).forEach(fin => {
+        const ids = [start];
+        for (let i = 0; i < cutOffs; i++) ids.push("CUT_OFF");
+        if (SHORT_FINISHERS.indexOf(fin) !== -1) ids.push("LAY_UP");
+        ids.push(fin);
+        const need = Math.ceil(minWindowFor(ids, s, dur));
+        rows.push({
+          cutOffs,
+          finisher: s.phrases[fin].display,
+          sequence: ids.map(id => s.phrases[id].display).join(" > "),
+          minWindowMs: need,
+          fitsAtDriveMax: need <= s.driveMaxMs ? "yes" : "no",
+        });
+      });
+    }
+    return rows;
+  }
+
+  function runSelfTest(log, drives) {
+    drives = drives || 10000;
+    const EPS = 1e-6;
+    const results = [];
+    const check = (name, failures) => {
+      const ok = failures.length === 0;
+      results.push({ name, ok });
+      log((ok ? "PASS  " : "FAIL  ") + name + (ok ? "" : "  (" + failures.length + " failures, e.g. " + failures[0] + ")"));
+    };
+
+    const defaults = cloneSettings(OFFENSE_DEFAULTS);
+    const dur = durationsFor(defaults, null);
+    const tight = Object.assign(cloneSettings(defaults), { driveMinMs: 1400, driveMaxMs: 1400, maxRate: 2, minGapMs: 40 });
+    const loose = Object.assign(cloneSettings(defaults), { driveMinMs: 30000, driveMaxMs: 30000, maxRate: 2 });
+
+    [["default", defaults], ["tight", tight]].forEach(pair => {
+      const label = pair[0];
+      const s = pair[1];
+      const settingsError = validateOffense(s, dur);
+      check(label + ": settings pass validation", settingsError ? [settingsError.message] : []);
+
+      const f = { 1: [], 2: [], 3: [], 4: [], 5: [], 6: [], plan: [] };
+      for (let n = 0; n < drives; n++) {
+        let plan;
+        try {
+          plan = planDrive(s, dur, Math.random);
+        } catch (e) {
+          f.plan.push(e.message);
+          continue;
+        }
+        const ids = plan.calls.map(c => c.id);
+        const where = ids.join(" > ");
+
+        if (NEXT.READ.indexOf(ids[0]) === -1) f[1].push(where);
+
+        const seq = ["READ"].concat(ids);
+        for (let i = 1; i < seq.length; i++) {
+          if (FINISHERS.has(seq[i - 1]) || !NEXT[seq[i - 1]] || NEXT[seq[i - 1]].indexOf(seq[i]) === -1) {
+            f[2].push(where);
+            break;
+          }
+        }
+
+        const last = ids[ids.length - 1];
+        const prev = ids[ids.length - 2];
+        const expected = prev === "LAY_UP" ? SHORT_FINISHERS : LONG_FINISHERS;
+        if (ids.filter(id => FINISHERS.has(id)).length !== 1 || expected.indexOf(last) === -1) f[3].push(where);
+
+        const cuts = ids.filter(id => id === "CUT_OFF").length;
+        const layUps = ids.filter(id => id === "LAY_UP").length;
+        if (cuts > s.maxCutOffsPerDrive || layUps > s.maxLayUpsPerDrive) f[4].push(where);
+
+        if (plan.D < s.driveMinMs || plan.D > s.driveMaxMs ||
+            plan.rate < s.baseRate - EPS || plan.rate > s.maxRate + EPS) {
+          f[5].push("D=" + plan.D + " rate=" + plan.rate);
+        }
+
+        const avail = plan.D - s.finisherBufferMs;
+        plan.calls.forEach((c, i) => {
+          const end = c.startMs + c.durMs;
+          if (c.startMs < -EPS || end > avail + EPS) f[6].push(where + " (" + c.id + " outside window)");
+          if (i > 0) {
+            const p = plan.calls[i - 1];
+            const gap = c.startMs - (p.startMs + p.durMs);
+            if (gap < s.minGapMs - EPS) f[6].push(where + " (gap " + gap.toFixed(1) + " ms)");
+          }
+        });
+      }
+
+      check(label + ": every drive could be planned", f.plan);
+      check(label + ": 1. drive starts with LEFT or RIGHT after READ", f[1]);
+      check(label + ": 2. every transition is legal, nothing after a finisher", f[2]);
+      check(label + ": 3. exactly one finisher, legal for the previous call", f[3]);
+      check(label + ": 4. cut-offs <= " + s.maxCutOffsPerDrive + ", lay-ups <= " + s.maxLayUpsPerDrive, f[4]);
+      check(label + ": 5. D within drive window, rate within base..max", f[5]);
+      check(label + ": 6. calls inside [0, D - buffer], no overlap, gaps >= minGap", f[6]);
+    });
+
+    // 7. With loose timing, picks made with every legal choice available
+    // should match the weights.
+    const tallies = {};
+    for (let n = 0; n < drives * 4; n++) {
+      planDrive(loose, dur, Math.random, (state, legal, survivors, pick) => {
+        if (survivors.length !== legal.length) return;
+        const key = weightTableKey(state);
+        tallies[key] = tallies[key] || { total: 0, picks: {} };
+        tallies[key].total++;
+        tallies[key].picks[pick] = (tallies[key].picks[pick] || 0) + 1;
+      });
+    }
+    const freqFailures = [];
+    WEIGHT_TABLES.forEach(key => {
+      const table = loose[key];
+      const weightSum = sumOf(Object.keys(table), table);
+      const t = tallies[key];
+      if (!t) {
+        freqFailures.push(key + ": no samples");
+        return;
+      }
+      Object.keys(table).forEach(id => {
+        const want = table[id] / weightSum;
+        const got = (t.picks[id] || 0) / t.total;
+        if (Math.abs(got - want) > 0.02) {
+          freqFailures.push(key + "." + id + " expected " + want.toFixed(3) + " got " + got.toFixed(3));
+        }
+      });
+    });
+    check("loose: 7. pick frequencies match the weights (within 2 points)", freqFailures);
+
+    const table = fitTable(defaults, dur);
+    const passed = results.every(r => r.ok);
+    log((passed ? "ALL PASS" : "SOME CHECKS FAILED") + " (" + results.filter(r => r.ok).length + "/" + results.length + ")");
+    return { passed, results, fitTable: table };
+  }
+
   return {
     OFFENSE_DEFAULTS,
     NEXT,
@@ -672,11 +812,16 @@ const OffensePlanner = (function () {
     minWindowFor,
     planDrive,
     validateOffense,
+    fitTable,
+    runSelfTest,
   };
 })();
 </script>
 <script>
 (function () {
+  // ?selftest=1 runs the simulation (last script below) instead of the app.
+  if (new URLSearchParams(window.location.search).get("selftest") === "1") return;
+
   const WORDS = ["Left", "Right", "Up", "Back"];
   const WORD_CLASS = { Left: "word-left", Right: "word-right", Up: "word-up", Back: "word-back" };
 
@@ -1100,6 +1245,38 @@ const OffensePlanner = (function () {
 
   startBtn.addEventListener("click", startGame);
   stopBtn.addEventListener("click", stopGame);
+})();
+</script>
+<script>
+// ?selftest=1: run the offense planner simulation and show the results.
+(function () {
+  if (new URLSearchParams(window.location.search).get("selftest") !== "1") return;
+
+  document.getElementById("app").classList.add("hidden");
+  const banner = document.createElement("pre");
+  banner.style.cssText = "margin:0;padding:16px;white-space:pre-wrap;font-size:13px;line-height:1.5;";
+  document.body.appendChild(banner);
+
+  const lines = [];
+  const log = line => {
+    console.log(line);
+    lines.push(line);
+  };
+
+  log("Reaction Caller offense self-test\n");
+  const result = OffensePlanner.runSelfTest(log, 10000);
+  console.table(result.fitTable);
+
+  const s = OffensePlanner.OFFENSE_DEFAULTS;
+  lines.push("\nFit table: minimum drive window at maxRate " + s.maxRate + ", minGap " + s.minGapMs +
+    " ms, buffer " + s.finisherBufferMs + " ms (driveMaxMs " + s.driveMaxMs + ")");
+  result.fitTable.forEach(r => {
+    lines.push(r.cutOffs + " cut-offs  " + (r.finisher + "                  ").slice(0, 19) +
+      String(r.minWindowMs).padStart(5) + " ms  fits: " + r.fitsAtDriveMax);
+  });
+
+  banner.style.color = result.passed ? "#4fd87c" : "#ff4f5e";
+  banner.textContent = lines.join("\n");
 })();
 </script>
 </body>
