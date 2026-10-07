@@ -421,6 +421,13 @@ const OffensePlanner = (function () {
     },
     afterLayUpWeights: { CUT_OFF: 25, LEFT_SIDE: 25, RIGHT_SIDE: 25, CENTER_SIDE: 25 },
 
+    // Learning spoken lengths on this device (onstart -> onend, normalized to rate 1.0).
+    // Each accepted measurement moves the stored value this fraction of the way.
+    learnAlpha: 0.3,
+    // Measurements outside [low, high] x the current value are ignored as outliers.
+    learnOutlierLow: 0.4,
+    learnOutlierHigh: 2.5,
+
     // Phrases. display = shown on screen; spoken = sent to the voice (fix
     // pronunciation here); estMs = rough spoken length at rate 1.0.
     // Measured lengths, once learned on a device, replace estMs.
@@ -659,6 +666,14 @@ const OffensePlanner = (function () {
     return null;
   }
 
+  // New learned length (ms at rate 1.0) after one measurement, or null to ignore it.
+  function learnDuration(currentMs, measuredMs, rate, s) {
+    const normalized = measuredMs * rate;
+    if (!(normalized > 0) || !isFinite(normalized)) return null;
+    if (normalized < currentMs * s.learnOutlierLow || normalized > currentMs * s.learnOutlierHigh) return null;
+    return currentMs + (normalized - currentMs) * s.learnAlpha;
+  }
+
   // ---- Self-test support (only called from ?selftest=1) ----
 
   // Minimum drive window needed at maxRate for 0-3 cut-offs and each finisher.
@@ -808,6 +823,7 @@ const OffensePlanner = (function () {
     WEIGHT_TABLES,
     cloneSettings,
     durationsFor,
+    learnDuration,
     fitRate,
     minWindowFor,
     planDrive,
@@ -868,6 +884,7 @@ const OffensePlanner = (function () {
 
   const STORAGE_MODE = "reactionCaller.mode";
   const STORAGE_SETTINGS = "reactionCaller.settings";
+  const STORAGE_LEARNED = "reactionCaller.learnedMs";
 
   let voices = [];
   let selectedMode = "defense";
@@ -979,6 +996,31 @@ const OffensePlanner = (function () {
 
   // ---- Offense mode: READ -> LEFT/RIGHT -> CUT OFF / LAY UP ... -> finisher ----
 
+  // Learned spoken lengths per phrase (ms at rate 1.0), kept in localStorage.
+  function loadLearned() {
+    let stored = null;
+    try {
+      stored = JSON.parse(storageGet(STORAGE_LEARNED));
+    } catch (e) {}
+    const learned = {};
+    if (stored && typeof stored === "object") {
+      Object.keys(OFFENSE_DEFAULTS.phrases).forEach(id => {
+        if (typeof stored[id] === "number" && stored[id] > 0) learned[id] = stored[id];
+      });
+    }
+    return learned;
+  }
+
+  let learnedMs = loadLearned();
+
+  function recordSpokenLength(id, measuredMs, rate, settings) {
+    const current = learnedMs[id] || settings.phrases[id].estMs;
+    const next = P.learnDuration(current, measuredMs, rate, settings);
+    if (next === null) return;
+    learnedMs[id] = Math.round(next);
+    storageSet(STORAGE_LEARNED, JSON.stringify(learnedMs));
+  }
+
   function renderCountdown(remainingMs, totalMs) {
     countdownFill.style.transform = "scaleX(" + (totalMs > 0 ? remainingMs / totalMs : 0) + ")";
     countdownText.textContent = (remainingMs / 1000).toFixed(1) + " s";
@@ -988,9 +1030,11 @@ const OffensePlanner = (function () {
     settings: null,
     timers: [],
     rafId: null,
+    runId: 0,
 
     start(settings) {
       this.settings = settings;
+      this.runId++;
       countdownEl.classList.remove("hidden");
       this.callRead();
     },
@@ -1008,7 +1052,22 @@ const OffensePlanner = (function () {
       const phrase = this.settings.phrases[id];
       const long = phrase.display.length > 7 ? " long" : "";
       showWord(phrase.display, PHRASE_CLASS[id] + long);
-      speak(phrase.spoken, { rate, cancel: false });
+      const utter = speak(phrase.spoken, { rate, cancel: false });
+      if (utter) this.measure(utter, id, rate);
+    },
+
+    // Time onstart -> onend to learn this device's real spoken lengths. Missing
+    // events, errors and anything cut short by Stop are simply ignored.
+    measure(utter, id, rate) {
+      const runId = this.runId;
+      const settings = this.settings;
+      let startedAt = null;
+      utter.onstart = () => { startedAt = performance.now(); };
+      utter.onerror = () => { startedAt = null; };
+      utter.onend = () => {
+        if (startedAt === null || runId !== this.runId) return;
+        recordSpokenLength(id, performance.now() - startedAt, rate, settings);
+      };
     },
 
     callRead() {
@@ -1020,7 +1079,7 @@ const OffensePlanner = (function () {
 
     startDrive() {
       const s = this.settings;
-      const plan = P.planDrive(s, P.durationsFor(s, null), Math.random);
+      const plan = P.planDrive(s, s.durations, Math.random);
 
       // Drive clock: t = 0 is when LEFT/RIGHT should be heard. Every call is
       // spoken speechLeadMs before its planned time to cover TTS start-up.
@@ -1060,6 +1119,7 @@ const OffensePlanner = (function () {
     },
 
     stop() {
+      this.runId++;
       this.timers.forEach(clearTimeout);
       this.timers = [];
       this.stopCountdown();
@@ -1197,7 +1257,10 @@ const OffensePlanner = (function () {
     let settings = range;
     if (selectedMode === "offense") {
       settings = readOffenseSettings(range);
-      const error = P.validateOffense(settings, P.durationsFor(settings, null));
+      // Spoken lengths are fixed for the whole run (the ones validated here);
+      // anything learned during the run takes effect on the next Start.
+      settings.durations = P.durationsFor(settings, learnedMs);
+      const error = P.validateOffense(settings, settings.durations);
       if (error) {
         if (error.field === "advanced") {
           advancedEl.open = true;
