@@ -217,69 +217,6 @@
 
   let timerId = null;
   let voices = [];
-  let wakeLock = null;
-
-  let keepAwakeVideo = null;
-
-  function startVideoKeepAwake() {
-    if (keepAwakeVideo) {
-      keepAwakeVideo.play().catch(() => {});
-      return;
-    }
-    const canvas = document.createElement("canvas");
-    canvas.width = 2;
-    canvas.height = 2;
-    const ctx = canvas.getContext("2d");
-    ctx.fillRect(0, 0, 2, 2);
-    const stream = canvas.captureStream(1);
-
-    const video = document.createElement("video");
-    video.muted = true;
-    video.playsInline = true;
-    video.setAttribute("playsinline", "");
-    video.style.position = "fixed";
-    video.style.width = "1px";
-    video.style.height = "1px";
-    video.style.opacity = "0.01";
-    video.style.pointerEvents = "none";
-    video.srcObject = stream;
-    document.body.appendChild(video);
-
-    keepAwakeVideo = video;
-    video.play().catch(() => {});
-  }
-
-  function stopVideoKeepAwake() {
-    if (keepAwakeVideo) {
-      keepAwakeVideo.pause();
-    }
-  }
-
-  async function acquireWakeLock() {
-    if ("wakeLock" in navigator) {
-      try {
-        wakeLock = await navigator.wakeLock.request("screen");
-        return;
-      } catch (e) {
-        wakeLock = null;
-      }
-    }
-    startVideoKeepAwake();
-  }
-
-  function releaseWakeLock() {
-    if (wakeLock) {
-      wakeLock.release().catch(() => {});
-      wakeLock = null;
-    }
-    stopVideoKeepAwake();
-  }
-
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible" && timerId !== null && !wakeLock) {
-      acquireWakeLock();
-    }
-  });
 
   function loadVoices() {
     voices = window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
@@ -327,7 +264,8 @@
     wordEl.textContent = text;
     wordEl.className = WORD_CLASS[text] || "";
     wordEl.classList.remove("show");
-    requestAnimationFrame(() => wordEl.classList.add("show"));
+    void wordEl.offsetWidth;
+    wordEl.classList.add("show");
   }
 
   function scheduleNext(min, max) {
@@ -351,7 +289,6 @@
     if (!range) return;
 
     primeSpeech();
-    acquireWakeLock();
 
     startScreen.classList.add("hidden");
     gameScreen.classList.remove("hidden");
@@ -367,7 +304,6 @@
       timerId = null;
     }
     if (window.speechSynthesis) window.speechSynthesis.cancel();
-    releaseWakeLock();
 
     gameScreen.classList.add("hidden");
     startScreen.classList.remove("hidden");
