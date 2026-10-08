@@ -185,6 +185,16 @@
     color: var(--text);
   }
 
+  /* The drill switch sits inside a panel, so it needs a darker track. */
+  .panel .segmented { background: var(--bg); }
+  .panel .segmented button { padding: 10px 6px; }
+
+  .panel-section {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
   .mode-label {
     color: var(--muted);
     font-size: 0.8rem;
@@ -265,7 +275,16 @@
     overflow-wrap: break-word;
   }
 
+  /* Phrases over 18 characters (e.g. "SPRINT FROM RIGHT CORNER"): one step smaller. */
+  #word.xlong {
+    font-size: clamp(1.6rem, 8vw, 3rem);
+  }
+
   .word-read { color: var(--text); }
+  .word-sprint { color: #ff7a4f; }
+  .word-catch { color: var(--text); }
+  .word-shot { color: #ffd24f; }
+  .word-nope { color: #ff6bd6; }
   .word-center { color: #c47bff; }
   .word-cut { color: #ff4f5e; }
   .word-layup { color: #ffd24f; }
@@ -288,7 +307,7 @@
     <h1>Reaction Caller</h1>
     <p class="subtitle" id="subtitle">A voice randomly calls Left, Right, Up, or Back. React fast.</p>
 
-    <div class="panel">
+    <div class="panel" id="rangePanel">
       <div class="range-row">
         <div class="field">
           <label for="minMs" id="minMsLabel">Min delay (ms)</label>
@@ -303,30 +322,115 @@
     </div>
 
     <div class="panel hidden" id="offensePanel">
-      <div class="range-row">
-        <div class="field">
-          <label for="driveMinMs">Min drive window (ms)</label>
-          <input type="number" id="driveMinMs" min="600" step="100" data-setting="driveMinMs">
-        </div>
-        <div class="field">
-          <label for="driveMaxMs">Max drive window (ms)</label>
-          <input type="number" id="driveMaxMs" min="600" step="100" data-setting="driveMaxMs">
-        </div>
+      <div class="segmented" role="group" aria-label="Offense drill">
+        <button type="button" data-drill="drive" aria-pressed="true">Drive</button>
+        <button type="button" data-drill="shooters" aria-pressed="false">Shooters only</button>
       </div>
-      <div class="error" id="driveError"></div>
 
-      <details class="advanced" id="advanced">
-        <summary>Advanced</summary>
+      <!-- Drive drill only -->
+      <div class="panel-section" id="driveSettings">
+        <div class="range-row">
+          <div class="field">
+            <label for="driveMinMs">Min drive window (ms)</label>
+            <input type="number" id="driveMinMs" min="600" step="100" data-setting="driveMinMs">
+          </div>
+          <div class="field">
+            <label for="driveMaxMs">Max drive window (ms)</label>
+            <input type="number" id="driveMaxMs" min="600" step="100" data-setting="driveMaxMs">
+          </div>
+        </div>
+        <div class="error" id="driveError"></div>
+
+        <details class="advanced" id="advanced">
+          <summary>Advanced</summary>
+          <div class="advanced-body">
+            <div class="field-grid">
+              <div class="field">
+                <label for="resetPauseMs">Reset pause (ms)</label>
+                <input type="number" id="resetPauseMs" min="0" step="100" data-setting="resetPauseMs">
+              </div>
+              <div class="field">
+                <label for="finisherBufferMs">Finisher buffer (ms)</label>
+                <input type="number" id="finisherBufferMs" min="0" step="10" data-setting="finisherBufferMs">
+              </div>
+              <div class="field">
+                <label for="maxCutOffsPerDrive">Max cut offs per drive</label>
+                <input type="number" id="maxCutOffsPerDrive" min="0" max="3" step="1" data-setting="maxCutOffsPerDrive">
+              </div>
+              <div class="field">
+                <label for="maxLayUpsPerDrive">Max lay ups per drive</label>
+                <input type="number" id="maxLayUpsPerDrive" min="0" max="5" step="1" data-setting="maxLayUpsPerDrive">
+              </div>
+            </div>
+            <div id="weightTables"></div>
+            <div class="error" id="advancedError"></div>
+          </div>
+        </details>
+      </div>
+
+      <!-- Shooters only drill -->
+      <div class="panel-section hidden" id="shootersSettings">
+        <div class="range-row">
+          <div class="field">
+            <label for="shWindowMinMs">Min window (ms)</label>
+            <input type="number" id="shWindowMinMs" min="600" step="100" data-setting="shooters.windowMinMs">
+          </div>
+          <div class="field">
+            <label for="shWindowMaxMs">Max window (ms)</label>
+            <input type="number" id="shWindowMaxMs" min="600" step="100" data-setting="shooters.windowMaxMs">
+          </div>
+        </div>
+        <div class="field">
+          <label for="shResetPauseMs">Reset pause (ms)</label>
+          <input type="number" id="shResetPauseMs" min="0" step="100" data-setting="shooters.resetPauseMs">
+        </div>
+        <div class="error" id="shootersError"></div>
+
+        <details class="advanced" id="shootersAdvanced">
+          <summary>Advanced</summary>
+          <div class="advanced-body">
+            <div id="getSetFields"></div>
+            <div class="field-grid">
+              <div class="field">
+                <label for="shNopeGapMinMs">Nope gap min (ms)</label>
+                <input type="number" id="shNopeGapMinMs" min="0" step="10" data-setting="shooters.nopeGapMinMs">
+              </div>
+              <div class="field">
+                <label for="shNopeGapMaxMs">Nope gap max (ms)</label>
+                <input type="number" id="shNopeGapMaxMs" min="0" step="10" data-setting="shooters.nopeGapMaxMs">
+              </div>
+              <div class="field">
+                <label for="shAfterNopeGapMinMs">After-nope gap min (ms)</label>
+                <input type="number" id="shAfterNopeGapMinMs" min="0" step="10" data-setting="shooters.afterNopeGapMinMs">
+              </div>
+              <div class="field">
+                <label for="shAfterNopeGapMaxMs">After-nope gap max (ms)</label>
+                <input type="number" id="shAfterNopeGapMaxMs" min="0" step="10" data-setting="shooters.afterNopeGapMaxMs">
+              </div>
+              <div class="field">
+                <label for="shShotBufferMs">Shot buffer (ms)</label>
+                <input type="number" id="shShotBufferMs" min="0" step="10" data-setting="shooters.shotBufferMs">
+              </div>
+              <div class="field">
+                <label for="shMaxCutOffsPerWindow">Max cut offs per window</label>
+                <input type="number" id="shMaxCutOffsPerWindow" min="0" max="5" step="1" data-setting="shooters.maxCutOffsPerWindow">
+              </div>
+              <div class="field">
+                <label for="shMaxNopesPerRep">Max nopes per rep</label>
+                <input type="number" id="shMaxNopesPerRep" min="0" max="3" step="1" data-setting="shooters.maxNopesPerRep">
+              </div>
+            </div>
+            <div id="shootersWeightTables"></div>
+            <div class="error" id="shootersAdvancedError"></div>
+          </div>
+        </details>
+      </div>
+
+      <!-- Shared by both drills -->
+      <details class="advanced" id="speech">
+        <summary>Speech (both drills)</summary>
         <div class="advanced-body">
           <div class="field-grid">
-            <div class="field">
-              <label for="resetPauseMs">Reset pause (ms)</label>
-              <input type="number" id="resetPauseMs" min="0" step="100" data-setting="resetPauseMs">
-            </div>
-            <div class="field">
-              <label for="minGapMs">Min gap (ms)</label>
-              <input type="number" id="minGapMs" min="0" step="10" data-setting="minGapMs">
-            </div>
             <div class="field">
               <label for="baseRate">Base speech rate</label>
               <input type="number" id="baseRate" min="0.5" max="2" step="0.05" inputmode="decimal" data-setting="baseRate">
@@ -336,24 +440,15 @@
               <input type="number" id="maxRate" min="0.5" max="2" step="0.05" inputmode="decimal" data-setting="maxRate">
             </div>
             <div class="field">
-              <label for="finisherBufferMs">Finisher buffer (ms)</label>
-              <input type="number" id="finisherBufferMs" min="0" step="10" data-setting="finisherBufferMs">
+              <label for="minGapMs">Min gap (ms)</label>
+              <input type="number" id="minGapMs" min="0" step="10" data-setting="minGapMs">
             </div>
             <div class="field">
               <label for="speechLeadMs">Speech lead (ms)</label>
               <input type="number" id="speechLeadMs" min="0" step="10" data-setting="speechLeadMs">
             </div>
-            <div class="field">
-              <label for="maxCutOffsPerDrive">Max cut offs per drive</label>
-              <input type="number" id="maxCutOffsPerDrive" min="0" max="3" step="1" data-setting="maxCutOffsPerDrive">
-            </div>
-            <div class="field">
-              <label for="maxLayUpsPerDrive">Max lay ups per drive</label>
-              <input type="number" id="maxLayUpsPerDrive" min="0" max="5" step="1" data-setting="maxLayUpsPerDrive">
-            </div>
           </div>
-          <div id="weightTables"></div>
-          <div class="error" id="advancedError"></div>
+          <div class="error" id="speechError"></div>
         </div>
       </details>
     </div>
@@ -704,11 +799,12 @@ const OffensePlanner = (function () {
     afterLayUpWeights: "After LAY UP weights",
   };
 
-  // Offense settings check. Returns null, or { field: "drive" | "advanced", message }.
+  // Drive settings check. Returns null, or { field: "drive" | "advanced" | "speech", message }.
   // The shared Min/Max read time fields are validated separately.
   function validateOffense(s, dur) {
     const drive = message => ({ field: "drive", message });
     const advanced = message => ({ field: "advanced", message });
+    const speech = message => ({ field: "speech", message });
 
     if (!isWhole(s.driveMinMs) || s.driveMinMs < 600) {
       return drive("Min drive window must be a whole number of at least 600 ms.");
@@ -718,12 +814,12 @@ const OffensePlanner = (function () {
     }
     if (!isNonNegative(s.resetPauseMs)) return advanced("Reset pause must be 0 ms or more.");
     if (!(s.baseRate >= 0.5 && s.baseRate <= 2) || !(s.maxRate >= 0.5 && s.maxRate <= 2)) {
-      return advanced("Speech rates must be between 0.5 and 2.0.");
+      return speech("Speech rates must be between 0.5 and 2.0.");
     }
-    if (s.baseRate > s.maxRate) return advanced("Base speech rate must not exceed max speech rate.");
-    if (!isNonNegative(s.minGapMs)) return advanced("Min gap must be 0 ms or more.");
+    if (s.baseRate > s.maxRate) return speech("Base speech rate must not exceed max speech rate.");
+    if (!isNonNegative(s.minGapMs)) return speech("Min gap must be 0 ms or more.");
     if (!isNonNegative(s.finisherBufferMs)) return advanced("Finisher buffer must be 0 ms or more.");
-    if (!isNonNegative(s.speechLeadMs)) return advanced("Speech lead must be 0 ms or more.");
+    if (!isNonNegative(s.speechLeadMs)) return speech("Speech lead must be 0 ms or more.");
     if (!isWhole(s.maxCutOffsPerDrive) || s.maxCutOffsPerDrive < 0 || s.maxCutOffsPerDrive > 3) {
       return advanced("Max cut offs per drive must be a whole number from 0 to 3.");
     }
@@ -1412,12 +1508,45 @@ const OffensePlanner = (function () {
     CENTER_SIDE: "word-center", LAY_UP_CENTER_SIDE: "word-center",
     CUT_OFF: "word-cut",
     LAY_UP: "word-layup",
+    SPRINT_FROM_PAINT: "word-sprint", SPRINT_FROM_LEFT_CORNER: "word-sprint", SPRINT_FROM_RIGHT_CORNER: "word-sprint",
+    CATCH: "word-catch",
+    SHOT: "word-shot",
+    NOPE: "word-nope",
   };
 
   const WEIGHT_TABLE_TITLES = {
     startWeights: "Start weights (after READ)",
     afterDriveOrCutOffWeights: "Weights after LEFT / RIGHT / CUT OFF",
     afterLayUpWeights: "Weights after LAY UP",
+  };
+
+  const SHOOTERS_WEIGHT_TABLE_TITLES = {
+    startWeights: "Start call weights",
+    afterStartWeights: "Weights after the start call",
+    afterDirectionOrCutOffWeights: "Weights after LEFT / RIGHT / CUT OFF",
+    afterShotWeights: "Weights after SHOT",
+    afterNopeWeights: "Weights after NOPE",
+  };
+
+  // Short labels for the Shooters form (the full phrases are too wide for two columns).
+  const SHORT_LABELS = {
+    SPRINT_FROM_PAINT: "From paint",
+    SPRINT_FROM_LEFT_CORNER: "From left corner",
+    SPRINT_FROM_RIGHT_CORNER: "From right corner",
+    CATCH: "Catch",
+    END: "END (rep ends)",
+  };
+
+  // Offense drills (OffensePlanner.PROFILES ids). A future "mixed" drill goes here too.
+  const DRILLS = {
+    drive: {
+      label: "OFFENSE · DRIVE",
+      subtitle: "Read the court, drive, react to the defense, and finish before the clock runs out.",
+    },
+    shooters: {
+      label: "OFFENSE · SHOOTERS",
+      subtitle: "Sprint to your spot or catch, create space, and shoot when you're open.",
+    },
   };
 
   const startScreen = document.getElementById("startScreen");
@@ -1432,22 +1561,44 @@ const OffensePlanner = (function () {
   const minMsLabel = document.getElementById("minMsLabel");
   const maxMsLabel = document.getElementById("maxMsLabel");
   const modeLabel = document.getElementById("modeLabel");
-  const modeButtons = document.querySelectorAll(".segmented button");
+  const modeButtons = document.querySelectorAll(".segmented button[data-mode]");
+  const drillButtons = document.querySelectorAll(".segmented button[data-drill]");
+  const rangePanel = document.getElementById("rangePanel");
   const offensePanel = document.getElementById("offensePanel");
+  const driveSettings = document.getElementById("driveSettings");
+  const shootersSettings = document.getElementById("shootersSettings");
   const driveError = document.getElementById("driveError");
   const advancedEl = document.getElementById("advanced");
   const advancedError = document.getElementById("advancedError");
   const weightTablesEl = document.getElementById("weightTables");
+  const shootersError = document.getElementById("shootersError");
+  const shootersAdvancedEl = document.getElementById("shootersAdvanced");
+  const shootersAdvancedError = document.getElementById("shootersAdvancedError");
+  const shootersWeightTablesEl = document.getElementById("shootersWeightTables");
+  const getSetFieldsEl = document.getElementById("getSetFields");
+  const speechEl = document.getElementById("speech");
+  const speechError = document.getElementById("speechError");
   const countdownEl = document.getElementById("countdown");
   const countdownFill = document.getElementById("countdownFill");
   const countdownText = document.getElementById("countdownText");
 
   const STORAGE_MODE = "reactionCaller.mode";
+  const STORAGE_DRILL = "reactionCaller.offenseDrill";
   const STORAGE_SETTINGS = "reactionCaller.settings";
   const STORAGE_LEARNED = "reactionCaller.learnedMs";
 
+  // Where each validation error is shown (and which <details> to open for it).
+  const ERROR_TARGETS = {
+    drive: { el: driveError },
+    advanced: { el: advancedError, details: advancedEl },
+    speech: { el: speechError, details: speechEl },
+    shooters: { el: shootersError },
+    shootersAdvanced: { el: shootersAdvancedError, details: shootersAdvancedEl },
+  };
+
   let voices = [];
   let selectedMode = "defense";
+  let selectedDrill = "drive";
   let activeMode = null;
 
   function storageGet(key) {
@@ -1613,7 +1764,8 @@ const OffensePlanner = (function () {
 
     say(id, rate) {
       const phrase = this.settings.phrases[id];
-      const long = phrase.display.length > 7 ? " long" : "";
+      const len = phrase.display.length;
+      const long = len > 18 ? " long xlong" : len > 7 ? " long" : "";
       showWord(phrase.display, PHRASE_CLASS[id] + long);
       const utter = speak(phrase.spoken, { rate, cancel: false });
       if (utter) this.measure(utter, id, rate);
@@ -1690,34 +1842,72 @@ const OffensePlanner = (function () {
 
   // ---- Offense settings form ----
 
-  function buildWeightTables() {
-    P.WEIGHT_TABLES.forEach(table => {
-      const section = document.createElement("div");
-      const title = document.createElement("p");
-      title.className = "weight-title";
-      title.textContent = WEIGHT_TABLE_TITLES[table];
-      const grid = document.createElement("div");
-      grid.className = "field-grid";
-      Object.keys(OFFENSE_DEFAULTS[table]).forEach(id => {
-        const inputId = "w-" + table + "-" + id;
-        const field = document.createElement("div");
-        field.className = "field";
-        const label = document.createElement("label");
-        label.htmlFor = inputId;
-        label.textContent = OFFENSE_DEFAULTS.phrases[id].display;
-        const input = document.createElement("input");
-        input.type = "number";
-        input.id = inputId;
-        input.min = "0";
-        input.step = "1";
-        input.dataset.weightTable = table;
-        input.dataset.weightId = id;
-        field.append(label, input);
-        grid.appendChild(field);
+  // Settings are addressed by dotted paths into OFFENSE_DEFAULTS, e.g. "shooters.windowMinMs".
+  function getPath(obj, path) {
+    return path.split(".").reduce((o, key) => (o == null ? undefined : o[key]), obj);
+  }
+
+  function setPath(obj, path, value) {
+    const keys = path.split(".");
+    const last = keys.pop();
+    keys.reduce((o, key) => o[key], obj)[last] = value;
+  }
+
+  function makeNumberField(inputId, labelText, attrs) {
+    const field = document.createElement("div");
+    field.className = "field";
+    const label = document.createElement("label");
+    label.htmlFor = inputId;
+    label.textContent = labelText;
+    const input = document.createElement("input");
+    input.type = "number";
+    input.id = inputId;
+    input.min = attrs.min;
+    input.step = attrs.step;
+    Object.assign(input.dataset, attrs.data);
+    field.append(label, input);
+    return field;
+  }
+
+  function makeSection(titleText, fields) {
+    const section = document.createElement("div");
+    const title = document.createElement("p");
+    title.className = "weight-title";
+    title.textContent = titleText;
+    const grid = document.createElement("div");
+    grid.className = "field-grid";
+    fields.forEach(f => grid.appendChild(f));
+    section.append(title, grid);
+    return section;
+  }
+
+  // Weight inputs for one drill. prefix is "" for Drive (so its input ids and
+  // saved keys stay as before) and "shooters." for Shooters.
+  function buildWeightTables(container, tables, prefix, titles) {
+    tables.forEach(table => {
+      const tablePath = prefix + table;
+      const fields = Object.keys(getPath(OFFENSE_DEFAULTS, tablePath)).map(id => {
+        const inputId = "w-" + tablePath.replace(/\./g, "-") + "-" + id;
+        const labelText = prefix && SHORT_LABELS[id] ? SHORT_LABELS[id] : OFFENSE_DEFAULTS.phrases[id].display;
+        return makeNumberField(inputId, labelText, {
+          min: "0", step: "1", data: { weightTable: tablePath, weightId: id },
+        });
       });
-      section.append(title, grid);
-      weightTablesEl.appendChild(section);
+      container.appendChild(makeSection(titles[table], fields));
     });
+  }
+
+  // Get-set min/max inputs, one pair per start call.
+  function buildGetSetFields() {
+    const fields = [];
+    P.START_CALLS.forEach(id => {
+      ["min", "max"].forEach(end => {
+        fields.push(makeNumberField("sh-getSet-" + id + "-" + end, SHORT_LABELS[id] + " " + end + " (ms)", {
+          min: "0", step: "100", data: { setting: "shooters.getSetMs." + id + "." + end + "Ms" },
+        }));
+      });
+    });
+    getSetFieldsEl.appendChild(makeSection("Get-set time after the start call", fields));
   }
 
   function parseNumber(value) {
@@ -1733,25 +1923,30 @@ const OffensePlanner = (function () {
   }
 
   function fillOffenseDefaults() {
-    settingInputs().forEach(input => { input.value = OFFENSE_DEFAULTS[input.dataset.setting]; });
+    settingInputs().forEach(input => { input.value = getPath(OFFENSE_DEFAULTS, input.dataset.setting); });
     weightInputs().forEach(input => {
-      input.value = OFFENSE_DEFAULTS[input.dataset.weightTable][input.dataset.weightId];
+      input.value = getPath(OFFENSE_DEFAULTS, input.dataset.weightTable)[input.dataset.weightId];
     });
   }
 
+  // range is the shared Min/Max read time (Drive only; null for Shooters).
   function readOffenseSettings(range) {
     const s = P.cloneSettings(OFFENSE_DEFAULTS);
-    settingInputs().forEach(input => { s[input.dataset.setting] = parseNumber(input.value); });
+    settingInputs().forEach(input => { setPath(s, input.dataset.setting, parseNumber(input.value)); });
     weightInputs().forEach(input => {
-      s[input.dataset.weightTable][input.dataset.weightId] = parseNumber(input.value);
+      getPath(s, input.dataset.weightTable)[input.dataset.weightId] = parseNumber(input.value);
     });
-    s.readMinMs = range.min;
-    s.readMaxMs = range.max;
-    s.drill = "drive";
+    if (range) {
+      s.readMinMs = range.min;
+      s.readMaxMs = range.max;
+    }
+    s.drill = selectedDrill;
     return s;
   }
 
-  // ---- Persistence: mode, shared Min/Max fields and offense settings only ----
+  // ---- Persistence: mode, drill, shared Min/Max fields and offense settings only ----
+  // Values are saved by input id, so settings saved before a field existed
+  // simply keep that field's default.
 
   function persistedInputs() {
     return [minMsInput, maxMsInput].concat(Array.from(settingInputs()), Array.from(weightInputs()));
@@ -1786,35 +1981,60 @@ const OffensePlanner = (function () {
     },
     offense: {
       mode: offenseMode,
-      label: "OFFENSE",
-      subtitle: "Read the court, drive, react to the defense, and finish before the clock runs out.",
+      // Label and subtitle come from DRILLS.
       minLabel: "Min read time (ms)",
       maxLabel: "Max read time (ms)",
     },
   };
 
+  function has(obj, key) {
+    return typeof key === "string" && Object.prototype.hasOwnProperty.call(obj, key);
+  }
+
   function clearErrors() {
     rangeError.textContent = "";
-    driveError.textContent = "";
-    advancedError.textContent = "";
+    Object.keys(ERROR_TARGETS).forEach(key => { ERROR_TARGETS[key].el.textContent = ""; });
+  }
+
+  function showError(error) {
+    const target = ERROR_TARGETS[error.field];
+    if (target.details) target.details.open = true;
+    target.el.textContent = error.message;
+  }
+
+  // Show the panels, labels and subtitle for the selected mode and drill.
+  function updateView() {
+    const offense = selectedMode === "offense";
+    const shooters = selectedDrill === "shooters";
+    const info = MODES[selectedMode];
+    modeButtons.forEach(btn => btn.setAttribute("aria-pressed", String(btn.dataset.mode === selectedMode)));
+    drillButtons.forEach(btn => btn.setAttribute("aria-pressed", String(btn.dataset.drill === selectedDrill)));
+    subtitleEl.textContent = offense ? DRILLS[selectedDrill].subtitle : info.subtitle;
+    minMsLabel.textContent = info.minLabel;
+    maxMsLabel.textContent = info.maxLabel;
+    offensePanel.classList.toggle("hidden", !offense);
+    // The read time only applies to Drive.
+    rangePanel.classList.toggle("hidden", offense && shooters);
+    driveSettings.classList.toggle("hidden", shooters);
+    shootersSettings.classList.toggle("hidden", !shooters);
+    clearErrors();
   }
 
   function selectMode(name) {
-    if (!MODES[name]) name = "defense";
-    selectedMode = name;
-    const info = MODES[name];
-    modeButtons.forEach(btn => btn.setAttribute("aria-pressed", String(btn.dataset.mode === name)));
-    subtitleEl.textContent = info.subtitle;
-    minMsLabel.textContent = info.minLabel;
-    maxMsLabel.textContent = info.maxLabel;
-    offensePanel.classList.toggle("hidden", name !== "offense");
-    clearErrors();
+    selectedMode = has(MODES, name) ? name : "defense";
+    updateView();
+  }
+
+  function selectDrill(name) {
+    selectedDrill = has(DRILLS, name) ? name : "drive";
+    updateView();
   }
 
   function startGame() {
     clearErrors();
-    const range = validateRange();
-    if (!range) return;
+    const usesRange = selectedMode === "defense" || selectedDrill === "drive";
+    const range = usesRange ? validateRange() : null;
+    if (usesRange && !range) return;
 
     let settings = range;
     if (selectedMode === "offense") {
@@ -1824,12 +2044,7 @@ const OffensePlanner = (function () {
       settings.durations = P.durationsFor(settings, learnedMs);
       const error = P.PROFILES[settings.drill].validate(settings, settings.durations);
       if (error) {
-        if (error.field === "advanced") {
-          advancedEl.open = true;
-          advancedError.textContent = error.message;
-        } else {
-          driveError.textContent = error.message;
-        }
+        showError(error);
         return;
       }
     }
@@ -1838,8 +2053,8 @@ const OffensePlanner = (function () {
 
     startScreen.classList.add("hidden");
     gameScreen.classList.remove("hidden");
-    modeLabel.textContent = MODES[selectedMode].label;
-    wordEl.textContent = " ";
+    modeLabel.textContent = selectedMode === "offense" ? DRILLS[selectedDrill].label : MODES[selectedMode].label;
+    wordEl.textContent = " ";
     wordEl.className = "";
 
     activeMode = MODES[selectedMode].mode;
@@ -1857,7 +2072,9 @@ const OffensePlanner = (function () {
     startScreen.classList.remove("hidden");
   }
 
-  buildWeightTables();
+  buildWeightTables(weightTablesEl, P.WEIGHT_TABLES, "", WEIGHT_TABLE_TITLES);
+  buildGetSetFields();
+  buildWeightTables(shootersWeightTablesEl, P.SHOOTERS_WEIGHT_TABLES, "shooters.", SHOOTERS_WEIGHT_TABLE_TITLES);
   fillOffenseDefaults();
   loadSettings();
   persistedInputs().forEach(input => input.addEventListener("input", saveSettings));
@@ -1866,6 +2083,12 @@ const OffensePlanner = (function () {
     selectMode(btn.dataset.mode);
     storageSet(STORAGE_MODE, selectedMode);
   }));
+  drillButtons.forEach(btn => btn.addEventListener("click", () => {
+    selectDrill(btn.dataset.drill);
+    storageSet(STORAGE_DRILL, selectedDrill);
+  }));
+  const savedDrill = storageGet(STORAGE_DRILL);
+  selectedDrill = has(DRILLS, savedDrill) ? savedDrill : "drive";
   selectMode(storageGet(STORAGE_MODE));
 
   startBtn.addEventListener("click", startGame);
