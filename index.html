@@ -2128,7 +2128,7 @@ const OffensePlanner = (function () {
   lines.push("\nShooters fit table: minimum window at maxRate " + s.maxRate + ", minGap " + s.minGapMs +
     " ms, shot buffer " + sh.shotBufferMs + " ms (windowMaxMs " + sh.windowMaxMs + ")");
   result.fitTables.shooters.forEach(r => {
-    lines.push(r.cutOffs + " cut-offs  " + (r.sequence + "                         ").slice(0, 26) +
+    lines.push(r.cutOffs + " cut-offs  " + r.sequence.padEnd(33) +
       String(r.minWindowMs).padStart(5) + " ms  fits: " + r.fitsAtWindowMax);
   });
 
