@@ -443,6 +443,62 @@ const OffensePlanner = (function () {
       LAY_UP_LEFT_SIDE:   { display: "LAY UP LEFT SIDE",   spoken: "lay up left side",   estMs: 1000 },
       LAY_UP_RIGHT_SIDE:  { display: "LAY UP RIGHT SIDE",  spoken: "lay up right side",  estMs: 1000 },
       LAY_UP_CENTER_SIDE: { display: "LAY UP CENTER SIDE", spoken: "lay up center side", estMs: 1100 },
+      // Shooters only drill (LEFT, RIGHT and CUT_OFF above are shared with Drive).
+      SPRINT_FROM_PAINT:        { display: "SPRINT FROM PAINT",        spoken: "sprint from paint",        estMs: 900 },
+      SPRINT_FROM_LEFT_CORNER:  { display: "SPRINT FROM LEFT CORNER",  spoken: "sprint from left corner",  estMs: 1100 },
+      SPRINT_FROM_RIGHT_CORNER: { display: "SPRINT FROM RIGHT CORNER", spoken: "sprint from right corner", estMs: 1150 },
+      CATCH:                    { display: "CATCH",                    spoken: "catch",                    estMs: 400 },
+      SHOT:                     { display: "SHOT",                     spoken: "shot",                     estMs: 350 },
+      NOPE:                     { display: "NOPE",                     spoken: "nope",                     estMs: 350 },
+    },
+
+    // ---------------------------------------------------------------
+    // Shooters only drill: a start call (sprint from a spot, or CATCH),
+    // then one or two create-space windows of LEFT/RIGHT, 0+ CUT OFF, SHOT.
+    // A NOPE after SHOT (shot contested) starts the second window.
+    // The speech settings above (baseRate, maxRate, minGapMs, speechLeadMs)
+    // are shared with Drive; nothing else from Drive applies here.
+    // ---------------------------------------------------------------
+    shooters: {
+      // Create-space window D (ms). Picked uniformly per window when LEFT/RIGHT is called.
+      windowMinMs: 1000,
+      windowMaxMs: 1800,
+
+      // Get-set time (ms) from the start of the start call to the first LEFT/RIGHT.
+      // Silently raised to at least the start call's length (at baseRate) + minGapMs.
+      getSetMs: {
+        SPRINT_FROM_PAINT:        { minMs: 1500, maxMs: 2200 },
+        SPRINT_FROM_LEFT_CORNER:  { minMs: 1300, maxMs: 2000 },
+        SPRINT_FROM_RIGHT_CORNER: { minMs: 1300, maxMs: 2000 },
+        CATCH:                    { minMs: 400,  maxMs: 800 },
+      },
+
+      // SHOT must finish being spoken this long before D ends (ms).
+      shotBufferMs: 0,
+
+      // Silence from the end of SHOT to the start of NOPE (ms).
+      nopeGapMinMs: 150,
+      nopeGapMaxMs: 400,
+
+      // Silence from the end of NOPE to the next LEFT/RIGHT (ms).
+      afterNopeGapMinMs: 200,
+      afterNopeGapMaxMs: 400,
+
+      // Wait after the last window ends before the next start call (ms).
+      // Separate from the Drive reset pause.
+      resetPauseMs: 1000,
+
+      // Caps. Cut offs are counted per window (they reset after a NOPE).
+      maxCutOffsPerWindow: 2,
+      maxNopesPerRep: 1,
+
+      // Pick weights, normalized after illegal / non-fitting choices are removed.
+      // END in afterShotWeights means the rep ends after that SHOT.
+      startWeights: { SPRINT_FROM_PAINT: 25, SPRINT_FROM_LEFT_CORNER: 25, SPRINT_FROM_RIGHT_CORNER: 25, CATCH: 25 },
+      afterStartWeights: { LEFT: 50, RIGHT: 50 },
+      afterDirectionOrCutOffWeights: { CUT_OFF: 30, SHOT: 70 },
+      afterShotWeights: { END: 65, NOPE: 35 },
+      afterNopeWeights: { LEFT: 50, RIGHT: 50 },
     },
   };
 
@@ -703,6 +759,235 @@ const OffensePlanner = (function () {
     return currentMs + (normalized - currentMs) * s.learnAlpha;
   }
 
+  // ===================================================================
+  // Shooters only drill: start call -> LEFT/RIGHT -> CUT OFF... -> SHOT
+  // [-> NOPE -> LEFT/RIGHT -> CUT OFF... -> SHOT]
+  // ===================================================================
+
+  const START_CALLS = ["SPRINT_FROM_PAINT", "SPRINT_FROM_LEFT_CORNER", "SPRINT_FROM_RIGHT_CORNER", "CATCH"];
+  const DIRECTIONS = ["LEFT", "RIGHT"];
+  const AFTER_DIRECTION = ["CUT_OFF", "SHOT"];
+
+  // REP_START is the state before the first call; END (after SHOT) ends the rep.
+  const SHOOTERS_NEXT = {
+    REP_START: START_CALLS,
+    SPRINT_FROM_PAINT: DIRECTIONS,
+    SPRINT_FROM_LEFT_CORNER: DIRECTIONS,
+    SPRINT_FROM_RIGHT_CORNER: DIRECTIONS,
+    CATCH: DIRECTIONS,
+    LEFT: AFTER_DIRECTION,
+    RIGHT: AFTER_DIRECTION,
+    CUT_OFF: AFTER_DIRECTION,
+    SHOT: ["END", "NOPE"],
+    NOPE: DIRECTIONS,
+  };
+
+  const SHOOTERS_WEIGHT_TABLES = [
+    "startWeights", "afterStartWeights", "afterDirectionOrCutOffWeights", "afterShotWeights", "afterNopeWeights",
+  ];
+
+  function shootersWeightTableKey(state) {
+    if (state === "REP_START") return "startWeights";
+    if (START_CALLS.indexOf(state) !== -1) return "afterStartWeights";
+    if (state === "SHOT") return "afterShotWeights";
+    if (state === "NOPE") return "afterNopeWeights";
+    return "afterDirectionOrCutOffWeights";
+  }
+
+  // Pick the call after `state` among survivors by weight; fallback(survivors)
+  // decides when every survivor has weight 0.
+  function pickShooters(state, survivors, sh, rng, onPick, fallback) {
+    let pick = pickWeighted(survivors, sh[shootersWeightTableKey(state)], rng);
+    if (pick === null) pick = fallback(survivors);
+    if (onPick) onPick(state, SHOOTERS_NEXT[state], survivors, pick);
+    return pick;
+  }
+
+  function randomOf(ids, rng) {
+    return ids[Math.floor(rng() * ids.length)];
+  }
+
+  // Plan one create-space window after `fromState` (a start call or NOPE):
+  // { D, rate, calls: [{ id, startMs, durMs }] }, times relative to LEFT/RIGHT.
+  // Same math as a drive: one rate per window, SHOT anchored to end at D - shotBufferMs.
+  function planShootersWindow(s, dur, rng, fromState, onPick) {
+    const sh = s.shooters;
+    const D = randomInt(sh.windowMinMs, sh.windowMaxMs, rng);
+    const fits = ids => fitRateIn(ids, D, sh.shotBufferMs, s, dur) !== null;
+
+    const dirs = DIRECTIONS.filter(id => fits([id, "SHOT"]));
+    if (dirs.length === 0) throw new Error("No direction fits in a " + D + " ms window");
+    const path = [pickShooters(fromState, dirs, sh, rng, onPick, ids => randomOf(ids, rng))];
+
+    // Add CUT OFFs one at a time while the cap allows and the path + CUT OFF + SHOT
+    // still fits at maxRate, then close with SHOT. No retries needed.
+    let cutOffs = 0;
+    for (;;) {
+      const state = path[path.length - 1];
+      const survivors = AFTER_DIRECTION.filter(id =>
+        id === "SHOT" || (cutOffs < sh.maxCutOffsPerWindow && fits(path.concat("CUT_OFF", "SHOT"))));
+      const pick = pickShooters(state, survivors, sh, rng, onPick, () => "SHOT");
+      path.push(pick);
+      if (pick === "SHOT") break;
+      cutOffs++;
+    }
+
+    const rate = fitRateIn(path, D, sh.shotBufferMs, s, dur);
+    return { D, rate, calls: scheduleCalls(path, D, rate, sh.shotBufferMs, dur) };
+  }
+
+  // One Shooters rep as a rep plan (see PROFILES below).
+  function planShootersRep(s, dur, rng, onPick) {
+    rng = rng || Math.random;
+    const sh = s.shooters;
+    const base = s.baseRate;
+    const calls = [];
+    const windows = [];
+
+    const start = pickShooters("REP_START", START_CALLS, sh, rng, onPick, ids => randomOf(ids, rng));
+    const startDur = dur[start] / base;
+    calls.push({ id: start, atMs: 0, durMs: startDur, rate: base });
+
+    // Get-set time, measured from the start of the start call. Clamped so the
+    // first LEFT/RIGHT can never overlap the start call.
+    const getSet = sh.getSetMs[start];
+    let t = Math.max(randomInt(getSet.minMs, getSet.maxMs, rng), startDur + s.minGapMs);
+    let from = start;
+    let nopes = 0;
+
+    for (;;) {
+      const w = planShootersWindow(s, dur, rng, from, onPick);
+      w.calls.forEach(c => calls.push({ id: c.id, atMs: t + c.startMs, durMs: c.durMs, rate: w.rate }));
+      windows.push({ startMs: t, durMs: w.D });
+
+      const after = SHOOTERS_NEXT.SHOT.filter(id => id === "END" || nopes < sh.maxNopesPerRep);
+      if (pickShooters("SHOT", after, sh, rng, onPick, () => "END") === "END") {
+        return { calls, windows, endMs: t + w.D, restMs: sh.resetPauseMs };
+      }
+
+      // NOPE starts a gap after SHOT has finished, so it never cuts SHOT off.
+      const shotEnd = t + w.D - sh.shotBufferMs;
+      const nopeAt = shotEnd + randomInt(sh.nopeGapMinMs, sh.nopeGapMaxMs, rng);
+      const nopeDur = dur.NOPE / base;
+      calls.push({ id: "NOPE", atMs: nopeAt, durMs: nopeDur, rate: base });
+      nopes++;
+      t = nopeAt + nopeDur + randomInt(sh.afterNopeGapMinMs, sh.afterNopeGapMaxMs, rng);
+      from = "NOPE";
+    }
+  }
+
+  // The shortest window: cheapest LEFT/RIGHT plus SHOT.
+  function shortestWindow(dur) {
+    return [cheapest(DIRECTIONS, dur), "SHOT"];
+  }
+
+  function isWholeNonNegative(n) {
+    return isWhole(n) && n >= 0;
+  }
+
+  // Speech settings shared by both drills. Returns null or { field: "speech", message }.
+  function validateSpeech(s) {
+    const speech = message => ({ field: "speech", message });
+    if (!(s.baseRate >= 0.5 && s.baseRate <= 2) || !(s.maxRate >= 0.5 && s.maxRate <= 2)) {
+      return speech("Speech rates must be between 0.5 and 2.0.");
+    }
+    if (s.baseRate > s.maxRate) return speech("Base speech rate must not exceed max speech rate.");
+    if (!isNonNegative(s.minGapMs)) return speech("Min gap must be 0 ms or more.");
+    if (!isNonNegative(s.speechLeadMs)) return speech("Speech lead must be 0 ms or more.");
+    return null;
+  }
+
+  const SHOOTERS_WEIGHT_TABLE_NAMES = {
+    startWeights: "Start call weights",
+    afterStartWeights: "Weights after the start call",
+    afterDirectionOrCutOffWeights: "Weights after LEFT / RIGHT / CUT OFF",
+    afterShotWeights: "Weights after SHOT",
+    afterNopeWeights: "Weights after NOPE",
+  };
+
+  // Shooters settings check. Returns null, or
+  // { field: "speech" | "shooters" | "shootersAdvanced", message }.
+  function validateShooters(s, dur) {
+    const main = message => ({ field: "shooters", message });
+    const advanced = message => ({ field: "shootersAdvanced", message });
+    const sh = s.shooters;
+
+    const speechError = validateSpeech(s);
+    if (speechError) return speechError;
+
+    if (!isWhole(sh.windowMinMs) || sh.windowMinMs < 600) {
+      return main("Min window must be a whole number of at least 600 ms.");
+    }
+    if (!isWhole(sh.windowMaxMs) || sh.windowMaxMs < sh.windowMinMs) {
+      return main("Min window must not exceed max window.");
+    }
+    if (!isWholeNonNegative(sh.resetPauseMs)) return main("Reset pause must be a whole number of 0 ms or more.");
+
+    for (const id of START_CALLS) {
+      const range = sh.getSetMs[id];
+      const name = "Get-set after " + s.phrases[id].display;
+      if (!isWholeNonNegative(range.minMs) || !isWholeNonNegative(range.maxMs)) {
+        return advanced(name + ": min and max must be whole numbers of 0 ms or more.");
+      }
+      if (range.minMs > range.maxMs) return advanced(name + ": min must not exceed max.");
+    }
+    if (!isWholeNonNegative(sh.shotBufferMs)) return advanced("Shot buffer must be a whole number of 0 ms or more.");
+    const ranges = [
+      ["Nope gap", sh.nopeGapMinMs, sh.nopeGapMaxMs],
+      ["After-nope gap", sh.afterNopeGapMinMs, sh.afterNopeGapMaxMs],
+    ];
+    for (const r of ranges) {
+      if (!isWholeNonNegative(r[1]) || !isWholeNonNegative(r[2])) {
+        return advanced(r[0] + ": min and max must be whole numbers of 0 ms or more.");
+      }
+      if (r[1] > r[2]) return advanced(r[0] + ": min must not exceed max.");
+    }
+    if (!isWhole(sh.maxCutOffsPerWindow) || sh.maxCutOffsPerWindow < 0 || sh.maxCutOffsPerWindow > 5) {
+      return advanced("Max cut offs per window must be a whole number from 0 to 5.");
+    }
+    if (!isWhole(sh.maxNopesPerRep) || sh.maxNopesPerRep < 0 || sh.maxNopesPerRep > 3) {
+      return advanced("Max nopes per rep must be a whole number from 0 to 3.");
+    }
+    for (const key of SHOOTERS_WEIGHT_TABLES) {
+      const table = sh[key];
+      const ids = Object.keys(table);
+      if (!ids.every(id => isNonNegative(table[id]))) {
+        return advanced(SHOOTERS_WEIGHT_TABLE_NAMES[key] + ": every weight must be a number of 0 or more.");
+      }
+      if (!(sumOf(ids, table) > 0)) {
+        return advanced(SHOOTERS_WEIGHT_TABLE_NAMES[key] + " must add up to more than 0.");
+      }
+    }
+
+    const shortest = shortestWindow(dur);
+    if (fitRateIn(shortest, sh.windowMinMs, sh.shotBufferMs, s, dur) === null) {
+      const need = Math.ceil(minWindowIn(shortest, sh.shotBufferMs, s, dur));
+      const names = shortest.map(id => s.phrases[id].display).join(" + ");
+      return main("The shortest window (" + names + ") needs at least " + need +
+        " ms at max speech rate " + s.maxRate + ". Raise the min window or the max speech rate.");
+    }
+    return null;
+  }
+
+  // Minimum window needed at maxRate for 0..maxCutOffsPerWindow cut offs.
+  function shootersFitTable(s, dur) {
+    const sh = s.shooters;
+    const rows = [];
+    for (let cutOffs = 0; cutOffs <= sh.maxCutOffsPerWindow; cutOffs++) {
+      const ids = [cheapest(DIRECTIONS, dur)];
+      for (let i = 0; i < cutOffs; i++) ids.push("CUT_OFF");
+      ids.push("SHOT");
+      const need = Math.ceil(minWindowIn(ids, sh.shotBufferMs, s, dur));
+      rows.push({
+        cutOffs,
+        sequence: ids.map(id => s.phrases[id].display).join(" > "),
+        minWindowMs: need,
+        fitsAtWindowMax: need <= sh.windowMaxMs ? "yes" : "no",
+      });
+    }
+    return rows;
+  }
+
   // ---- Self-test support (only called from ?selftest=1) ----
 
   // Minimum drive window needed at maxRate for 0-3 cut-offs and each finisher.
@@ -851,6 +1136,180 @@ const OffensePlanner = (function () {
     return fitTable(defaults, dur);
   }
 
+  // Shooters self-test. Splits each rep into its windows by structure: a window
+  // starts at the LEFT/RIGHT after the start call or after a NOPE.
+  function shootersSelfTest(check, reps) {
+    const defaults = cloneSettings(OFFENSE_DEFAULTS);
+    const dur = durationsFor(defaults, null);
+    const variant = (top, sh) => {
+      const s = Object.assign(cloneSettings(defaults), top);
+      Object.assign(s.shooters, sh);
+      return s;
+    };
+    const tight = variant({ maxRate: 2, minGapMs: 40 }, { windowMinMs: 1000, windowMaxMs: 1000 });
+    const loose = variant({ maxRate: 2 }, { windowMinMs: 30000, windowMaxMs: 30000 });
+    const fmt = ms => ms.toFixed(1);
+
+    [["default", defaults], ["tight", tight]].forEach(pair => {
+      const label = "shooters " + pair[0];
+      const s = pair[1];
+      const sh = s.shooters;
+      const settingsError = validateShooters(s, dur);
+      check(label + ": settings pass validation", settingsError ? [settingsError.message] : []);
+
+      const f = { plan: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [], 7: [], 8: [] };
+      for (let n = 0; n < reps; n++) {
+        let rep;
+        try {
+          rep = planShootersRep(s, dur, Math.random);
+        } catch (e) {
+          f.plan.push(e.message);
+          continue;
+        }
+        const calls = rep.calls;
+        const ids = calls.map(c => c.id);
+        const where = ids.join(" > ");
+
+        // 1. Start call, then LEFT/RIGHT.
+        if (START_CALLS.indexOf(ids[0]) === -1 || DIRECTIONS.indexOf(ids[1]) === -1) f[1].push(where);
+
+        // 2. Every transition is in the state table; NOPE only right after SHOT.
+        const seq = ["REP_START"].concat(ids, "END");
+        for (let i = 1; i < seq.length; i++) {
+          const allowed = SHOOTERS_NEXT[seq[i - 1]];
+          if (!allowed || allowed.indexOf(seq[i]) === -1) {
+            f[2].push(where);
+            break;
+          }
+        }
+        if (ids.some((id, i) => id === "NOPE" && ids[i - 1] !== "SHOT")) f[2].push(where + " (NOPE not after SHOT)");
+
+        // Split into windows and NOPEs.
+        const groups = [];
+        const nopes = [];
+        calls.slice(1).forEach(c => {
+          if (c.id === "NOPE") nopes.push(c);
+          else if (DIRECTIONS.indexOf(c.id) !== -1 && (groups.length === 0 || groups[groups.length - 1].done)) groups.push({ calls: [c] });
+          else if (groups.length) groups[groups.length - 1].calls.push(c);
+          if (c.id === "SHOT" && groups.length) groups[groups.length - 1].done = true;
+        });
+
+        // 3. Each window: exactly one SHOT, last; the rep ends right after a SHOT.
+        if (groups.length !== rep.windows.length || ids[ids.length - 1] !== "SHOT") f[3].push(where);
+        groups.forEach(g => {
+          const shots = g.calls.filter(c => c.id === "SHOT").length;
+          if (shots !== 1 || g.calls[g.calls.length - 1].id !== "SHOT") f[3].push(where);
+        });
+        const lastWin = rep.windows[rep.windows.length - 1];
+        if (rep.endMs !== lastWin.startMs + lastWin.durMs) f[3].push(where + " (endMs)");
+
+        // 4. Caps.
+        if (groups.some(g => g.calls.filter(c => c.id === "CUT_OFF").length > sh.maxCutOffsPerWindow) ||
+            nopes.length > sh.maxNopesPerRep) {
+          f[4].push(where);
+        }
+
+        // 5. Window timing.
+        groups.forEach((g, k) => {
+          const w = rep.windows[k];
+          if (!w) return;
+          const rate = g.calls[0].rate;
+          if (w.durMs < sh.windowMinMs || w.durMs > sh.windowMaxMs || !isWhole(w.durMs) ||
+              rate < s.baseRate - EPS || rate > s.maxRate + EPS || g.calls.some(c => c.rate !== rate)) {
+            f[5].push(where + " (D=" + w.durMs + " rate=" + rate + ")");
+          }
+          if (g.calls[0].atMs !== w.startMs) f[5].push(where + " (window does not start at LEFT/RIGHT)");
+          const availEnd = w.startMs + w.durMs - sh.shotBufferMs;
+          g.calls.forEach((c, i) => {
+            if (c.atMs < w.startMs - EPS || c.atMs + c.durMs > availEnd + EPS) f[5].push(where + " (" + c.id + " outside window)");
+            if (i > 0) {
+              const p = g.calls[i - 1];
+              const gap = c.atMs - (p.atMs + p.durMs);
+              if (gap < s.minGapMs - EPS) f[5].push(where + " (gap " + fmt(gap) + " ms)");
+            }
+          });
+          const shot = g.calls[g.calls.length - 1];
+          if (Math.abs(shot.atMs + shot.durMs - availEnd) > EPS) f[5].push(where + " (SHOT not ending at D - buffer)");
+        });
+
+        // 6. NOPE timing: after SHOT ends, then the next LEFT/RIGHT after NOPE ends.
+        nopes.forEach(nope => {
+          const i = calls.indexOf(nope);
+          const shot = calls[i - 1];
+          const next = calls[i + 1];
+          const gap = nope.atMs - (shot.atMs + shot.durMs);
+          if (gap < sh.nopeGapMinMs - EPS || gap > sh.nopeGapMaxMs + EPS) f[6].push(where + " (nope gap " + fmt(gap) + ")");
+          const after = next ? next.atMs - (nope.atMs + nope.durMs) : NaN;
+          if (!(after >= sh.afterNopeGapMinMs - EPS && after <= sh.afterNopeGapMaxMs + EPS)) {
+            f[6].push(where + " (after-nope gap " + after + ")");
+          }
+        });
+
+        // 7. Get-set: first LEFT/RIGHT after the start call, within the clamped range.
+        const startDur = dur[ids[0]] / s.baseRate;
+        const clamp = startDur + s.minGapMs;
+        const range = sh.getSetMs[ids[0]];
+        const first = calls[1].atMs;
+        if (first < clamp - EPS || first < range.minMs - EPS || first > Math.max(range.maxMs, clamp) + EPS) {
+          f[7].push(where + " (first LEFT/RIGHT at " + fmt(first) + ")");
+        }
+
+        // 8. Rep shape: start call and NOPE at baseRate, nothing overlaps, rest pause.
+        if (calls[0].atMs !== 0 || calls[0].rate !== s.baseRate || nopes.some(c => c.rate !== s.baseRate)) {
+          f[8].push(where + " (start call / NOPE rate)");
+        }
+        for (let i = 1; i < calls.length; i++) {
+          if (calls[i].atMs < calls[i - 1].atMs + calls[i - 1].durMs - EPS) f[8].push(where + " (overlap at " + calls[i].id + ")");
+        }
+        if (rep.restMs !== sh.resetPauseMs) f[8].push(where + " (restMs)");
+      }
+
+      check(label + ": every rep could be planned", f.plan);
+      check(label + ": 1. rep starts with a start call, then LEFT or RIGHT", f[1]);
+      check(label + ": 2. every transition is legal, NOPE only right after SHOT", f[2]);
+      check(label + ": 3. each window ends with its one SHOT, the rep ends after a SHOT", f[3]);
+      check(label + ": 4. cut offs per window <= " + sh.maxCutOffsPerWindow + ", nopes per rep <= " + sh.maxNopesPerRep, f[4]);
+      check(label + ": 5. D in range, rate base..max, calls inside window, gaps >= minGap, SHOT ends at D - buffer", f[5]);
+      check(label + ": 6. NOPE " + sh.nopeGapMinMs + "-" + sh.nopeGapMaxMs + " ms after SHOT ends, next call " +
+        sh.afterNopeGapMinMs + "-" + sh.afterNopeGapMaxMs + " ms after NOPE ends", f[6]);
+      check(label + ": 7. first LEFT/RIGHT >= start call + minGap and within the get-set range", f[7]);
+      check(label + ": 8. start call and NOPE at baseRate, no overlaps in the rep, rest = reset pause", f[8]);
+    });
+
+    // 9. With loose timing, picks made with every legal choice available
+    // should match the weights.
+    const tallies = {};
+    for (let n = 0; n < reps * 4; n++) {
+      planShootersRep(loose, dur, Math.random, (state, legal, survivors, pick) => {
+        if (survivors.length !== legal.length) return;
+        const key = shootersWeightTableKey(state);
+        tallies[key] = tallies[key] || { total: 0, picks: {} };
+        tallies[key].total++;
+        tallies[key].picks[pick] = (tallies[key].picks[pick] || 0) + 1;
+      });
+    }
+    const freqFailures = [];
+    SHOOTERS_WEIGHT_TABLES.forEach(key => {
+      const table = loose.shooters[key];
+      const weightSum = sumOf(Object.keys(table), table);
+      const t = tallies[key];
+      if (!t) {
+        freqFailures.push(key + ": no samples");
+        return;
+      }
+      Object.keys(table).forEach(id => {
+        const want = table[id] / weightSum;
+        const got = (t.picks[id] || 0) / t.total;
+        if (Math.abs(got - want) > 0.02) {
+          freqFailures.push(key + "." + id + " expected " + want.toFixed(3) + " got " + got.toFixed(3));
+        }
+      });
+    });
+    check("shooters loose: 9. pick frequencies match the weights (within 2 points)", freqFailures);
+
+    return shootersFitTable(defaults, dur);
+  }
+
   // ---- Drill profiles ----
   // A profile bundles one drill: its phrase ids, state table, weight tables,
   // a pure planRep(settings, durations, rng), validate(settings, durations),
@@ -874,6 +1333,16 @@ const OffensePlanner = (function () {
       validate: validateOffense,
       fitTable,
       selfTest: driveSelfTest,
+    },
+    shooters: {
+      id: "shooters",
+      phraseIds: START_CALLS.concat(DIRECTIONS, AFTER_DIRECTION, "NOPE"),
+      next: SHOOTERS_NEXT,
+      weightTables: SHOOTERS_WEIGHT_TABLES,
+      planRep: planShootersRep,
+      validate: validateShooters,
+      fitTable: shootersFitTable,
+      selfTest: shootersSelfTest,
     },
   };
 
@@ -914,6 +1383,12 @@ const OffensePlanner = (function () {
     planDriveRep,
     validateOffense,
     fitTable,
+    START_CALLS,
+    SHOOTERS_NEXT,
+    SHOOTERS_WEIGHT_TABLES,
+    planShootersRep,
+    validateShooters,
+    shootersFitTable,
     runSelfTest,
   };
 })();
@@ -1413,16 +1888,25 @@ const OffensePlanner = (function () {
     lines.push(line);
   };
 
-  log("Reaction Caller offense self-test\n");
+  log("Reaction Caller offense self-test (Drive and Shooters)\n");
   const result = OffensePlanner.runSelfTest(log, 10000);
-  console.table(result.fitTable);
+  console.table(result.fitTables.drive);
+  console.table(result.fitTables.shooters);
 
   const s = OffensePlanner.OFFENSE_DEFAULTS;
-  lines.push("\nFit table: minimum drive window at maxRate " + s.maxRate + ", minGap " + s.minGapMs +
+  lines.push("\nDrive fit table: minimum drive window at maxRate " + s.maxRate + ", minGap " + s.minGapMs +
     " ms, buffer " + s.finisherBufferMs + " ms (driveMaxMs " + s.driveMaxMs + ")");
-  result.fitTable.forEach(r => {
+  result.fitTables.drive.forEach(r => {
     lines.push(r.cutOffs + " cut-offs  " + (r.finisher + "                  ").slice(0, 19) +
       String(r.minWindowMs).padStart(5) + " ms  fits: " + r.fitsAtDriveMax);
+  });
+
+  const sh = s.shooters;
+  lines.push("\nShooters fit table: minimum window at maxRate " + s.maxRate + ", minGap " + s.minGapMs +
+    " ms, shot buffer " + sh.shotBufferMs + " ms (windowMaxMs " + sh.windowMaxMs + ")");
+  result.fitTables.shooters.forEach(r => {
+    lines.push(r.cutOffs + " cut-offs  " + (r.sequence + "                         ").slice(0, 26) +
+      String(r.minWindowMs).padStart(5) + " ms  fits: " + r.fitsAtWindowMax);
   });
 
   banner.style.color = result.passed ? "#4fd87c" : "#ff4f5e";
