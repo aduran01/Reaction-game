@@ -508,18 +508,27 @@ const OffensePlanner = (function () {
   }
 
   // The single speech rate a call sequence needs inside window D, or null if it
-  // cannot fit at maxRate.
-  function fitRate(ids, D, s, dur) {
-    const avail = D - s.finisherBufferMs;
+  // cannot fit at maxRate. bufferMs is kept free at the end of the window.
+  function fitRateIn(ids, D, bufferMs, s, dur) {
+    const avail = D - bufferMs;
     const gaps = (ids.length - 1) * s.minGapMs;
     if (avail <= gaps) return null;
     const rate = Math.max(s.baseRate, sumOf(ids, dur) / (avail - gaps));
     return rate <= s.maxRate + 1e-9 ? rate : null;
   }
 
-  // Smallest drive window in which a sequence fits at maxRate.
+  // Smallest window in which a sequence fits at maxRate.
+  function minWindowIn(ids, bufferMs, s, dur) {
+    return sumOf(ids, dur) / s.maxRate + (ids.length - 1) * s.minGapMs + bufferMs;
+  }
+
+  // Drive versions: the finisher buffer is kept free.
+  function fitRate(ids, D, s, dur) {
+    return fitRateIn(ids, D, s.finisherBufferMs, s, dur);
+  }
+
   function minWindowFor(ids, s, dur) {
-    return sumOf(ids, dur) / s.maxRate + (ids.length - 1) * s.minGapMs + s.finisherBufferMs;
+    return minWindowIn(ids, s.finisherBufferMs, s, dur);
   }
 
   function pickWeighted(ids, weights, rng) {
@@ -538,9 +547,11 @@ const OffensePlanner = (function () {
     return null;
   }
 
-  // Lay out a call sequence inside D. Times are ms relative to the LEFT/RIGHT call.
-  function scheduleCalls(ids, D, rate, s, dur) {
-    const avail = D - s.finisherBufferMs;
+  // Lay out a call sequence inside D. Times are ms relative to the window's first
+  // call. The last call ends exactly at D - bufferMs; the middle calls are spaced
+  // evenly between the first and the last.
+  function scheduleCalls(ids, D, rate, bufferMs, dur) {
+    const avail = D - bufferMs;
     const calls = ids.map(id => ({ id, startMs: 0, durMs: dur[id] / rate }));
     const last = calls[calls.length - 1];
     last.startMs = avail - last.durMs;
@@ -596,7 +607,25 @@ const OffensePlanner = (function () {
     }
 
     const rate = fitRate(path, D, s, dur);
-    return { D, rate, calls: scheduleCalls(path, D, rate, s, dur) };
+    return { D, rate, calls: scheduleCalls(path, D, rate, s.finisherBufferMs, dur) };
+  }
+
+  // One Drive rep: READ at 0, the read time (s.readMinMs..s.readMaxMs, from the
+  // shared Min/Max fields), then the drive window, then the reset pause.
+  function planDriveRep(s, dur, rng, onPick) {
+    rng = rng || Math.random;
+    const readMs = randomInt(s.readMinMs, s.readMaxMs, rng);
+    const drive = planDrive(s, dur, rng, onPick);
+    const calls = [{ id: "READ", atMs: 0, durMs: dur.READ / s.baseRate, rate: s.baseRate }];
+    drive.calls.forEach(c => {
+      calls.push({ id: c.id, atMs: readMs + c.startMs, durMs: c.durMs, rate: drive.rate });
+    });
+    return {
+      calls,
+      windows: [{ startMs: readMs, durMs: drive.D }],
+      endMs: readMs + drive.D,
+      restMs: s.resetPauseMs,
+    };
   }
 
   // The shortest possible drive: cheapest LEFT/RIGHT plus its cheapest finisher.
@@ -699,16 +728,10 @@ const OffensePlanner = (function () {
     return rows;
   }
 
-  function runSelfTest(log, drives) {
-    drives = drives || 10000;
-    const EPS = 1e-6;
-    const results = [];
-    const check = (name, failures) => {
-      const ok = failures.length === 0;
-      results.push({ name, ok });
-      log((ok ? "PASS  " : "FAIL  ") + name + (ok ? "" : "  (" + failures.length + " failures, e.g. " + failures[0] + ")"));
-    };
+  const EPS = 1e-6;
 
+  // Drive self-test. check(name, failures) records one PASS/FAIL line.
+  function driveSelfTest(check, drives) {
     const defaults = cloneSettings(OFFENSE_DEFAULTS);
     const dur = durationsFor(defaults, null);
     const tight = Object.assign(cloneSettings(defaults), { driveMinMs: 1400, driveMaxMs: 1400, maxRate: 2, minGapMs: 40 });
@@ -808,10 +831,70 @@ const OffensePlanner = (function () {
     });
     check("loose: 7. pick frequencies match the weights (within 2 points)", freqFailures);
 
-    const table = fitTable(defaults, dur);
+    // The rep wrapper the runner executes: READ at 0, then the drive inside its window.
+    const repSettings = Object.assign(cloneSettings(defaults), { readMinMs: 1000, readMaxMs: 3000 });
+    const repFailures = [];
+    for (let n = 0; n < drives; n++) {
+      const rep = planDriveRep(repSettings, dur, Math.random);
+      const w = rep.windows[0];
+      const first = rep.calls[0];
+      if (first.id !== "READ" || first.atMs !== 0 || first.rate !== repSettings.baseRate) repFailures.push("READ not first");
+      if (rep.windows.length !== 1 || w.startMs < 1000 || w.startMs > 3000) repFailures.push("read time " + w.startMs);
+      if (rep.calls[1].atMs !== w.startMs) repFailures.push("LEFT/RIGHT not at window start");
+      if (rep.endMs !== w.startMs + w.durMs || rep.restMs !== repSettings.resetPauseMs) repFailures.push("endMs/restMs");
+      rep.calls.slice(1).forEach(c => {
+        if (c.atMs < w.startMs - EPS || c.atMs + c.durMs > w.startMs + w.durMs + EPS) repFailures.push(c.id + " outside window");
+      });
+    }
+    check("drive rep: READ at 0, read time in range, calls inside the window", repFailures);
+
+    return fitTable(defaults, dur);
+  }
+
+  // ---- Drill profiles ----
+  // A profile bundles one drill: its phrase ids, state table, weight tables,
+  // a pure planRep(settings, durations, rng), validate(settings, durations),
+  // its fit table and its self-test. Phrases (and learned lengths) are shared by id.
+  //
+  // planRep returns one rep plan, the only shape the runner executes:
+  //   {
+  //     calls:   [{ id, atMs, durMs, rate }],  // every spoken call, ms from the rep start
+  //     windows: [{ startMs, durMs }],         // countdown windows the bar draws
+  //     endMs,                                 // when the rep's last window ends
+  //     restMs                                 // pause after endMs before the next rep
+  //   }
+  // A future mixed drill only has to pick a profile per rep and call its planRep.
+  const PROFILES = {
+    drive: {
+      id: "drive",
+      phraseIds: ["READ"].concat(NEXT.READ, AFTER_DRIVE, SHORT_FINISHERS),
+      next: NEXT,
+      weightTables: WEIGHT_TABLES,
+      planRep: planDriveRep,
+      validate: validateOffense,
+      fitTable,
+      selfTest: driveSelfTest,
+    },
+  };
+
+  // Runs every profile's self-test. Returns { passed, results, fitTables: { drive, … } }.
+  function runSelfTest(log, reps) {
+    reps = reps || 10000;
+    const results = [];
+    const check = (name, failures) => {
+      const ok = failures.length === 0;
+      results.push({ name, ok });
+      log((ok ? "PASS  " : "FAIL  ") + name + (ok ? "" : "  (" + failures.length + " failures, e.g. " + failures[0] + ")"));
+    };
+
+    const fitTables = {};
+    Object.keys(PROFILES).forEach(id => {
+      fitTables[id] = PROFILES[id].selfTest(check, reps);
+    });
+
     const passed = results.every(r => r.ok);
     log((passed ? "ALL PASS" : "SOME CHECKS FAILED") + " (" + results.filter(r => r.ok).length + "/" + results.length + ")");
-    return { passed, results, fitTable: table };
+    return { passed, results, fitTable: fitTables.drive, fitTables };
   }
 
   return {
@@ -821,12 +904,14 @@ const OffensePlanner = (function () {
     LONG_FINISHERS,
     SHORT_FINISHERS,
     WEIGHT_TABLES,
+    PROFILES,
     cloneSettings,
     durationsFor,
     learnDuration,
     fitRate,
     minWindowFor,
     planDrive,
+    planDriveRep,
     validateOffense,
     fitTable,
     runSelfTest,
@@ -1026,17 +1111,20 @@ const OffensePlanner = (function () {
     countdownText.textContent = (remainingMs / 1000).toFixed(1) + " s";
   }
 
+  // Runs rep plans from the active drill profile (see OffensePlanner.PROFILES).
   const offenseMode = {
     settings: null,
+    profile: null,
     timers: [],
     rafId: null,
     runId: 0,
 
     start(settings) {
       this.settings = settings;
+      this.profile = P.PROFILES[settings.drill];
       this.runId++;
       countdownEl.classList.remove("hidden");
-      this.callRead();
+      this.startRep();
     },
 
     // Every timer goes through here so Stop can clear all of them.
@@ -1070,45 +1158,43 @@ const OffensePlanner = (function () {
       };
     },
 
-    callRead() {
+    // Plan one rep and schedule all of it from a single clock origin.
+    startRep() {
       const s = this.settings;
+      const plan = this.profile.planRep(s, s.durations, Math.random);
+
+      // Rep clock: t = 0 is when the first call should be heard. Every call is
+      // spoken speechLeadMs before its planned time to cover TTS start-up, so the
+      // first call goes out right now. Each timer is computed from this origin,
+      // never chained from the previous one, so drift does not accumulate.
+      const origin = performance.now() + s.speechLeadMs;
+      const at = ms => origin + ms - s.speechLeadMs - performance.now();
+
       countdownEl.classList.add("idle");
-      this.say("READ", s.baseRate);
-      this.later(() => this.startDrive(), randomDelay(s.readMinMs, s.readMaxMs));
-    },
-
-    startDrive() {
-      const s = this.settings;
-      const plan = P.planDrive(s, s.durations, Math.random);
-
-      // Drive clock: t = 0 is when LEFT/RIGHT should be heard. Every call is
-      // spoken speechLeadMs before its planned time to cover TTS start-up.
-      const driveStart = performance.now() + s.speechLeadMs;
-      const at = ms => driveStart + ms - s.speechLeadMs - performance.now();
-
-      this.say(plan.calls[0].id, plan.rate);
-      plan.calls.slice(1).forEach(call => {
-        this.later(() => this.say(call.id, plan.rate), at(call.startMs));
+      plan.calls.forEach(call => {
+        const delay = at(call.atMs);
+        if (delay <= 0) this.say(call.id, call.rate);
+        else this.later(() => this.say(call.id, call.rate), delay);
       });
 
-      this.runCountdown(driveStart, plan.D);
-      this.later(() => this.endDrive(plan.D), driveStart + plan.D - performance.now());
+      // The countdown bar is drawn only from plan.windows.
+      plan.windows.forEach(w => {
+        this.later(() => this.runCountdown(origin + w.startMs, w.durMs), at(w.startMs));
+      });
+
+      this.later(() => this.startRep(), origin + plan.endMs + plan.restMs - performance.now());
     },
 
-    runCountdown(driveStart, D) {
+    // Drain the bar from durMs to 0 starting at windowStart; it then sits empty at 0.0 s.
+    runCountdown(windowStart, durMs) {
+      this.stopCountdown();
       countdownEl.classList.remove("idle");
       const tick = () => {
-        const remaining = Math.min(D, Math.max(0, driveStart + D - performance.now()));
-        renderCountdown(remaining, D);
+        const remaining = Math.min(durMs, Math.max(0, windowStart + durMs - performance.now()));
+        renderCountdown(remaining, durMs);
         this.rafId = remaining > 0 ? requestAnimationFrame(tick) : null;
       };
       tick();
-    },
-
-    endDrive(D) {
-      this.stopCountdown();
-      renderCountdown(0, D);
-      this.later(() => this.callRead(), this.settings.resetPauseMs);
     },
 
     stopCountdown() {
@@ -1186,6 +1272,7 @@ const OffensePlanner = (function () {
     });
     s.readMinMs = range.min;
     s.readMaxMs = range.max;
+    s.drill = "drive";
     return s;
   }
 
@@ -1260,7 +1347,7 @@ const OffensePlanner = (function () {
       // Spoken lengths are fixed for the whole run (the ones validated here);
       // anything learned during the run takes effect on the next Start.
       settings.durations = P.durationsFor(settings, learnedMs);
-      const error = P.validateOffense(settings, settings.durations);
+      const error = P.PROFILES[settings.drill].validate(settings, settings.durations);
       if (error) {
         if (error.field === "advanced") {
           advancedEl.open = true;
