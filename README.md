@@ -7,7 +7,7 @@
   - **Drive** simulates a ball-handler driving from the top of the key to the basket. The app calls **READY** (get in your stance, live dribble, wait for the call), then a drive direction (**LEFT** / **RIGHT**), then zero or more reactions to the defense (**CUT OFF**, **LAY UP**), and finally a **finisher** such as **LAY UP LEFT SIDE**. All of it happens inside a timed drive window shown as a countdown bar.
   - **Shooters only** trains sprinting to a spot, catching and dribbling to create space for a shot. The app calls a start call (**SPRINT FROM PAINT**, **SPRINT FROM LEFT CORNER**, **SPRINT FROM RIGHT CORNER** or **CATCH**), then **LEFT** / **RIGHT**, zero or more **CUT OFF**s and **SHOT**, all inside a timed create-space window. Sometimes a **NOPE** (the shot is contested) follows, and a second window starts.
 
-  In both drills, calls are planned so that every spoken phrase fits inside its window and no call ever cuts off another. An Offense session is organized as **sets of reps**. After each set the app says "set done" and shows a quick big-button form where you log how the set went (shots made and attempted, lost handles, missed calls, how it felt). Every set is saved on the device as soon as you log it, then a rest countdown leads into the next set. Ending a session shows a summary compared with your recent sessions, and a **History** screen shows trends over weeks and lets you export and import the log as a backup.
+  In both drills, calls are planned so that every spoken phrase fits inside its window and no call ever cuts off another. An Offense session is organized as **sets of reps**. After each set the app says "set done" and shows a quick big-button form where you log how the set went (shots made and attempted, lost handles, missed calls, how it felt). Every set is saved on the device as soon as you log it, then a rest countdown leads into the next set. Ending a session shows a summary compared with your recent sessions, and a **History** screen shows trends over weeks and lets you export and import the log as a backup. With **Auto difficulty** on, each drill has a level from 1 to 5 that sets its timing and moves up or down after each logged set, so the task stays hard but doable.
 
 The app is meant to run on a phone (iPhone Safari is the main target) propped up nearby while you train. The words are big enough to read from a distance, and the voice means you don't have to look at all.
 
@@ -15,7 +15,7 @@ The whole project is two files:
 
 | File | Size | Purpose |
 |------|------|---------|
-| `index.html` | ~174 KB | The entire app: markup, styles and JavaScript in one page |
+| `index.html` | ~198 KB | The entire app: markup, styles and JavaScript in one page |
 | `server.js` | ~1 KB | A tiny Node.js static file server so phones on your network can open the app |
 
 There is no build step, no `package.json`, no framework and no third-party library.
@@ -35,6 +35,7 @@ There is no build step, no `package.json`, no framework and no third-party libra
    - [Offense: logging a set](#offense-logging-a-set)
    - [Offense: session summary](#offense-session-summary)
    - [History and backup](#history-and-backup)
+   - [Offense: adaptive difficulty](#offense-adaptive-difficulty)
    - [Stopping](#stopping)
    - [What is saved between visits](#what-is-saved-between-visits)
 3. [Offense mode in depth (Drive drill)](#offense-mode-in-depth-drive-drill)
@@ -139,7 +140,7 @@ Each word has a 25% chance on every call, and the same word can repeat. Speech i
 
 Offense is **Call & Execute: move fluency and readiness under unpredictable timing.** Every call tells you exactly what to do; the training effect is executing the move fast and clean when you can't predict when (or which way) the call comes. It does not train reading the defense or making decisions.
 
-Select **Offense** to see the offense panel. At its top is a **Drive | Shooters only** switch (Drive is the default, and your choice is remembered). Below it are the settings for the selected drill, then the **Session** group (reps per set, planned sets, session time warning; see [sessions, sets and reps](#offense-sessions-sets-and-reps)), and at the bottom a collapsible **Speech (both drills)** group: base and max speech rate, minimum gap and speech lead. Both drills use the same session and speech settings.
+Select **Offense** to see the offense panel. At its top is a **Drive | Shooters only** switch (Drive is the default, and your choice is remembered). Below it is **Auto difficulty** (on by default) with each drill's current level and a **Reset level** button (see [adaptive difficulty](#offense-adaptive-difficulty)), then the settings for the selected drill, then the **Session** group (reps per set, planned sets, session time warning; see [sessions, sets and reps](#offense-sessions-sets-and-reps)), and at the bottom a collapsible **Speech (both drills)** group: base and max speech rate, minimum gap and speech lead. Both drills use the same session and speech settings.
 
 | Drill | When to use it |
 |-------|----------------|
@@ -252,7 +253,7 @@ The **Session** group in the offense panel uses big − / + steppers (you can al
 
 An invalid value shows an error under the Session group when you press Start.
 
-During a set, the game screen shows, under the mode label, **SET 2 / 4 · REP 5 / 8** (the current set and rep, out of the planned sets and reps per set), and the elapsed session time (mm:ss) in the top-right corner. Past the plan the set number keeps counting (**SET 5 / 4**). The session clock keeps running between sets.
+During a set, the game screen shows, under the mode label, **SET 2 / 4 · REP 5 / 8 · LVL 3** (the current set and rep, out of the planned sets and reps per set, and the difficulty level when [Auto difficulty](#offense-adaptive-difficulty) is on), and the elapsed session time (mm:ss) in the top-right corner. Past the plan the set number keeps counting (**SET 5 / 4**). The session clock keeps running between sets.
 
 When the **last rep of a set ends** (at the end of its window, without waiting for its reset pause):
 
@@ -279,7 +280,7 @@ Buttons:
 
 | Button | What it does |
 |--------|--------------|
-| **Save & rest** | Saves the set and shows the rest countdown (**Rest between sets**, default 60 s) with a summary of the session so far, e.g. "This session: 3 sets · 14/24 made (58%) · 0.21 errors per rep · 2 of 3 rated sets clean". When it reaches 00:00 a big **Next set** button appears. **End session** is available throughout |
+| **Save & rest** | Saves the set and shows the rest countdown (**Rest between sets**, default 60 s), the level line when Auto difficulty is on (e.g. "Level 3 → 4: nice, timing gets tighter"), and a summary of the session so far, e.g. "This session: 3 sets · 14/24 made (58%) · 0.21 errors per rep · 2 of 3 rated sets clean". When it reaches 00:00 a big **Next set** button appears. **End session** is available throughout |
 | **Save & end session** | Saves the set, ends the session and shows the [session summary](#offense-session-summary) |
 | **Skip logging** | Saves the set with every outcome field (made, attempted, lost handles, missed calls, rating, note) empty (`null`), then rests like Save & rest |
 | **Discard** | Only after Stop mid-set: drops the partial set without saving it and ends the session |
@@ -328,6 +329,53 @@ If the browser can't start a download, the export shows its text in that box ins
 
 The history screen shows the **last export** date ("Never exported." until the first). The start screen shows a gentle reminder when **more than 10 sessions** haven't been exported (sessions that ended after the last export).
 
+### Offense: adaptive difficulty
+
+Learning is best when a task is hard but doable for your current skill (the "challenge point" idea). Instead of hand-editing windows and weights, **Auto difficulty** (in the offense panel, **on** by default) gives each drill a **level from 1 (easiest) to 5** that sets its timing, and moves the level after every logged set.
+
+**When Auto difficulty is on:**
+
+- Planning uses the current level's values (table below). The manual fields those values replace are shown greyed out and read-only, labelled **"set by Level 3"**. Every other field (reset pause, caps, gaps, get-set times, the other weights, speech settings, session settings) still applies as you set it. Your own values in the replaced fields are kept and saved, and come back when you turn Auto difficulty off.
+- Each logged set records its `level` in the training log, and the game screen shows **LVL 3** next to the set counter.
+- After you save a set, the rule below picks the level for the **next** set, and the rest screen shows one line: "Level 3 → 4: nice, timing gets tighter", "Level 3 → 2: easing off so you can lock it in", or "Holding at Level 3" (with the reason when a set couldn't count: too few shots, or a skipped set). The level is stored per drill, so it carries over to your next session.
+- The start screen shows each drill's current level, with a **Reset level** button per drill (back to Level 3).
+
+**When it is off**, everything works exactly as before: your own field values plan the reps, sets are logged with `level: null`, and levels don't change.
+
+**Levels** (all values provisional, in `TRAINING_DEFAULTS.levels`):
+
+| Level | Drive window (ms) | Drive read time (ms) | Drive CUT OFF / LAY UP weights | Shooters window (ms) | Shooters CUT OFF : SHOT | NOPE : END |
+|---|---|---|---|---|---|---|
+| 1 | 2200–2800 | 2000–3500 | 10 / 10 | 1600–2200 | 15 : 85 | 15 : 85 |
+| 2 | 1900–2500 | 1500–3000 | 15 / 15 | 1400–2000 | 25 : 75 | 25 : 75 |
+| 3 | 1600–2200 | 1000–2500 | 20 / 20 | 1200–1800 | 30 : 70 | 35 : 65 |
+| 4 | 1500–2000 | 800–2000 | 28 / 25 | 1050–1600 | 40 : 60 | 40 : 60 |
+| 5 | 1400–1800 | 600–1500 | 35 / 30 | 950–1400 | 45 : 55 | 45 : 55 |
+
+The Drive CUT OFF / LAY UP weights are the CUT OFF and LAY UP entries of `afterDriveOrCutOffWeights` (the three `LAY UP … SIDE` finishers stay at 20 each), so higher levels make drives busier as well as shorter. Shooters levels set `afterDirectionOrCutOffWeights` and `afterShotWeights`.
+
+Every level passes the drill's normal validation, including the shortest-drive and shortest-window fit checks (a self-test check loops over all ten). From the fit tables, at the defaults (`maxRate` 1.6, `minGapMs` 120):
+
+| Level | Drive: most CUT OFFs that fit at the min / max window | Shooters: most CUT OFFs that fit at the min / max window |
+|---|---|---|
+| 1 | 3 / 3 | 2 / 2 |
+| 2 | 2 / 3 | 2 / 2 |
+| 3 | 1 / 3 | 1 / 2 |
+| 4 | 1 / 2 | 1 / 2 |
+| 5 | 1 / 2 | 0 / 2 |
+
+(Drive counts use the cheapest finisher; longer finishers need a little more room.)
+
+**The adjustment rule** (`nextLevel(level, set, cfg)`), applied after each saved set:
+
+- A set only counts if its outcomes were logged (not skipped) and it has **at least 5 shots attempted**. Otherwise the level holds.
+- *success* = made / attempted; *error rate* = (lost handles + missed calls) / reps.
+- **Step up** one level if success ≥ **0.80** and error rate ≤ **0.10**.
+- **Step down** one level if success < **0.50** or error rate ≥ **0.30**.
+- Otherwise **hold**. The level always stays within 1–5.
+
+**These thresholds, the level values and the starting level are starting heuristics to tune, not research-proven values.** The challenge-point idea says to keep practice hard but doable; it doesn't say that 80% or 0.10 errors per rep is the right line for this drill. They are all marked `// provisional` in `TRAINING_DEFAULTS` (`startLevel`, `levelMinAttempts`, `levelUpSuccess`, `levelUpMaxErrorRate`, `levelDownSuccess`, `levelDownErrorRate`, `levels`). Watch your History trends and adjust them.
+
 ### Stopping
 
 **Stop in the middle of an Offense set**, once at least one rep of that set has finished, halts the set and opens the log form for the **partial set**:
@@ -359,6 +407,8 @@ The app uses `localStorage` and saves only:
 | `reactionCaller.log` | The training log: every Offense session and its logged sets (see [The training log](#the-training-log)) | After every saved set (Save & rest, Save & end session, Skip logging), and when a session with saved sets ends |
 | `reactionCaller.log.backup.<time>` | The raw text of a stored log that this version couldn't read (broken, or from a newer version), kept untouched | Once, just before the first new log is saved over it |
 | `reactionCaller.lastExportAt` | ISO time of the last JSON export (download, or copying the JSON text) | On export |
+| `reactionCaller.levels` | Each drill's current level, e.g. `{"drive":3,"shooters":4}` (missing or invalid means Level 3) | After every logged set with Auto difficulty on, and on Reset level |
+| `reactionCaller.autoLevel` | `"on"` or `"off"` (missing means on) | When you tap the Auto difficulty toggle |
 | `reactionCaller.migrations` | Ids of one-time migrations already applied, e.g. `["read-to-ready"]` | Once, on the first load after a migration is added |
 
 Settings are saved by input id, and the Drive and speech fields kept their ids. So settings saved before the Shooters drill or the Session group existed still load, and any field without a saved value shows its default.
@@ -680,7 +730,7 @@ Every logged Offense set is stored in `localStorage` under `reactionCaller.log`.
     endedAt,     // ISO time of the last saved set, then of End session
     sets: [{
       drill,             // "drive" | "shooters"
-      level,             // null for now; filled in by a later step
+      level,             // 1-5 with Auto difficulty on, null with it off
       reps,              // reps completed (fewer than reps per set for a partial set)
       startedAt, endedAt,// ISO times: the set's first rep starts / the set ends
       made, attempted,   // whole numbers, made <= attempted; both null when skipped
@@ -779,6 +829,17 @@ const TRAINING_DEFAULTS = {
   trendMinSessions: 3,        // fewer than this shows "Not enough data"
   backupReminderSessions: 10, // provisional; start-screen export reminder above this
   setDoneSpoken: "set done",  // spoken when a set ends
+
+  // Adaptive difficulty: every value provisional
+  startLevel: 3,
+  levelMinAttempts: 5,
+  levelUpSuccess: 0.80, levelUpMaxErrorRate: 0.10,
+  levelDownSuccess: 0.50, levelDownErrorRate: 0.30,
+  levels: {
+    drive:    [{ driveMinMs: 2200, driveMaxMs: 2800, readMinMs: 2000, readMaxMs: 3500,
+                 "afterDriveOrCutOffWeights.CUT_OFF": 10, "afterDriveOrCutOffWeights.LAY_UP": 10 }, …],
+    shooters: [{ "shooters.windowMinMs": 1600, …, "shooters.afterShotWeights.END": 85 }, …],
+  },
 };
 ```
 
@@ -804,7 +865,7 @@ http://localhost:8080/index.html?selftest=1
 
 Use `/index.html?selftest=1`, not `/?selftest=1`. The bundled `server.js` only maps a bare `/` to `index.html`, so `/?selftest=1` returns "Not found".
 
-Instead of the app, the page runs a simulation of both offense planners (every drill profile's self-test) plus checks of the session helpers and the training log, and prints **PASS** / **FAIL** for each check to the console and to an on-page banner (green when everything passes, red otherwise). There are 60 checks in total: 18 Drive, 21 Shooters, 5 Session, 2 Defaults, 7 Training log and 7 History.
+Instead of the app, the page runs a simulation of both offense planners (every drill profile's self-test) plus checks of the session helpers and the training log, and prints **PASS** / **FAIL** for each check to the console and to an on-page banner (green when everything passes, red otherwise). There are 63 checks in total: 18 Drive, 21 Shooters, 5 Session, 2 Defaults, 3 Levels, 7 Training log and 7 History.
 
 **Drive.** It runs 10,000 drives at the **default** settings and 10,000 at **tight** settings (`D` fixed at 1400 ms, `maxRate` 2.0, `minGapMs` 40), and checks:
 
@@ -841,6 +902,12 @@ Instead of the app, the page runs a simulation of both offense planners (every d
 
 1. the `READ` phrase is shown as READY and spoken "ready"; `migrateLearned` drops a stored `READ` length on the first load but keeps other phrases, records `read-to-ready`, sets the marker even when nothing was stored, and doesn't drop a re-learned value on later loads;
 2. every default Shooters get-set minimum is at least the start call's estimated length at `baseRate` + `minGapMs`, every get-set range is at least 600 ms wide, and the Drive read time range is at least 2000 ms wide.
+
+**Levels.** It checks:
+
+1. both drills have exactly 5 levels that set the same settings, every path exists in `OFFENSE_DEFAULTS`, every level passes the drill's validation (including the shortest-drive / shortest-window fit), plans 500 reps without error, and no level has a longer window than the one below it;
+2. `levelDecision` / `nextLevel`: up at 8/10 with 0.1 errors per rep and exactly at both thresholds (4/5, 1 error in 10 reps); hold at 79% success, at error rate 0.11, and at 50% with 0.29; down at 49% and at error rate 0.30; clamped at 5 and 1; hold with only 4 attempts, for a skipped set and when errors weren't logged; a partial set with 5 attempts counts;
+3. `applyLevel` sets only the level's settings without changing its input (e.g. Shooters Level 4: window 1050, NOPE 40, SHOT 60; Drive Level 1: read 2000, CUT OFF 10, finishers still 20); `normalizeLevels` replaces missing, fractional or out-of-range levels with the start level; `progressLabel` adds " · LVL 3" only when a level is given; `levelMessage` reads "Level 3 → 4: nice, timing gets tighter" and "Holding at Level 3".
 
 **Training log.** It checks `TrainingLog`:
 
@@ -997,16 +1064,17 @@ Notable pieces:
 - **`.game-header`**, **`.session-progress`**, **`.session-clock`**, **`.session-banner`**: the game screen header (mode label, the muted "SET · REP" line and the mm:ss clock in its top-right corner) and the fatigue banner above it (panel background with a yellow left border).
 - **Set log**: `.log-row` puts a label (with a muted `.hint`) and a 56 px stepper on one row, wrapping to two lines on narrow screens; `.segmented.choice` is the 52 px rating row; the note is a `textarea` (16 px text so iPhone doesn't zoom). `#saveRestBtn` is the big blue primary button, `#saveEndBtn` grey, and `.log-minor` holds the outlined **Skip logging** and red **Discard** buttons. Inputs and the textarea re-enable text selection, which the page otherwise turns off.
 - **Rest**: `.rest-count` is the huge mm:ss countdown. **`#nextSetBtn`** / **`#endSessionBtn`**: its big blue button (at least 80 px tall, shown when the rest is over) and grey secondary button.
+- **Adaptive difficulty**: `.toggle-row` / `.toggle-btn` (the 88 × 48 px On/Off button, blue when on), `.level-row` with a `.small-btn` (Reset level), `.level-locked` (a field set by a level, dimmed) with its `.level-note`, and `.level-line` (the rest-screen level message).
 - **Summary and history**: `.stack` stacks cards; `.drill-card` with a `.stat-grid` (a two-column `<dl>`) and `.compare-line`; `.chart` styles the inline SVG (`.axis`, `.tick`, solid `.line-make` in the accent blue, dashed `.line-lost` in orange, dots and axis titles in the same colors) and `.legend`; `.history-item` is a session row (a full-width button plus its `.history-detail` of `.set-line`s); `.confirm` is the red-bordered confirmation box; `.secondary-btn` (grey, 52 px), `.danger-btn` (red) and `.button-row` (side-by-side buttons); `.reminder` is the start-screen export reminder (yellow left border, like the fatigue banner).
 - **`.countdown`**: the track and fill bar plus a tabular-number readout. The fill shrinks via `transform: scaleX(remaining / D)`. `.idle` hides it without changing the layout.
 - Word color classes: `.word-left`, `.word-right`, `.word-up`, `.word-back` (Defense), `.word-read`, `.word-center`, `.word-cut`, `.word-layup` (Drive; LEFT/RIGHT variants reuse the Defense blue and green) and `.word-sprint`, `.word-catch`, `.word-shot`, `.word-nope` (Shooters).
 
 ### Markup
 
-- **Start screen**: mode switch, title, subtitle (changes with the mode and drill), Defense's Min/Max delay panel (`#rangePanel`, hidden in Offense), the offense panel and **Start**. The offense panel holds the drill switch, `#driveSettings` (drive window fields plus Advanced), `#shootersSettings` (window fields, reset pause, Advanced), the shared `#sessionSettings` group (stepper inputs with `data-training` keys into `TRAINING_DEFAULTS`) and the shared `#speech` group. The weight inputs and the Shooters get-set inputs are generated from `OFFENSE_DEFAULTS` at load, so the form always matches the tables in code.
+- **Start screen**: mode switch, title, subtitle (changes with the mode and drill), Defense's Min/Max delay panel (`#rangePanel`, hidden in Offense), the offense panel and **Start**. The offense panel holds the drill switch, `#levelSettings` (the Auto difficulty toggle `#autoLevelBtn`, each drill's level with a Reset level button, and `#levelStatus`), `#driveSettings` (read time and drive window fields plus Advanced), `#shootersSettings` (window fields, reset pause, Advanced), the shared `#sessionSettings` group (stepper inputs with `data-training` keys into `TRAINING_DEFAULTS`) and the shared `#speech` group. The weight inputs and the Shooters get-set inputs are generated from `OFFENSE_DEFAULTS` at load, so the form always matches the tables in code.
 - **Game screen**: fatigue banner (Offense, hidden until due), mode label (`DEFENSE`, `OFFENSE · DRIVE` or `OFFENSE · SHOOTERS`), set/rep line and session clock (Offense only), word stage, countdown (Offense only) and **Stop**.
 - **Set log screen** (`#logScreen`, Offense only): drill label, set title, the four stepper rows, the rating buttons, the collapsed note, an error line and the save / skip / discard buttons.
-- **Rest screen** (`#restScreen`, Offense only): drill label, countdown, session summary, save status, **Next set** (hidden until the rest is over) and **End session**.
+- **Rest screen** (`#restScreen`, Offense only): drill label, countdown, session summary, save status, the level line (`#restLevel`, Auto difficulty only), **Next set** (hidden until the rest is over) and **End session**.
 - **Summary screen** (`#summaryScreen`): session length, one card per drill (`#summaryDrills`) and **Done**.
 - **History screen** (`#historyScreen`): trend cards (`#historyTrends`), the session list (`#historyList`), the backup panel (last export, export / import buttons, a hidden file input, the backup text box and the import confirmation) and **Back**. The start screen also has the **History** button and the `#backupReminder` line.
 
@@ -1036,7 +1104,11 @@ A pure module (an IIFE assigned to `const OffensePlanner`). It contains:
 | `TRAINING_DEFAULTS` | Session structure: reps per set, planned sets, session time warning, rest between sets, the "set done" phrase |
 | `validateSession(t)` | Session settings check; returns `null` or `{ field: "session", message }` |
 | `newSession()` / `beginRep(p)` / `isSetComplete(p, t)` / `beginSet(p)` | The set and rep counter. Progress is `{ set, rep }` (current set from 1, reps started in it) |
-| `progressLabel(p, t)` | "SET 2 / 4 · REP 5 / 8" |
+| `progressLabel(p, t, level)` | "SET 2 / 4 · REP 5 / 8", plus " · LVL 3" when `level` is given |
+| `LEVEL_COUNT`, `levelPaths(drill, t)`, `applyLevel(s, drill, level, t)` | 5; the settings paths a drill's levels set; a copy of the settings with a level applied |
+| `normalizeLevels(stored, t)` | Stored levels → `{ drive, shooters }`, each 1–5 (else `startLevel`) |
+| `levelDecision(level, set, cfg)` / `nextLevel(level, set, cfg)` | The adjustment rule: `{ level, change }` (`up`, `down`, `hold`, `atTop`, `atBottom`, `tooFew`, `skipped`) / just the level |
+| `levelMessage(from, decision, cfg)` | The rest-screen line |
 | `formatElapsed(ms)` | Session clock text, mm:ss |
 | `sessionWarningDue(elapsedMs, t)` / `sessionWarningText(t)` | When the fatigue banner is due, and its text |
 | `runSelfTest(log, reps)` | The simulation (every profile's self-test, then the session checks); returns `{ passed, results, fitTable, fitTables: { drive, shooters } }` |
@@ -1082,6 +1154,7 @@ Wrapped in an IIFE, so nothing leaks into the global scope. If `?selftest=1` is 
 - **Settings form**: inputs carry `data-setting` paths into `OFFENSE_DEFAULTS` (e.g. `shooters.windowMinMs`, `shooters.getSetMs.CATCH.minMs`), read and written with `getPath` / `setPath`. Session inputs carry `data-training` keys into `TRAINING_DEFAULTS`, read by `readTrainingSettings()` into `settings.training`. `wireSteppers(root)` makes each − / + button inside `root` (the offense panel and the set log) step its input by the input's `step`, clamped to its `min` / `max`, and fires `input` so the value is handled like typing. `buildWeightTables()` (once per drill), `buildGetSetFields()`, `fillOffenseDefaults()`, `readOffenseSettings()` (empty fields become `NaN` so validation catches them), `saveSettings()` / `loadSettings()`.
 - **`updateView`, `selectMode`, `selectDrill`**: show the right panels, labels and subtitle for the mode and drill.
 - **`startGame` / `stopGame`**: validate (the Min/Max fields only for Defense and Drive, then the drill's `validate`, then `validateSession`; `showError` puts the message in the right place via `ERROR_TARGETS`), prime speech, switch screens, show the session clock and set/rep line only in Offense, start a new session record (Offense), start or stop the active mode, and cancel speech. `stopGame` ends the session and writes its end time to the log if it has saved sets. `stopPressed` (the Stop button) halts the set and opens the partial-set log instead when an Offense set has at least one finished rep.
+- **Adaptive difficulty**: `levels` (from `reactionCaller.levels` via `normalizeLevels`) and `autoLevel` hold the state. `updateLevelView()` shows the levels and toggle, and with Auto on calls `lockInput()` on every setting or weight input whose path a level sets (it keeps the manual value in `data-manual-value`, makes the input read-only and adds the "set by Level N" note); `unlockInput()` restores it. `manualValue(input)` is what `saveSettings()` and `readOffenseSettings()` use, so level values are never saved as your own. `startGame` keeps the manual settings in `runBaseSettings` and applies the level on top (`settings.level`, or `null` with Auto off). After a set is committed, `adjustLevel(set)` runs `levelDecision`, stores the new level and prepares the rest-screen line; `applyCurrentLevel()` (in the **Next set** tap) re-applies the level to `runBaseSettings` for the next set, keeping the spoken lengths validated at Start (if those settings don't validate, the previous ones are kept).
 - **Summary, history and backup**: `showSummary(session)` builds one `drillCard` per drill from `summarizeByDrill` and `compareWithPrevious`. `openHistory()` renders `renderTrends()` (one `trendChart(series)` inline SVG per drill, from `trendGeometry`), `renderSessionList()` (rows that expand into `sessionDetail` with the delete confirmation) and `renderLastExport()`. `exportJson()` / `exportCsv()` use `downloadText()` (a `Blob` and an `<a download>` click), falling back to `showBackupText()`. `importText()` parses with `parseImport`, previews with `mergeLogs` and asks via the confirmation box when sessions conflict; `applyImport(replace)` merges and saves. `saveTrainingLog(log)` saves any changed log; `updateBackupReminder()` runs on load and on every return to the start screen (`showStart()`).
 - **Set log and rest**: `trainingLog` is the state from `TrainingLog.openLog(logStore)` (`logStore` wraps `storageGet` / `storageSet`). `openSetLog(partial)` fills the form for the set that just ended, with its settings snapshot. `commitSet()` validates with `TrainingLog.validateSet`, adds the set to the session and saves the whole log (`persistSession` → `upsertSession` + `saveTrainingLog` → `saveLog`). `showRest()` runs the rest countdown and shows `summarizeSession`; `startNextSet()` primes speech and starts the next set.
 
@@ -1123,6 +1196,8 @@ Runs only with `?selftest=1`. It hides the app, calls `OffensePlanner.runSelfTes
 - **Trends are per drill and per session.** Make % and lost handles are drawn on two axes in one small chart; missed calls and clean share are only in the session summary and the session list.
 - **Import can't undo.** Replacing conflicting sessions or deleting a session is permanent, unless you have an exported backup.
 - **Next set waits for the rest to finish.** There is no way to cut the rest short except setting **Rest between sets** lower (0 = none).
+- **Levels move one step per logged set**, based on that set alone (no averaging over several sets), and only in Offense with Auto difficulty on. Sets logged with it off have `level: null` and don't move the level.
+- **Levels are validated with the estimated spoken lengths.** If your voice is much slower than estimated, a level's shortest window could fail at Start (the error says what it needs); mid-session, a level that doesn't fit is skipped and the previous settings are kept. Turning Auto difficulty off lets you set the windows by hand.
 - **Planned sets is a target, not a limit.** After the last planned set the app still offers **Next set**; only you end the session. The fatigue warning likewise never stops the session.
 - **Defense has no sets, reps or session clock.** It still runs until you press Stop.
 - **No pause or resume.** Ending a session keeps its saved sets in the log, but the next Start begins a new session at set 1. A partial set you **Discard** is not saved.
@@ -1160,6 +1235,8 @@ Runs only with `?selftest=1`. It hides the app, calls `OffensePlanner.runSelfTes
 | Offense calls are heard later than the countdown suggests | Voice slower than planned, or slow to start | Let it learn for a few drives, set **Speech lead** to 100–200 ms, or add a **Finisher buffer** |
 | Long drives with several CUT OFFs never happen | They don't fit in the drive window | Raise the max drive window or max speech rate (check the fit table) |
 | A phrase is mispronounced | The voice's reading of the `spoken` text | Change `spoken` for that phrase in `OFFENSE_DEFAULTS.phrases` |
+| Window, read time or some weight fields are greyed out and won't change | Auto difficulty is on, so the level sets them ("set by Level N") | Turn **Auto difficulty** off to use your own values (they were kept) |
+| The level never changes | Auto difficulty is off, sets are skipped, or sets have fewer than 5 shots attempted | Log made/attempted with at least 5 attempts (the rest screen says why it held) |
 | Changed a default in code but the form still shows the old value | A saved value overrides it | Run `localStorage.removeItem("reactionCaller.settings")` on the app's page |
 | Defense words sound cut off | Delay shorter than the spoken word | Raise the **Min delay** |
 | "The shortest window (LEFT + SHOT) needs at least N ms…" | Shooters min window too small for LEFT/RIGHT + SHOT at the max rate (possibly because learned lengths grew) | Raise the **Min window** to N, raise the max speech rate, or lower the min gap |
@@ -1186,7 +1263,7 @@ Runs only with `?selftest=1`. It hides the app, calls `OffensePlanner.runSelfTes
 - An option for one countdown bar over the whole Shooters rep (a change to what the planner puts in `windows`).
 - A "Reset to defaults" button and a way to view or clear learned lengths from the UI.
 - Charts for missed calls and clean share, and a per-week view.
-- Fill each set's `level` and adapt difficulty from the logged results.
+- Tune the level thresholds from real logs, e.g. adjust over the last two or three sets instead of one, and chart the level in History.
 - An option to prevent the same Defense word twice in a row.
 - Voice picker and a mute toggle (visual-only mode).
 - Harden the server: serve only `index.html`, map `/?…` to `index.html`, use a `ROOT + path.sep` prefix check, and make the port configurable.
