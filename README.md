@@ -7,7 +7,7 @@
   - **Drive** simulates a ball-handler driving from the top of the key to the basket. The app calls **READ**, then a drive direction (**LEFT** / **RIGHT**), then zero or more reactions to the defense (**CUT OFF**, **LAY UP**), and finally a **finisher** such as **LAY UP LEFT SIDE**. All of it happens inside a timed drive window shown as a countdown bar.
   - **Shooters only** trains sprinting to a spot, catching and dribbling to create space for a shot. The app calls a start call (**SPRINT FROM PAINT**, **SPRINT FROM LEFT CORNER**, **SPRINT FROM RIGHT CORNER** or **CATCH**), then **LEFT** / **RIGHT**, zero or more **CUT OFF**s and **SHOT**, all inside a timed create-space window. Sometimes a **NOPE** (the shot is contested) follows, and a second window starts.
 
-  In both drills, calls are planned so that every spoken phrase fits inside its window and no call ever cuts off another. An Offense session is organized as **sets of reps**: after each set the app says "set done" and waits for you to start the next set or end the session.
+  In both drills, calls are planned so that every spoken phrase fits inside its window and no call ever cuts off another. An Offense session is organized as **sets of reps**. After each set the app says "set done" and shows a quick big-button form where you log how the set went (shots made and attempted, lost handles, missed calls, how it felt). Every set is saved on the device as soon as you log it, then a rest countdown leads into the next set.
 
 The app is meant to run on a phone (iPhone Safari is the main target) propped up nearby while you train. The words are big enough to read from a distance, and the voice means you don't have to look at all.
 
@@ -15,7 +15,7 @@ The whole project is two files:
 
 | File | Size | Purpose |
 |------|------|---------|
-| `index.html` | ~99 KB | The entire app: markup, styles and JavaScript in one page |
+| `index.html` | ~129 KB | The entire app: markup, styles and JavaScript in one page |
 | `server.js` | ~1 KB | A tiny Node.js static file server so phones on your network can open the app |
 
 There is no build step, no `package.json`, no framework and no third-party library.
@@ -32,6 +32,7 @@ There is no build step, no `package.json`, no framework and no third-party libra
    - [Offense: Drive drill](#offense-drive-drill)
    - [Offense: Shooters only drill](#offense-shooters-only-drill)
    - [Offense: sessions, sets and reps](#offense-sessions-sets-and-reps)
+   - [Offense: logging a set](#offense-logging-a-set)
    - [Stopping](#stopping)
    - [What is saved between visits](#what-is-saved-between-visits)
 3. [Offense mode in depth (Drive drill)](#offense-mode-in-depth-drive-drill)
@@ -51,6 +52,7 @@ There is no build step, no `package.json`, no framework and no third-party libra
    - [Planning a Shooters rep](#planning-a-shooters-rep)
    - [Shooters validation](#shooters-validation)
 5. [Drill profiles and rep plans](#drill-profiles-and-rep-plans)
+   - [The training log](#the-training-log)
 6. [Tuning offense mode](#tuning-offense-mode)
 7. [Project structure](#project-structure)
 8. [Architecture overview](#architecture-overview)
@@ -248,6 +250,7 @@ The **Session** group in the offense panel uses big − / + steppers (you can al
 | Reps per set | 8 | whole number 3–30 | Reps before the set ends |
 | Planned sets | 4 | whole number 1–20 | Your target. It is shown on the game screen, but it is **not a hard stop**: you can keep going |
 | Session time warning (min) | 45 | whole number ≥ 0 (0 = off) | When the session clock reaches it, a calm banner appears at the top of the game screen: "45 min: decision quality and technique drop with fatigue. Consider finishing this set and stopping." The session is never stopped automatically, and the banner stays until the session ends |
+| Rest between sets (s) | 60 | whole number 0–600 | The rest countdown after **Save & rest** or **Skip logging** (steps of 15 s) |
 
 An invalid value shows an error under the Session group when you press Start.
 
@@ -257,20 +260,53 @@ When the **last rep of a set ends** (at the end of its window, without waiting f
 
 1. no more reps are scheduled;
 2. the voice says **"set done"**, queued behind the last call so it never cuts it off;
-3. the **Set complete** screen appears: "Set 2 of 4 done." (after the last planned set it adds "That's every planned set. End the session, or keep going."), with a big **Next set** button and an **End session** button.
+3. the **set log** form appears (see [logging a set](#offense-logging-a-set)).
 
-**Next set** starts the next set right away, beginning with its first call (READ or a Shooters start call). The tap unlocks speech again on iPhone. **End session** returns to the start screen, like Stop.
+### Offense: logging a set
 
-The Set complete screen is a placeholder. A form for logging the set's results will replace it.
+You log a set only **after** it ends, never during it. The form is one screen of big controls (− / + steppers at least 56 px tall, three large rating buttons), so it works with sweaty hands. You can also type into the number fields.
+
+The top shows the drill and what you are logging, e.g. **OFFENSE · SHOOTERS** / **Set 2 · 8 reps**, or **Partial set 2 · 5 of 8 reps** after Stop.
+
+| Field | Default | Meaning |
+|-------|---------|---------|
+| **Shots made** | 0 | Shots or finishes you made. Can't go above attempted: the + button stops there, and lowering attempted pulls made down with it |
+| **Shots attempted** | the reps in the set | Each rep ends in exactly one real shot or finish (a SHOT followed by NOPE doesn't count), so this is normally the rep count |
+| **Lost handles** | 0 | Lost dribble, travel, or picked up the dribble early |
+| **Missed or late calls** | 0 | Calls you didn't react to in time |
+| **How did the set feel?** | none | One tap: **Clean**, **Rushed** or **Off-balance**. Optional; tap the selected one again to clear it |
+| **Note** | empty | Optional free text (up to 500 characters), under a collapsed "Add a note" |
+
+Buttons:
+
+| Button | What it does |
+|--------|--------------|
+| **Save & rest** | Saves the set and shows the rest countdown (**Rest between sets**, default 60 s) with a summary of the session so far, e.g. "This session: 3 sets · 14/24 made (58%) · 0.21 errors per rep · 2 of 3 rated sets clean". When it reaches 00:00 a big **Next set** button appears. **End session** is available throughout |
+| **Save & end session** | Saves the set and returns to the start screen |
+| **Skip logging** | Saves the set with every outcome field (made, attempted, lost handles, missed calls, rating, note) empty (`null`), then rests like Save & rest |
+| **Discard** | Only after Stop mid-set: drops the partial set without saving it and ends the session |
+
+If a value is invalid (e.g. you typed made 9 with attempted 8, or left a field empty), the reason shows above the buttons and nothing is saved until you fix it.
+
+**Next set** starts the next set right away, beginning with its first call (READ or a Shooters start call). The tap unlocks speech again on iPhone. **End session** returns to the start screen.
+
+The rest screen says "Set saved." after each save, or "Couldn't save to this device. Storage may be blocked or full." if storage refused it. Training carries on either way. What is stored is described in [The training log](#the-training-log).
 
 ### Stopping
 
-Press **Stop** in any mode or drill (or **End session** on the Set complete screen) to:
+**Stop in the middle of an Offense set**, once at least one rep of that set has finished, halts the set and opens the log form for the **partial set**:
+
+- every pending call and the countdown are cleared and speech is silenced immediately, as before;
+- the form shows "Partial set *n* · *done* of *planned* reps", with attempted defaulting to the reps completed (the rep in progress when you pressed Stop doesn't count);
+- it has the same buttons plus **Discard**. Save & rest and Skip logging continue the session (rest, then the next set); Save & end session and Discard end it.
+
+**Stop in Defense**, or in Offense before any rep of the current set has finished, and **End session** (on the rest screen) or **Discard**:
 
 - cancel every pending call (Offense keeps all its timers in one list and clears them all, whatever state the rep is in: start call, get-set, mid-window, NOPE gap or reset pause);
-- stop the countdown animation and the session clock;
+- stop the countdown animation, the session clock and any rest countdown;
 - silence speech immediately (`speechSynthesis.cancel()`);
-- return to the start screen. Your settings stay in the fields. The set and rep count are not kept: the next Start begins a new session at set 1.
+- write the session's end time to the training log, if it has saved sets;
+- return to the start screen. Your settings stay in the fields. The next Start begins a new session at set 1.
 
 Speech events that arrive late from a stopped run are ignored.
 
@@ -284,10 +320,12 @@ The app uses `localStorage` and saves only:
 | `reactionCaller.offenseDrill` | `"drive"` or `"shooters"` (missing or unknown means Drive) | When you tap the drill switch |
 | `reactionCaller.settings` | The raw text of the shared Min/Max fields and every offense field: Drive window and Advanced values, the shared speech settings, every Shooters field (window, reset pause, get-set ranges, gaps, buffer, caps), every weight and the Session fields (reps per set, planned sets, session time warning), keyed by input id | Whenever you edit any of those fields, by typing or with the − / + steppers |
 | `reactionCaller.learnedMs` | Learned spoken length of each offense phrase, Drive and Shooters alike (see [Learned spoken lengths](#learned-spoken-lengths)) | After each measured offense call |
+| `reactionCaller.log` | The training log: every Offense session and its logged sets (see [The training log](#the-training-log)) | After every saved set (Save & rest, Save & end session, Skip logging), and when a session with saved sets ends |
+| `reactionCaller.log.backup.<time>` | The raw text of a stored log that this version couldn't read (broken, or from a newer version), kept untouched | Once, just before the first new log is saved over it |
 
 Settings are saved by input id, and the Drive and speech fields kept their ids. So settings saved before the Shooters drill or the Session group existed still load, and any field without a saved value shows its default.
 
-Nothing else is stored. Sessions, sets and reps are not recorded yet. Every storage access is wrapped in `try/catch`. If storage is blocked (private mode, disabled site data), the app works normally with the built-in defaults and just doesn't remember anything.
+Nothing else is stored. Every storage access is wrapped in `try/catch`. If storage is blocked (private mode, disabled site data), the app works normally with the built-in defaults and just doesn't remember anything; the rest screen then says the set couldn't be saved.
 
 To reset everything to defaults, clear the site's data in your browser, or run `localStorage.clear()` in the browser console on the app's page.
 
@@ -411,7 +449,7 @@ The same runner executes every drill's rep plan:
 1. When a rep starts, the app records the rep clock origin with `performance.now()` (plus `speechLeadMs`, so t = 0 is when the first call should be *heard*). The first call (READ, or a Shooters start call) is spoken right away.
 2. Every later call gets its own `setTimeout`, computed from that origin rather than chained from the previous timer, so drift doesn't accumulate. Each fires `speechLeadMs` early. The word appears at the same moment it is sent to the voice, at the call's planned rate.
 3. The countdown bar is drawn **only from `plan.windows`**. At each window's start it drains on `requestAnimationFrame` from the same clock, then sits empty at "0.0 s". It is hidden from the start of the rep until the first window.
-4. When `endMs + restMs` has passed, the runner plans and starts the next rep. If the rep was the **last of its set**, the runner instead ends the set at `endMs` (the rest is not waited for): it says "set done" with `cancel: false` and shows the Set complete screen. **Next set** starts the next set's first rep inside that tap (see [sessions, sets and reps](#offense-sessions-sets-and-reps)).
+4. When `endMs + restMs` has passed, the runner plans and starts the next rep. If the rep was the **last of its set**, the runner instead ends the set at `endMs` (the rest is not waited for): it says "set done" with `cancel: false` and shows the set log form. **Next set** starts the next set's first rep inside that tap (see [sessions, sets and reps](#offense-sessions-sets-and-reps)).
 5. On **Start** (and on **Next set**), Offense speaks the first call immediately, right after unlocking speech inside the click. That unlock is required on iPhone.
 
 Every timer goes into one list, so Stop clears all of them in any state. The session clock runs on its own interval, which Stop also clears. A run id makes late `onend` events from a stopped run be ignored. In Offense the runner never calls `speechSynthesis.cancel()` between calls; only Stop does.
@@ -588,6 +626,60 @@ The runner ([Running a rep](#running-a-rep)) knows nothing about drills: it spea
 
 A mixer is **not built yet**. It would be a third profile (e.g. `mixed`) whose `planRep` picks Drive or Shooters per rep and calls that profile's `planRep`, plus a third button in the drill switch. Its settings would need both drills' validations, and the Drive read time.
 
+### The training log
+
+Every logged Offense set is stored in `localStorage` under `reactionCaller.log`. The log is saved after **every** set, not only at the end of the session, so nothing is lost if Safari closes the tab mid-session.
+
+```js
+{
+  version: 1,
+  sessions: [{
+    id,          // e.g. "slx8k2a3f9q1", made at Start
+    startedAt,   // ISO time of Start
+    endedAt,     // ISO time of the last saved set, then of End session
+    sets: [{
+      drill,             // "drive" | "shooters"
+      level,             // null for now; filled in by a later step
+      reps,              // reps completed (fewer than reps per set for a partial set)
+      startedAt, endedAt,// ISO times: the set's first rep starts / the set ends
+      made, attempted,   // whole numbers, made <= attempted; both null when skipped
+      lostHandles,       // whole number or null
+      missedCalls,       // whole number or null
+      quality,           // "clean" | "rushed" | "off_balance" | null
+      note,              // string (max 500) or null
+      settingsSnapshot,  // copy of the timing settings this set ran with
+      extra: {}          // for later drills to add their own fields
+    }]
+  }]
+}
+```
+
+A session only appears in the log once its first set is saved. Partial sets are kept as normal sets with fewer `reps`; compare with `settingsSnapshot.repsPerSet` to spot them.
+
+**`settingsSnapshot`** keeps old sets interpretable after you change settings. It holds, for both drills, the speech settings (`baseRate`, `maxRate`, `minGapMs`, `speechLeadMs`) and `repsPerSet`, plus:
+
+- **Drive**: read time (`readMinMs` / `readMaxMs`), drive window, reset pause, finisher buffer, both caps and the three weight tables;
+- **Shooters**: the whole `shooters` settings object (window, get-set times, shot buffer, nope gaps, reset pause, caps and the five weight tables).
+
+**Summaries** (pure helpers in `TrainingLog`):
+
+| Helper | Returns |
+|--------|---------|
+| `setSuccess(set)` | `made / attempted`, or `null` when skipped or nothing was attempted |
+| `setErrorRate(set)` | `(lostHandles + missedCalls) / reps`, or `null` when skipped |
+| `summarizeSession(session)` | Totals (`sets`, `reps`, `made`, `attempted`, `lostHandles`, `missedCalls`), `makePct` (made / attempted over sets with shots logged), `errorsPerRep` (errors over the reps of sets with errors logged), and `cleanShare` (sets rated Clean / sets with any rating). Each rate is `null` when there is nothing to count |
+
+**Versioning and safety.** The log carries a schema `version`. On load:
+
+| Stored text | What happens |
+|-------------|--------------|
+| nothing | A new log is started |
+| a version 1 log | It is used and appended to |
+| broken JSON, not a log, or an unknown version | A new empty log is started **alongside** it. The stored text is not touched until the first set is saved; then it is first copied, unchanged, to `reactionCaller.log.backup.<time>` and read back. Only if that copy succeeded is the new log written to `reactionCaller.log` |
+| a newer version (e.g. 2) | The same: kept as a backup, never deleted or overwritten |
+
+If the backup can't be written (storage full), the log is not saved at all, so the old data is never lost; the rest screen then says the set couldn't be saved.
+
 ---
 
 ## Tuning offense mode
@@ -639,6 +731,7 @@ const TRAINING_DEFAULTS = {
   repsPerSet: 8,              // whole number 3-30
   plannedSets: 4,             // whole number 1-20; a target, not a hard stop
   sessionWarningMin: 45,      // provisional; 0 = off
+  restSec: 60,                // provisional; rest countdown after a logged set, 0-600
   setDoneSpoken: "set done",  // spoken when a set ends
 };
 ```
@@ -665,7 +758,7 @@ http://localhost:8080/index.html?selftest=1
 
 Use `/index.html?selftest=1`, not `/?selftest=1`. The bundled `server.js` only maps a bare `/` to `index.html`, so `/?selftest=1` returns "Not found".
 
-Instead of the app, the page runs a simulation of both offense planners (every drill profile's self-test) plus checks of the session helpers, and prints **PASS** / **FAIL** for each check to the console and to an on-page banner (green when everything passes, red otherwise). There are 44 checks in total: 18 Drive, 21 Shooters and 5 Session.
+Instead of the app, the page runs a simulation of both offense planners (every drill profile's self-test) plus checks of the session helpers and the training log, and prints **PASS** / **FAIL** for each check to the console and to an on-page banner (green when everything passes, red otherwise). There are 51 checks in total: 18 Drive, 21 Shooters, 5 Session and 7 Training log.
 
 **Drive.** It runs 10,000 drives at the **default** settings and 10,000 at **tight** settings (`D` fixed at 1400 ms, `maxRate` 2.0, `minGapMs` 40), and checks:
 
@@ -693,10 +786,20 @@ Instead of the app, the page runs a simulation of both offense planners (every d
 **Session.** It checks the pure session helpers:
 
 1. `TRAINING_DEFAULTS` passes `validateSession`;
-2. `validateSession` rejects out-of-range, fractional and missing values (reps per set 2 / 31 / 8.5, planned sets 0 / 21 / 1.5, warning −1 / 2.5, and NaN for each) and accepts the bounds (3, 30, 1, 20, warning 0);
+2. `validateSession` rejects out-of-range, fractional and missing values (reps per set 2 / 31 / 8.5, planned sets 0 / 21 / 1.5, warning −1 / 2.5, rest −1 / 601 / 2.5, and NaN for each) and accepts the bounds (3, 30, 1, 20, warning 0, rest 0 and 600);
 3. walking 6 sets (past the 4 planned) with 3, 8 and 30 reps per set, every set ends after exactly that many reps, and the label reads "SET s / 4 · REP r / n" at every rep;
 4. `formatElapsed` gives mm:ss (e.g. 754000 ms → "12:34", 4503000 ms → "75:03", negative → "00:00");
 5. the fatigue warning is due at and after 45 min but not 1 ms before, never when set to 0, and its text starts with "45 min: decision quality".
+
+**Training log.** It checks `TrainingLog`:
+
+1. valid sets pass `validateSet`: a full set, a skipped set (all outcomes `null`), a note, made = attempted, 0 of 0, every rating, both drills;
+2. `validateSet` rejects made > attempted, negative, fractional, NaN and string counts, made without attempted, unknown or wrongly cased ratings ("great", "Clean"), an unknown drill, 0 reps, a note over 500 characters, a missing `extra`, snapshot or end time;
+3. the math: `setSuccess` (5/8, and `null` when skipped or 0 attempted), `setErrorRate` (3 errors in 6 reps = 0.5, `null` when skipped), and `summarizeSession` on a 4-set session with a skipped and a partial set (28 reps, 10/20 made = 50%, 4 errors over 20 logged reps = 0.2 per rep, 2 of 3 rated sets clean), plus an empty session (all rates `null`);
+4. `snapshotSettings` holds the drill's own windows, read or get-set times, weights, caps and speech settings (and nothing from the other drill), as a deep copy that later setting changes don't affect;
+5. `upsertSession` appends a new session, replaces one with the same id, and doesn't change the log it was given;
+6. `parseLog` reads a version 1 log; treats missing or empty text as a new log; and for a newer version (2, 99), a missing or string version, a non-array `sessions`, invalid JSON, `null`, an array, a number or a string returns a new empty log plus the original text to keep, without throwing;
+7. with a fake store: opening a version 2 log doesn't change it; the first save copies it byte-for-byte to `reactionCaller.log.backup.<time>` and then writes the new log; a second save makes no new backup; when the backup can't be written, the broken log is left untouched and the save reports failure; a valid log keeps its sessions across reopen and save.
 
 It also prints a **Drive fit table**: for 0–3 cut-offs and each finisher, the minimum drive window needed at `maxRate`, and whether it fits at `driveMaxMs`. With the defaults (`maxRate` 1.6, `minGapMs` 120, buffer 0, `driveMaxMs` 2000):
 
@@ -721,7 +824,7 @@ So every window size in the default 1000–1800 range can take 0 or 1 CUT OFF, a
 
 The self-test uses `OFFENSE_DEFAULTS`, `TRAINING_DEFAULTS` and the seed estimates only. It ignores saved settings and learned lengths, and in self-test mode the normal app never starts.
 
-You can run the same checks without a browser: the planner script has no DOM access, so it can be pulled out of `index.html` and run under Node with `OffensePlanner.runSelfTest(console.log)`.
+You can run the same checks without a browser: the planner script has no DOM access, so it can be pulled out of `index.html` and run under Node with `OffensePlanner.runSelfTest(console.log, 10000, [TrainingLog.selfTest])` (the third argument adds the training log checks).
 
 ---
 
@@ -750,22 +853,26 @@ Reaction game/
                      │   ├─ Start screen: mode switch, settings, Start    │
                      │   ├─ Game screen: mode label, set/rep, clock,      │
                      │   │    word, countdown, Stop                       │
-                     │   ├─ Set complete screen: Next set, End session    │
+                     │   ├─ Set log screen: steppers, rating, note, save  │
+                     │   ├─ Rest screen: countdown, summary, Next set     │
                      │   ├─ Script 1: OffensePlanner (pure functions)     │
                      │   │    OFFENSE_DEFAULTS, TRAINING_DEFAULTS, state  │
                      │   │    tables, fit/plan, validation, learning      │
                      │   │    math, session helpers, drill profiles,      │
                      │   │    self-test                                   │
+                     │   │  + TrainingLog (pure): set validation,         │
+                     │   │    snapshots, summaries, versioned load/save   │
                      │   ├─ Script 2: the app                             │
                      │   │    speech, Defense mode, Offense rep and set   │
-                     │   │    runner, settings form, localStorage         │
+                     │   │    runner, set log form, rest, settings form,  │
+                     │   │    localStorage                                │
                      │   └─ Script 3: ?selftest=1 page (inactive normally)│
                      └────────────────────────────────────────────────────┘
 ```
 
 All logic runs **in the browser**. The server only delivers files and has no game state, API or database.
 
-The planner is kept pure on purpose: its functions take settings, spoken lengths and an injectable `rng` (default `Math.random`) and return plain data. They never touch the DOM, timers or speech. That is what lets the self-test simulate tens of thousands of drives and reps in under a second, using exactly the code the game uses. Each drill is a profile whose `planRep` returns a rep plan, and the runner in Script 2 only executes rep plans (see [Drill profiles and rep plans](#drill-profiles-and-rep-plans)).
+The planner is kept pure on purpose: its functions take settings, spoken lengths and an injectable `rng` (default `Math.random`) and return plain data. They never touch the DOM, timers or speech. That is what lets the self-test simulate tens of thousands of drives and reps in under a second, using exactly the code the game uses. Each drill is a profile whose `planRep` returns a rep plan, and the runner in Script 2 only executes rep plans (see [Drill profiles and rep plans](#drill-profiles-and-rep-plans)). `TrainingLog` follows the same rule: it never touches `localStorage` itself, but reads and writes through a store object (`{ get, set }`) that the app passes in and the self-test fakes.
 
 ---
 
@@ -825,7 +932,8 @@ Notable pieces:
 - **`#word`**: the called word, `clamp(3rem, 16vw, 6rem)`, weight 800, uppercase. It is invisible by default (opacity 0, scale 0.85). Adding `.show` fades and grows it in over 120 ms. **`#word.long`** (over 7 characters) drops to `clamp(2rem, 10vw, 3.75rem)`, centers and allows wrapping. **`#word.xlong`** (over 18 characters, i.e. "SPRINT FROM LEFT/RIGHT CORNER") drops further to `clamp(1.6rem, 8vw, 3rem)`, which puts it on two lines at 320 px.
 - **`.stepper`**: a number input between − and + buttons, each at least 48 px tall, for fields filled in by hand (the Session group).
 - **`.game-header`**, **`.session-progress`**, **`.session-clock`**, **`.session-banner`**: the game screen header (mode label, the muted "SET · REP" line and the mm:ss clock in its top-right corner) and the fatigue banner above it (panel background with a yellow left border).
-- **`#nextSetBtn`** / **`#endSessionBtn`**: the Set complete screen's big blue button (at least 80 px tall) and its grey secondary button.
+- **Set log**: `.log-row` puts a label (with a muted `.hint`) and a 56 px stepper on one row, wrapping to two lines on narrow screens; `.segmented.choice` is the 52 px rating row; the note is a `textarea` (16 px text so iPhone doesn't zoom). `#saveRestBtn` is the big blue primary button, `#saveEndBtn` grey, and `.log-minor` holds the outlined **Skip logging** and red **Discard** buttons. Inputs and the textarea re-enable text selection, which the page otherwise turns off.
+- **Rest**: `.rest-count` is the huge mm:ss countdown. **`#nextSetBtn`** / **`#endSessionBtn`**: its big blue button (at least 80 px tall, shown when the rest is over) and grey secondary button.
 - **`.countdown`**: the track and fill bar plus a tabular-number readout. The fill shrinks via `transform: scaleX(remaining / D)`. `.idle` hides it without changing the layout.
 - Word color classes: `.word-left`, `.word-right`, `.word-up`, `.word-back` (Defense), `.word-read`, `.word-center`, `.word-cut`, `.word-layup` (Drive; LEFT/RIGHT variants reuse the Defense blue and green) and `.word-sprint`, `.word-catch`, `.word-shot`, `.word-nope` (Shooters).
 
@@ -833,9 +941,10 @@ Notable pieces:
 
 - **Start screen**: mode switch, title, subtitle (changes with the mode and drill), the shared Min/Max panel (`#rangePanel`, hidden in the Shooters drill), the offense panel and **Start**. The offense panel holds the drill switch, `#driveSettings` (drive window fields plus Advanced), `#shootersSettings` (window fields, reset pause, Advanced), the shared `#sessionSettings` group (stepper inputs with `data-training` keys into `TRAINING_DEFAULTS`) and the shared `#speech` group. The weight inputs and the Shooters get-set inputs are generated from `OFFENSE_DEFAULTS` at load, so the form always matches the tables in code.
 - **Game screen**: fatigue banner (Offense, hidden until due), mode label (`DEFENSE`, `OFFENSE · DRIVE` or `OFFENSE · SHOOTERS`), set/rep line and session clock (Offense only), word stage, countdown (Offense only) and **Stop**.
-- **Set complete screen** (`#setScreen`, Offense only): drill label, "Set complete", "Set n of N done.", **Next set** and **End session**. A placeholder for the set log form.
+- **Set log screen** (`#logScreen`, Offense only): drill label, set title, the four stepper rows, the rating buttons, the collapsed note, an error line and the save / skip / discard buttons.
+- **Rest screen** (`#restScreen`, Offense only): drill label, countdown, session summary, save status, **Next set** (hidden until the rest is over) and **End session**.
 
-All three screens are always in the DOM, and the `.hidden` class switches between them.
+All four screens are always in the DOM, and the `.hidden` class switches between them.
 
 ### Script 1: `OffensePlanner`
 
@@ -857,13 +966,30 @@ A pure module (an IIFE assigned to `const OffensePlanner`). It contains:
 | `validateOffense(s, dur)` / `validateShooters(s, dur)` | Setting checks per drill; return `null` or `{ field, message }` |
 | `learnDuration(current, measured, rate, s)` | One learning step, or `null` for an outlier |
 | `fitTable(s, dur)` / `shootersFitTable(s, dur)` | Rows for the fit tables |
-| `TRAINING_DEFAULTS` | Session structure: reps per set, planned sets, session time warning, the "set done" phrase |
+| `TRAINING_DEFAULTS` | Session structure: reps per set, planned sets, session time warning, rest between sets, the "set done" phrase |
 | `validateSession(t)` | Session settings check; returns `null` or `{ field: "session", message }` |
 | `newSession()` / `beginRep(p)` / `isSetComplete(p, t)` / `beginSet(p)` | The set and rep counter. Progress is `{ set, rep }` (current set from 1, reps started in it) |
 | `progressLabel(p, t)` | "SET 2 / 4 · REP 5 / 8" |
 | `formatElapsed(ms)` | Session clock text, mm:ss |
 | `sessionWarningDue(elapsedMs, t)` / `sessionWarningText(t)` | When the fatigue banner is due, and its text |
 | `runSelfTest(log, reps)` | The simulation (every profile's self-test, then the session checks); returns `{ passed, results, fitTable, fitTables: { drive, shooters } }` |
+
+`runSelfTest(log, reps, extraSuites)` also runs each function in `extraSuites` as `suite(check)`; the self-test page passes `[TrainingLog.selfTest]`.
+
+The same script also defines **`TrainingLog`**, a second pure module (an IIFE assigned to `const TrainingLog`):
+
+| Export | Purpose |
+|--------|---------|
+| `LOG_VERSION`, `LOG_KEY`, `BACKUP_PREFIX` | Schema version 1, `reactionCaller.log`, `reactionCaller.log.backup.` |
+| `QUALITIES`, `NOTE_MAX` | `["clean", "rushed", "off_balance"]`, 500 |
+| `emptyLog()` | `{ version: 1, sessions: [] }` |
+| `validateSet(set)` | `null` or `{ field, message }` |
+| `snapshotSettings(s)` | The drill's timing settings, deep-copied |
+| `upsertSession(log, session)` | A new log with the session added or replaced by id |
+| `setSuccess`, `setErrorRate`, `summarizeSession` | Summaries (see [The training log](#the-training-log)) |
+| `parseLog(raw)` | `{ status: "empty" \| "ok" \| "newer" \| "corrupt", log, keepRaw }`; never throws |
+| `openLog(store)` / `saveLog(state, store, nowMs)` | Load from, and save to, an injected `{ get, set }` store, backing up unreadable text first; `saveLog` returns `{ state, saved }` |
+| `selfTest(check)` | The training log checks |
 
 Internally, `fitRateIn` / `minWindowIn` / `scheduleCalls` take the end buffer as a parameter, so a drive window (finisher buffer) and a Shooters window (shot buffer) use the same math.
 
@@ -877,11 +1003,11 @@ Wrapped in an IIFE, so nothing leaks into the global scope. If `?selftest=1` is 
   - `showWord` sets the text and classes, removes `.show`, forces a reflow (`void wordEl.offsetWidth`) and adds `.show` back. The reflow makes the fade-in replay reliably even when the same call (e.g. CUT OFF) repeats.
 - **Modes**: each mode is an object with `start(settings)` and `stop()`. `MODES` maps `defense` / `offense` to the mode object plus its labels. `DRILLS` maps `drive` / `shooters` to the offense game label and subtitle.
   - `defenseMode` chains `setTimeout` calls with a fresh random delay each time: pick a word, show it, speak it, schedule the next.
-  - `offenseMode` runs rep plans from the selected profile, as in [Running a rep](#running-a-rep), grouped into sets. `startRep()` counts the rep, plans and schedules it, and schedules either the next rep or `finishSet()` (says "set done", shows the Set complete screen). `nextSet()` starts the next set from the **Next set** tap. `startClock()` updates the session clock and shows the fatigue banner once. `runCountdown()` drains the bar for one window. `later(fn, ms)` wraps every timer and records its id so `stop()` can clear them all. `say(id, rate)` shows and speaks a phrase and attaches the measuring handlers. `runId` lets late `onend` events from a stopped run be ignored.
-- **Settings form**: inputs carry `data-setting` paths into `OFFENSE_DEFAULTS` (e.g. `shooters.windowMinMs`, `shooters.getSetMs.CATCH.minMs`), read and written with `getPath` / `setPath`. Session inputs carry `data-training` keys into `TRAINING_DEFAULTS`, read by `readTrainingSettings()` into `settings.training`. `wireSteppers()` makes each − / + button step its input by the input's `step`, clamped to its `min` / `max`, and fires `input` so the value is saved. `buildWeightTables()` (once per drill), `buildGetSetFields()`, `fillOffenseDefaults()`, `readOffenseSettings()` (empty fields become `NaN` so validation catches them), `saveSettings()` / `loadSettings()`.
+  - `offenseMode` runs rep plans from the selected profile, as in [Running a rep](#running-a-rep), grouped into sets. `startRep()` counts the rep, plans and schedules it, and schedules either the next rep (counting `repsCompleted` at each rep's `endMs`) or `finishSet()` (says "set done", opens the set log). `haltSet()` clears the timers and countdown for Stop mid-set but keeps the session clock; `stop()` also stops the clock. `nextSet()` starts the next set from the **Next set** tap and records the set's start time. `startClock()` updates the session clock and shows the fatigue banner once. `runCountdown()` drains the bar for one window. `later(fn, ms)` wraps every timer and records its id so `stop()` can clear them all. `say(id, rate)` shows and speaks a phrase and attaches the measuring handlers. `runId` lets late `onend` events from a stopped run be ignored.
+- **Settings form**: inputs carry `data-setting` paths into `OFFENSE_DEFAULTS` (e.g. `shooters.windowMinMs`, `shooters.getSetMs.CATCH.minMs`), read and written with `getPath` / `setPath`. Session inputs carry `data-training` keys into `TRAINING_DEFAULTS`, read by `readTrainingSettings()` into `settings.training`. `wireSteppers(root)` makes each − / + button inside `root` (the offense panel and the set log) step its input by the input's `step`, clamped to its `min` / `max`, and fires `input` so the value is handled like typing. `buildWeightTables()` (once per drill), `buildGetSetFields()`, `fillOffenseDefaults()`, `readOffenseSettings()` (empty fields become `NaN` so validation catches them), `saveSettings()` / `loadSettings()`.
 - **`updateView`, `selectMode`, `selectDrill`**: show the right panels, labels and subtitle for the mode and drill.
-- **`startGame` / `stopGame`**: validate (the Min/Max fields only for Defense and Drive, then the drill's `validate`, then `validateSession`; `showError` puts the message in the right place via `ERROR_TARGETS`), prime speech, switch screens, show the session clock and set/rep line only in Offense, start or stop the active mode, and cancel speech on Stop or End session.
-- **`showSetComplete` / `startNextSet`**: switch to the Set complete screen, and back to the game screen on **Next set** (priming speech in that tap).
+- **`startGame` / `stopGame`**: validate (the Min/Max fields only for Defense and Drive, then the drill's `validate`, then `validateSession`; `showError` puts the message in the right place via `ERROR_TARGETS`), prime speech, switch screens, show the session clock and set/rep line only in Offense, start a new session record (Offense), start or stop the active mode, and cancel speech. `stopGame` ends the session and writes its end time to the log if it has saved sets. `stopPressed` (the Stop button) halts the set and opens the partial-set log instead when an Offense set has at least one finished rep.
+- **Set log and rest**: `trainingLog` is the state from `TrainingLog.openLog(logStore)` (`logStore` wraps `storageGet` / `storageSet`). `openSetLog(partial)` fills the form for the set that just ended, with its settings snapshot. `commitSet()` validates with `TrainingLog.validateSet`, adds the set to the session and saves the whole log (`persistSession` → `upsertSession` + `saveLog`). `showRest()` runs the rest countdown and shows `summarizeSession`; `startNextSet()` primes speech and starts the next set.
 
 ### Script 3: self-test page
 
@@ -912,10 +1038,13 @@ Runs only with `?selftest=1`. It hides the app, calls `OffensePlanner.runSelfTes
 - **Shooters: the countdown bar covers each create-space window, not the whole rep.** It is hidden during the start call and get-set time, and empty around a NOPE and during the reset pause.
 - **No mixed drill yet.** Each Start runs either Drive or Shooters only. The code is structured for a mixer (see [Drill profiles and rep plans](#drill-profiles-and-rep-plans)), but it isn't built.
 - **Shooters: the get-set time is not checked against how long the sprint really takes you.** Tune the `getSetMs` ranges to your court and speed.
-- **No scoring, logging or reaction-time measurement yet.** Offense counts sets and reps on screen, but nothing about a session is saved, and the Set complete screen is a placeholder without a log form.
+- **Results are self-reported.** You count shots, lost handles and missed calls yourself and enter them after the set; there is no automatic scoring or reaction-time measurement.
+- **The log can't be viewed or exported in the app yet.** It is only kept in this browser's storage (see [The training log](#the-training-log)), so clearing site data deletes it, and `file://` and `http://…:8080` keep separate logs.
+- **Next set waits for the rest to finish.** There is no way to cut the rest short except setting **Rest between sets** lower (0 = none).
 - **Planned sets is a target, not a limit.** After the last planned set the app still offers **Next set**; only you end the session. The fatigue warning likewise never stops the session.
 - **Defense has no sets, reps or session clock.** It still runs until you press Stop.
-- **Stop discards the session.** There is no pause or resume; the next Start begins again at set 1.
+- **No pause or resume.** Ending a session keeps its saved sets in the log, but the next Start begins a new session at set 1. A partial set you **Discard** is not saved.
+- **A rep that was in progress when you pressed Stop isn't counted** in the partial set's reps.
 - **No upper bound on read time or delay.** Large values are accepted.
 - **Saved settings override code defaults.** Editing `OFFENSE_DEFAULTS` doesn't change a field that already has a saved value on that device.
 
@@ -959,7 +1088,10 @@ Runs only with `?selftest=1`. It hides the app, calls `OffensePlanner.runSelfTes
 | Shooters: the bar shows "0.0 s" while NOPE is called | Between windows the bar sits empty by design | Expected. It drains again when the next LEFT/RIGHT is called |
 | Settings saved before the Shooters drill or the Session group | They load as before. The new fields start at their defaults | Nothing to do |
 | "Reps per set must be a whole number from 3 to 30." (or planned sets / session time warning) | A Session value is out of range or empty | Use the − / + steppers, which stay within range |
-| Offense stopped calling after a few reps and shows "Set complete" | The set has ended (Reps per set reached) | Tap **Next set** to continue, or **End session** |
+| Offense stopped calling after a few reps and shows the set log | The set has ended (Reps per set reached) | Log it and tap **Save & rest**, then **Next set** when the rest is over |
+| "Couldn't save to this device. Storage may be blocked or full." | Private browsing, blocked site data or full storage | Training continues, but this set isn't kept. Allow site data for the app's address |
+| Pressing Stop went straight to the start screen instead of the log | No rep of that set had finished yet, so there was nothing to log | Expected |
+| A `reactionCaller.log.backup.…` key appeared | The stored log couldn't be read (broken, or written by a newer version), so it was kept aside before a new log was started | Nothing is lost. The raw text is in that key |
 
 ---
 
@@ -968,7 +1100,8 @@ Runs only with `?selftest=1`. It hides the app, calls `OffensePlanner.runSelfTes
 - A **mixed** offense drill that picks Drive or Shooters at random per rep (a third profile; see [Drill profiles and rep plans](#drill-profiles-and-rep-plans)).
 - An option for one countdown bar over the whole Shooters rep (a change to what the planner puts in `windows`).
 - A "Reset to defaults" button and a way to view or clear learned lengths from the UI.
-- Log each set's results on the Set complete screen, and track progress across sessions.
+- A history screen to view progress across sessions, and an export of the training log.
+- Fill each set's `level` and adapt difficulty from the logged results.
 - An option to prevent the same Defense word twice in a row.
 - Voice picker and a mute toggle (visual-only mode).
 - Harden the server: serve only `index.html`, map `/?…` to `index.html`, use a `ROOT + path.sep` prefix check, and make the port configurable.
