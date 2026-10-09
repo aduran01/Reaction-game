@@ -7,7 +7,7 @@
   - **Drive** simulates a ball-handler driving from the top of the key to the basket. The app calls **READ**, then a drive direction (**LEFT** / **RIGHT**), then zero or more reactions to the defense (**CUT OFF**, **LAY UP**), and finally a **finisher** such as **LAY UP LEFT SIDE**. All of it happens inside a timed drive window shown as a countdown bar.
   - **Shooters only** trains sprinting to a spot, catching and dribbling to create space for a shot. The app calls a start call (**SPRINT FROM PAINT**, **SPRINT FROM LEFT CORNER**, **SPRINT FROM RIGHT CORNER** or **CATCH**), then **LEFT** / **RIGHT**, zero or more **CUT OFF**s and **SHOT**, all inside a timed create-space window. Sometimes a **NOPE** (the shot is contested) follows, and a second window starts.
 
-  In both drills, calls are planned so that every spoken phrase fits inside its window and no call ever cuts off another. An Offense session is organized as **sets of reps**. After each set the app says "set done" and shows a quick big-button form where you log how the set went (shots made and attempted, lost handles, missed calls, how it felt). Every set is saved on the device as soon as you log it, then a rest countdown leads into the next set.
+  In both drills, calls are planned so that every spoken phrase fits inside its window and no call ever cuts off another. An Offense session is organized as **sets of reps**. After each set the app says "set done" and shows a quick big-button form where you log how the set went (shots made and attempted, lost handles, missed calls, how it felt). Every set is saved on the device as soon as you log it, then a rest countdown leads into the next set. Ending a session shows a summary compared with your recent sessions, and a **History** screen shows trends over weeks and lets you export and import the log as a backup.
 
 The app is meant to run on a phone (iPhone Safari is the main target) propped up nearby while you train. The words are big enough to read from a distance, and the voice means you don't have to look at all.
 
@@ -15,7 +15,7 @@ The whole project is two files:
 
 | File | Size | Purpose |
 |------|------|---------|
-| `index.html` | ~129 KB | The entire app: markup, styles and JavaScript in one page |
+| `index.html` | ~174 KB | The entire app: markup, styles and JavaScript in one page |
 | `server.js` | ~1 KB | A tiny Node.js static file server so phones on your network can open the app |
 
 There is no build step, no `package.json`, no framework and no third-party library.
@@ -33,6 +33,8 @@ There is no build step, no `package.json`, no framework and no third-party libra
    - [Offense: Shooters only drill](#offense-shooters-only-drill)
    - [Offense: sessions, sets and reps](#offense-sessions-sets-and-reps)
    - [Offense: logging a set](#offense-logging-a-set)
+   - [Offense: session summary](#offense-session-summary)
+   - [History and backup](#history-and-backup)
    - [Stopping](#stopping)
    - [What is saved between visits](#what-is-saved-between-visits)
 3. [Offense mode in depth (Drive drill)](#offense-mode-in-depth-drive-drill)
@@ -282,15 +284,53 @@ Buttons:
 | Button | What it does |
 |--------|--------------|
 | **Save & rest** | Saves the set and shows the rest countdown (**Rest between sets**, default 60 s) with a summary of the session so far, e.g. "This session: 3 sets · 14/24 made (58%) · 0.21 errors per rep · 2 of 3 rated sets clean". When it reaches 00:00 a big **Next set** button appears. **End session** is available throughout |
-| **Save & end session** | Saves the set and returns to the start screen |
+| **Save & end session** | Saves the set, ends the session and shows the [session summary](#offense-session-summary) |
 | **Skip logging** | Saves the set with every outcome field (made, attempted, lost handles, missed calls, rating, note) empty (`null`), then rests like Save & rest |
 | **Discard** | Only after Stop mid-set: drops the partial set without saving it and ends the session |
 
 If a value is invalid (e.g. you typed made 9 with attempted 8, or left a field empty), the reason shows above the buttons and nothing is saved until you fix it.
 
-**Next set** starts the next set right away, beginning with its first call (READ or a Shooters start call). The tap unlocks speech again on iPhone. **End session** returns to the start screen.
+**Next set** starts the next set right away, beginning with its first call (READ or a Shooters start call). The tap unlocks speech again on iPhone. **End session** ends the session and shows the [session summary](#offense-session-summary).
 
 The rest screen says "Set saved." after each save, or "Couldn't save to this device. Storage may be blocked or full." if storage refused it. Training carries on either way. What is stored is described in [The training log](#the-training-log).
+
+### Offense: session summary
+
+When a session that has at least one saved set ends (**End session**, **Save & end session**, **Discard**, or Stop before a set's first rep finishes), the **Session done** screen shows:
+
+- the **session length** (from Start to the end, mm:ss);
+- a card **per drill** played, with: sets, reps, made / attempted and make %, lost handles per 10 reps, missed calls per 10 reps, and the share of rated sets marked Clean. Values that weren't logged show "–" (skipped sets don't count toward the rates);
+- one plain-language line comparing today with the **mean of your previous 5 sessions of the same drill** (each earlier session's own rate, averaged), e.g. "Make % 62 (avg 55). Lost handles 1.2 per 10 reps (avg 2.0)". With no earlier sessions of that drill it adds "No earlier sessions to compare with yet". With fewer than 5 earlier sessions it averages those it has.
+
+**Done** returns to the start screen. A session with no saved sets goes straight back to the start screen.
+
+### History and backup
+
+Tap **History** on the start screen.
+
+**Trends.** For each drill, a small chart of the last 20 sessions of that drill (oldest on the left). The solid blue line is **make %** (left axis, 0–100%), the dashed orange line is **lost handles per 10 reps** (right axis, 0 up to the highest value rounded up, at least 2). The first and last session dates are under the x-axis. With fewer than 3 sessions of a drill it shows "Not enough data".
+
+**Sessions.** Every saved session, newest first: date and time, drills, sets, make % and errors (lost handles + missed calls) per 10 reps. Tap one to see its sets (drill, reps, made / attempted, lost, missed, rating, note). **Delete session** asks for confirmation first ("Delete" / "Cancel"), then removes it from the log for good.
+
+**Backup.** Saved data lives only in this browser, at this exact address. Safari can clear it after weeks without a visit, and if your computer's LAN IP changes the app opens at a new address with an empty log. So export now and then:
+
+| Button | What it does |
+|--------|--------------|
+| **Export log (JSON)** | Downloads the whole log as `reaction-caller-log-YYYY-MM-DD.json`. This is the backup you can import later. Records the export date |
+| **Export sets (CSV)** | Downloads `reaction-caller-sets-YYYY-MM-DD.csv`: one row per set, for a spreadsheet. Columns: `session_id, session_started, set, drill, level, reps, set_started, set_ended, made, attempted, lost_handles, missed_calls, quality, note`. Empty cells are values that weren't logged; notes with commas, quotes or line breaks are quoted (`"` doubled) |
+| **Import JSON file** | Picks a JSON backup and merges it (below) |
+| **Backup as text** | Shows the JSON in a text box with **Copy** and **Import this text**. Use it to copy the log by hand, or to paste a backup in |
+
+If the browser can't start a download, the export shows its text in that box instead, ready to copy. Copying the JSON log counts as an export.
+
+**Import** merges by session id and never creates duplicates:
+
+- sessions that aren't here yet are added;
+- exact copies of sessions already here are skipped;
+- sessions with the same id but different content are **not replaced unless you agree**: the app asks "N sessions in the backup differ from the version saved here. Replace them with the backup's version?" with **Replace them** and **Keep mine**;
+- a file that isn't valid JSON, isn't a Reaction Caller log, or comes from a newer log version is rejected with a message, and nothing changes. Sessions inside the file that aren't valid are skipped and counted.
+
+The history screen shows the **last export** date ("Never exported." until the first). The start screen shows a gentle reminder when **more than 10 sessions** haven't been exported (sessions that ended after the last export).
 
 ### Stopping
 
@@ -306,7 +346,7 @@ The rest screen says "Set saved." after each save, or "Couldn't save to this dev
 - stop the countdown animation, the session clock and any rest countdown;
 - silence speech immediately (`speechSynthesis.cancel()`);
 - write the session's end time to the training log, if it has saved sets;
-- return to the start screen. Your settings stay in the fields. The next Start begins a new session at set 1.
+- show the [session summary](#offense-session-summary) if the session has saved sets, otherwise return to the start screen. Your settings stay in the fields. The next Start begins a new session at set 1.
 
 Speech events that arrive late from a stopped run are ignored.
 
@@ -322,6 +362,7 @@ The app uses `localStorage` and saves only:
 | `reactionCaller.learnedMs` | Learned spoken length of each offense phrase, Drive and Shooters alike (see [Learned spoken lengths](#learned-spoken-lengths)) | After each measured offense call |
 | `reactionCaller.log` | The training log: every Offense session and its logged sets (see [The training log](#the-training-log)) | After every saved set (Save & rest, Save & end session, Skip logging), and when a session with saved sets ends |
 | `reactionCaller.log.backup.<time>` | The raw text of a stored log that this version couldn't read (broken, or from a newer version), kept untouched | Once, just before the first new log is saved over it |
+| `reactionCaller.lastExportAt` | ISO time of the last JSON export (download, or copying the JSON text) | On export |
 
 Settings are saved by input id, and the Drive and speech fields kept their ids. So settings saved before the Shooters drill or the Session group existed still load, and any field without a saved value shows its default.
 
@@ -732,6 +773,10 @@ const TRAINING_DEFAULTS = {
   plannedSets: 4,             // whole number 1-20; a target, not a hard stop
   sessionWarningMin: 45,      // provisional; 0 = off
   restSec: 60,                // provisional; rest countdown after a logged set, 0-600
+  compareSessions: 5,         // session summary compares with this many earlier sessions
+  trendSessions: 20,          // trend charts cover this many latest sessions per drill
+  trendMinSessions: 3,        // fewer than this shows "Not enough data"
+  backupReminderSessions: 10, // provisional; start-screen export reminder above this
   setDoneSpoken: "set done",  // spoken when a set ends
 };
 ```
@@ -758,7 +803,7 @@ http://localhost:8080/index.html?selftest=1
 
 Use `/index.html?selftest=1`, not `/?selftest=1`. The bundled `server.js` only maps a bare `/` to `index.html`, so `/?selftest=1` returns "Not found".
 
-Instead of the app, the page runs a simulation of both offense planners (every drill profile's self-test) plus checks of the session helpers and the training log, and prints **PASS** / **FAIL** for each check to the console and to an on-page banner (green when everything passes, red otherwise). There are 51 checks in total: 18 Drive, 21 Shooters, 5 Session and 7 Training log.
+Instead of the app, the page runs a simulation of both offense planners (every drill profile's self-test) plus checks of the session helpers and the training log, and prints **PASS** / **FAIL** for each check to the console and to an on-page banner (green when everything passes, red otherwise). There are 58 checks in total: 18 Drive, 21 Shooters, 5 Session, 7 Training log and 7 History.
 
 **Drive.** It runs 10,000 drives at the **default** settings and 10,000 at **tight** settings (`D` fixed at 1400 ms, `maxRate` 2.0, `minGapMs` 40), and checks:
 
@@ -800,6 +845,16 @@ Instead of the app, the page runs a simulation of both offense planners (every d
 5. `upsertSession` appends a new session, replaces one with the same id, and doesn't change the log it was given;
 6. `parseLog` reads a version 1 log; treats missing or empty text as a new log; and for a newer version (2, 99), a missing or string version, a non-array `sessions`, invalid JSON, `null`, an array, a number or a string returns a new empty log plus the original text to keep, without throwing;
 7. with a fake store: opening a version 2 log doesn't change it; the first save copies it byte-for-byte to `reactionCaller.log.backup.<time>` and then writes the new log; a second save makes no new backup; when the backup can't be written, the broken log is left untouched and the save reports failure; a valid log keeps its sessions across reopen and save.
+
+**History.** It checks the summary, trend, merge and backup helpers in `TrainingLog`:
+
+1. `summarizeByDrill` splits a mixed session by drill (in play order), with correct totals, lost and missed per 10 reps and clean share; `sessionLengthMs` gives 32:10 for a 32 min 10 s session and `null` without an end time;
+2. `compareWithPrevious` averages only the **previous 5** sessions of the **same** drill (not later sessions, the other drill or the session itself), and `comparisonText` reads exactly "Make % 62 (avg 50). Lost handles 1.2 per 10 reps (avg 5.0)"; with no history it says "No earlier sessions to compare with yet"; with fewer than 5 earlier sessions it averages those; a drill not played today gives "Nothing logged to compare.";
+3. `trendSeries` returns the last 20 sessions of a drill, oldest first, ignoring the other drill; `trendGeometry` places the first and last points at the plot edges (a single point in the middle), 100% at the top and 0% at the bottom, scales lost handles to a rounded-up axis maximum (at least 2), and leaves out missing values;
+4. `mergeLogs` adds new sessions, skips exact copies, keeps conflicting sessions unless asked to replace them, never duplicates an id (even when the file repeats one), doesn't change its input, and a second identical merge adds nothing;
+5. `parseImport` accepts an exported log, skips invalid sessions (and counts them), rejects broken JSON, arrays, logs without a version, newer versions (with a "newer version" message) and string versions; `deleteSession` removes only that session without changing its input;
+6. `csvField` / `setsToCsv`: commas, quotes (doubled), line breaks and leading spaces are quoted; `null` becomes an empty cell and 0 stays "0"; one row per set, oldest session first, with the header and a CRLF after every row;
+7. `exportFileName` gives `reaction-caller-log-2026-01-05.json` for that local date; `unexportedCount` counts every session when never exported, and only sessions that ended after the last export otherwise.
 
 It also prints a **Drive fit table**: for 0–3 cut-offs and each finisher, the minimum drive window needed at `maxRate`, and whether it fits at `driveMaxMs`. With the defaults (`maxRate` 1.6, `minGapMs` 120, buffer 0, `driveMaxMs` 2000):
 
@@ -934,6 +989,7 @@ Notable pieces:
 - **`.game-header`**, **`.session-progress`**, **`.session-clock`**, **`.session-banner`**: the game screen header (mode label, the muted "SET · REP" line and the mm:ss clock in its top-right corner) and the fatigue banner above it (panel background with a yellow left border).
 - **Set log**: `.log-row` puts a label (with a muted `.hint`) and a 56 px stepper on one row, wrapping to two lines on narrow screens; `.segmented.choice` is the 52 px rating row; the note is a `textarea` (16 px text so iPhone doesn't zoom). `#saveRestBtn` is the big blue primary button, `#saveEndBtn` grey, and `.log-minor` holds the outlined **Skip logging** and red **Discard** buttons. Inputs and the textarea re-enable text selection, which the page otherwise turns off.
 - **Rest**: `.rest-count` is the huge mm:ss countdown. **`#nextSetBtn`** / **`#endSessionBtn`**: its big blue button (at least 80 px tall, shown when the rest is over) and grey secondary button.
+- **Summary and history**: `.stack` stacks cards; `.drill-card` with a `.stat-grid` (a two-column `<dl>`) and `.compare-line`; `.chart` styles the inline SVG (`.axis`, `.tick`, solid `.line-make` in the accent blue, dashed `.line-lost` in orange, dots and axis titles in the same colors) and `.legend`; `.history-item` is a session row (a full-width button plus its `.history-detail` of `.set-line`s); `.confirm` is the red-bordered confirmation box; `.secondary-btn` (grey, 52 px), `.danger-btn` (red) and `.button-row` (side-by-side buttons); `.reminder` is the start-screen export reminder (yellow left border, like the fatigue banner).
 - **`.countdown`**: the track and fill bar plus a tabular-number readout. The fill shrinks via `transform: scaleX(remaining / D)`. `.idle` hides it without changing the layout.
 - Word color classes: `.word-left`, `.word-right`, `.word-up`, `.word-back` (Defense), `.word-read`, `.word-center`, `.word-cut`, `.word-layup` (Drive; LEFT/RIGHT variants reuse the Defense blue and green) and `.word-sprint`, `.word-catch`, `.word-shot`, `.word-nope` (Shooters).
 
@@ -943,8 +999,10 @@ Notable pieces:
 - **Game screen**: fatigue banner (Offense, hidden until due), mode label (`DEFENSE`, `OFFENSE · DRIVE` or `OFFENSE · SHOOTERS`), set/rep line and session clock (Offense only), word stage, countdown (Offense only) and **Stop**.
 - **Set log screen** (`#logScreen`, Offense only): drill label, set title, the four stepper rows, the rating buttons, the collapsed note, an error line and the save / skip / discard buttons.
 - **Rest screen** (`#restScreen`, Offense only): drill label, countdown, session summary, save status, **Next set** (hidden until the rest is over) and **End session**.
+- **Summary screen** (`#summaryScreen`): session length, one card per drill (`#summaryDrills`) and **Done**.
+- **History screen** (`#historyScreen`): trend cards (`#historyTrends`), the session list (`#historyList`), the backup panel (last export, export / import buttons, a hidden file input, the backup text box and the import confirmation) and **Back**. The start screen also has the **History** button and the `#backupReminder` line.
 
-All four screens are always in the DOM, and the `.hidden` class switches between them.
+All six screens are always in the DOM, and the `.hidden` class switches between them.
 
 ### Script 1: `OffensePlanner`
 
@@ -987,6 +1045,14 @@ The same script also defines **`TrainingLog`**, a second pure module (an IIFE as
 | `snapshotSettings(s)` | The drill's timing settings, deep-copied |
 | `upsertSession(log, session)` | A new log with the session added or replaced by id |
 | `setSuccess`, `setErrorRate`, `summarizeSession` | Summaries (see [The training log](#the-training-log)) |
+| `summarizeSets(sets)` | The same totals for any list of sets, plus `lostPer10` and `missedPer10` |
+| `setsOfDrill`, `sessionDrills`, `summarizeByDrill`, `sessionLengthMs` | Per-drill views of a session, and its length in ms |
+| `compareWithPrevious(log, session, drill, n)` / `comparisonText(cmp)` | Today vs the mean of the previous `n` sessions of the drill, and its one-line text |
+| `trendSeries(log, drill, n)` / `trendGeometry(series, box)` | The last `n` sessions' make % and lost handles per 10 reps, and their chart coordinates |
+| `deleteSession(log, id)` | A new log without that session |
+| `parseImport(text)` / `mergeLogs(current, incoming, replaceConflicts)` | Read a backup; merge by session id (`{ log, added, identical, conflicts }`) |
+| `csvField(v)` / `setsToCsv(log)` | CSV export of every set |
+| `exportFileName(date, base, ext)` / `unexportedCount(log, lastExportAt)` | Backup file names; sessions not yet exported |
 | `parseLog(raw)` | `{ status: "empty" \| "ok" \| "newer" \| "corrupt", log, keepRaw }`; never throws |
 | `openLog(store)` / `saveLog(state, store, nowMs)` | Load from, and save to, an injected `{ get, set }` store, backing up unreadable text first; `saveLog` returns `{ state, saved }` |
 | `selfTest(check)` | The training log checks |
@@ -1007,7 +1073,8 @@ Wrapped in an IIFE, so nothing leaks into the global scope. If `?selftest=1` is 
 - **Settings form**: inputs carry `data-setting` paths into `OFFENSE_DEFAULTS` (e.g. `shooters.windowMinMs`, `shooters.getSetMs.CATCH.minMs`), read and written with `getPath` / `setPath`. Session inputs carry `data-training` keys into `TRAINING_DEFAULTS`, read by `readTrainingSettings()` into `settings.training`. `wireSteppers(root)` makes each − / + button inside `root` (the offense panel and the set log) step its input by the input's `step`, clamped to its `min` / `max`, and fires `input` so the value is handled like typing. `buildWeightTables()` (once per drill), `buildGetSetFields()`, `fillOffenseDefaults()`, `readOffenseSettings()` (empty fields become `NaN` so validation catches them), `saveSettings()` / `loadSettings()`.
 - **`updateView`, `selectMode`, `selectDrill`**: show the right panels, labels and subtitle for the mode and drill.
 - **`startGame` / `stopGame`**: validate (the Min/Max fields only for Defense and Drive, then the drill's `validate`, then `validateSession`; `showError` puts the message in the right place via `ERROR_TARGETS`), prime speech, switch screens, show the session clock and set/rep line only in Offense, start a new session record (Offense), start or stop the active mode, and cancel speech. `stopGame` ends the session and writes its end time to the log if it has saved sets. `stopPressed` (the Stop button) halts the set and opens the partial-set log instead when an Offense set has at least one finished rep.
-- **Set log and rest**: `trainingLog` is the state from `TrainingLog.openLog(logStore)` (`logStore` wraps `storageGet` / `storageSet`). `openSetLog(partial)` fills the form for the set that just ended, with its settings snapshot. `commitSet()` validates with `TrainingLog.validateSet`, adds the set to the session and saves the whole log (`persistSession` → `upsertSession` + `saveLog`). `showRest()` runs the rest countdown and shows `summarizeSession`; `startNextSet()` primes speech and starts the next set.
+- **Summary, history and backup**: `showSummary(session)` builds one `drillCard` per drill from `summarizeByDrill` and `compareWithPrevious`. `openHistory()` renders `renderTrends()` (one `trendChart(series)` inline SVG per drill, from `trendGeometry`), `renderSessionList()` (rows that expand into `sessionDetail` with the delete confirmation) and `renderLastExport()`. `exportJson()` / `exportCsv()` use `downloadText()` (a `Blob` and an `<a download>` click), falling back to `showBackupText()`. `importText()` parses with `parseImport`, previews with `mergeLogs` and asks via the confirmation box when sessions conflict; `applyImport(replace)` merges and saves. `saveTrainingLog(log)` saves any changed log; `updateBackupReminder()` runs on load and on every return to the start screen (`showStart()`).
+- **Set log and rest**: `trainingLog` is the state from `TrainingLog.openLog(logStore)` (`logStore` wraps `storageGet` / `storageSet`). `openSetLog(partial)` fills the form for the set that just ended, with its settings snapshot. `commitSet()` validates with `TrainingLog.validateSet`, adds the set to the session and saves the whole log (`persistSession` → `upsertSession` + `saveTrainingLog` → `saveLog`). `showRest()` runs the rest countdown and shows `summarizeSession`; `startNextSet()` primes speech and starts the next set.
 
 ### Script 3: self-test page
 
@@ -1022,8 +1089,12 @@ Runs only with `?selftest=1`. It hides the app, calls `OffensePlanner.runSelfTes
 | **Web Speech API** (`speechSynthesis`, `SpeechSynthesisUtterance`) | Speaking calls, measuring spoken length (`onstart` / `onend`) | Voices depend on the OS. iPhone needs a user gesture first, which is why the app primes speech in the Start tap. If speech is unavailable, the app still runs with visual calls only. |
 | `performance.now()` | Drive clock for scheduling and the countdown | |
 | `requestAnimationFrame` | Countdown bar animation | |
-| `localStorage` | Mode, settings and learned lengths | Optional. Every access is guarded. |
+| `localStorage` | Mode, settings, learned lengths, the training log and the last export date | Optional. Every access is guarded. |
 | `URLSearchParams` | Detecting `?selftest=1` | |
+| `Blob`, `URL.createObjectURL`, `<a download>` | Exporting the log (JSON) and sets (CSV) as files | If unavailable, the export is shown as text to copy |
+| `File.text()` / `FileReader`, `<input type="file">` | Importing a JSON backup | Read locally; nothing is uploaded |
+| `navigator.clipboard.writeText` | **Copy** in the backup text box | Falls back to `document.execCommand("copy")`, then to selecting the text |
+| Inline SVG | Trend charts on the history screen | Drawn by hand, no chart library |
 | CSS `env(safe-area-inset-*)`, `dvh`, `clamp()`, `<details>` | Notch-safe, responsive layout | Older browsers fall back to `vh`. |
 
 ---
@@ -1039,7 +1110,9 @@ Runs only with `?selftest=1`. It hides the app, calls `OffensePlanner.runSelfTes
 - **No mixed drill yet.** Each Start runs either Drive or Shooters only. The code is structured for a mixer (see [Drill profiles and rep plans](#drill-profiles-and-rep-plans)), but it isn't built.
 - **Shooters: the get-set time is not checked against how long the sprint really takes you.** Tune the `getSetMs` ranges to your court and speed.
 - **Results are self-reported.** You count shots, lost handles and missed calls yourself and enter them after the set; there is no automatic scoring or reaction-time measurement.
-- **The log can't be viewed or exported in the app yet.** It is only kept in this browser's storage (see [The training log](#the-training-log)), so clearing site data deletes it, and `file://` and `http://…:8080` keep separate logs.
+- **The log lives in one browser, at one address.** Clearing site data (or Safari clearing it after weeks without a visit) deletes it, and `file://`, `http://localhost:8080` and `http://<LAN IP>:8080` each keep a separate log. Export regularly from **History**; importing a backup at a new address merges it in.
+- **Trends are per drill and per session.** Make % and lost handles are drawn on two axes in one small chart; missed calls and clean share are only in the session summary and the session list.
+- **Import can't undo.** Replacing conflicting sessions or deleting a session is permanent, unless you have an exported backup.
 - **Next set waits for the rest to finish.** There is no way to cut the rest short except setting **Rest between sets** lower (0 = none).
 - **Planned sets is a target, not a limit.** After the last planned set the app still offers **Next set**; only you end the session. The fatigue warning likewise never stops the session.
 - **Defense has no sets, reps or session clock.** It still runs until you press Stop.
@@ -1091,6 +1164,9 @@ Runs only with `?selftest=1`. It hides the app, calls `OffensePlanner.runSelfTes
 | Offense stopped calling after a few reps and shows the set log | The set has ended (Reps per set reached) | Log it and tap **Save & rest**, then **Next set** when the rest is over |
 | "Couldn't save to this device. Storage may be blocked or full." | Private browsing, blocked site data or full storage | Training continues, but this set isn't kept. Allow site data for the app's address |
 | Pressing Stop went straight to the start screen instead of the log | No rep of that set had finished yet, so there was nothing to log | Expected |
+| History is empty on the phone, but sessions were logged | The app was opened at a different address (e.g. the computer's LAN IP changed), or Safari cleared site data | Open the old address if it still works, or import your latest JSON backup from **History** |
+| Export does nothing / no file appears | The browser blocked or doesn't support downloads | Use **Backup as text** → **Copy**, and paste it into a note or a file |
+| "This backup is from a newer version of the app" | The backup was made by a newer app version | Update `index.html`, then import |
 | A `reactionCaller.log.backup.…` key appeared | The stored log couldn't be read (broken, or written by a newer version), so it was kept aside before a new log was started | Nothing is lost. The raw text is in that key |
 
 ---
@@ -1100,7 +1176,7 @@ Runs only with `?selftest=1`. It hides the app, calls `OffensePlanner.runSelfTes
 - A **mixed** offense drill that picks Drive or Shooters at random per rep (a third profile; see [Drill profiles and rep plans](#drill-profiles-and-rep-plans)).
 - An option for one countdown bar over the whole Shooters rep (a change to what the planner puts in `windows`).
 - A "Reset to defaults" button and a way to view or clear learned lengths from the UI.
-- A history screen to view progress across sessions, and an export of the training log.
+- Charts for missed calls and clean share, and a per-week view.
 - Fill each set's `level` and adapt difficulty from the logged results.
 - An option to prevent the same Defense word twice in a row.
 - Voice picker and a mute toggle (visual-only mode).
