@@ -458,6 +458,71 @@
 
   #discardBtn { color: var(--danger); }
 
+  /* Adaptive difficulty. */
+  .toggle-row,
+  .level-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .toggle-label {
+    font-size: 1rem;
+    font-weight: 600;
+  }
+  .toggle-label .hint {
+    display: block;
+    color: var(--muted);
+    font-size: 0.8rem;
+    font-weight: 400;
+    margin-top: 2px;
+  }
+
+  .toggle-btn {
+    flex: none;
+    width: 88px;
+    min-height: 48px;
+    padding: 0;
+    background: #2a2e38;
+    color: var(--muted);
+  }
+  .toggle-btn[aria-pressed="true"] {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  .level-row span { font-size: 1rem; font-variant-numeric: tabular-nums; }
+
+  .small-btn {
+    flex: none;
+    width: auto;
+    min-height: 48px;
+    padding: 0 16px;
+    font-size: 0.9rem;
+    background: transparent;
+    border: 1px solid #2a2e38;
+    color: var(--muted);
+  }
+
+  .level-locked {
+    opacity: 0.6;
+  }
+
+  .level-note {
+    display: block;
+    color: var(--accent);
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  .level-line {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 700;
+    text-align: center;
+  }
+
   /* Summary, history and backup. */
   .stack {
     width: 100%;
@@ -688,6 +753,23 @@
       <div class="segmented" role="group" aria-label="Offense drill">
         <button type="button" data-drill="drive" aria-pressed="true">Drive</button>
         <button type="button" data-drill="shooters" aria-pressed="false">Shooters only</button>
+      </div>
+
+      <!-- Adaptive difficulty, shared by both drills -->
+      <div class="panel-section" id="levelSettings">
+        <div class="toggle-row">
+          <span class="toggle-label">Auto difficulty<span class="hint">Sets the timing from your level, and adjusts the level after each logged set</span></span>
+          <button type="button" id="autoLevelBtn" class="toggle-btn" aria-pressed="true">On</button>
+        </div>
+        <div class="level-row">
+          <span id="levelText-drive">Drive: Level 3</span>
+          <button type="button" class="small-btn" data-reset-level="drive">Reset level</button>
+        </div>
+        <div class="level-row">
+          <span id="levelText-shooters">Shooters only: Level 3</span>
+          <button type="button" class="small-btn" data-reset-level="shooters">Reset level</button>
+        </div>
+        <p class="status-text" id="levelStatus" role="status"></p>
       </div>
 
       <!-- Drive drill only -->
@@ -956,6 +1038,7 @@
     <div class="rest-count" id="restCount">01:00</div>
     <p class="subtitle" id="restSummary"></p>
     <p class="subtitle" id="restSaved"></p>
+    <p class="level-line hidden" id="restLevel"></p>
     <button id="nextSetBtn" class="hidden">Next set</button>
     <button id="endSessionBtn">End session</button>
   </div>
@@ -1692,7 +1775,131 @@ const OffensePlanner = (function () {
 
     // Spoken when a set ends (at baseRate, queued behind the last call, never cancelling it).
     setDoneSpoken: "set done",
+
+    // ---- Adaptive difficulty (challenge point: hard but doable). ----
+    // Every value below is a starting heuristic to tune, not a research-proven number.
+    // Level for a drill that has never been played, and after "Reset level".
+    startLevel: 3, // provisional
+    // A logged set adjusts the level only with at least this many shots attempted.
+    levelMinAttempts: 5, // provisional
+    // Step up when success (made / attempted) >= levelUpSuccess AND
+    // error rate ((lost handles + missed calls) / reps) <= levelUpMaxErrorRate.
+    levelUpSuccess: 0.80, // provisional
+    levelUpMaxErrorRate: 0.10, // provisional
+    // Step down when success < levelDownSuccess OR error rate >= levelDownErrorRate.
+    levelDownSuccess: 0.50, // provisional
+    levelDownErrorRate: 0.30, // provisional
+    // Five levels per drill, Level 1 easiest. Each maps a settings path (as in
+    // OFFENSE_DEFAULTS) to its value; with Auto difficulty on these replace the
+    // matching manual fields. Every level must pass the drill's validation.
+    levels: {
+      drive: [
+        { driveMinMs: 2200, driveMaxMs: 2800, readMinMs: 2000, readMaxMs: 3500,
+          "afterDriveOrCutOffWeights.CUT_OFF": 10, "afterDriveOrCutOffWeights.LAY_UP": 10 }, // provisional
+        { driveMinMs: 1900, driveMaxMs: 2500, readMinMs: 1500, readMaxMs: 3000,
+          "afterDriveOrCutOffWeights.CUT_OFF": 15, "afterDriveOrCutOffWeights.LAY_UP": 15 }, // provisional
+        { driveMinMs: 1600, driveMaxMs: 2200, readMinMs: 1000, readMaxMs: 2500,
+          "afterDriveOrCutOffWeights.CUT_OFF": 20, "afterDriveOrCutOffWeights.LAY_UP": 20 }, // provisional
+        { driveMinMs: 1500, driveMaxMs: 2000, readMinMs: 800, readMaxMs: 2000,
+          "afterDriveOrCutOffWeights.CUT_OFF": 28, "afterDriveOrCutOffWeights.LAY_UP": 25 }, // provisional
+        { driveMinMs: 1400, driveMaxMs: 1800, readMinMs: 600, readMaxMs: 1500,
+          "afterDriveOrCutOffWeights.CUT_OFF": 35, "afterDriveOrCutOffWeights.LAY_UP": 30 }, // provisional
+      ],
+      shooters: [
+        { "shooters.windowMinMs": 1600, "shooters.windowMaxMs": 2200,
+          "shooters.afterDirectionOrCutOffWeights.CUT_OFF": 15, "shooters.afterDirectionOrCutOffWeights.SHOT": 85,
+          "shooters.afterShotWeights.NOPE": 15, "shooters.afterShotWeights.END": 85 }, // provisional
+        { "shooters.windowMinMs": 1400, "shooters.windowMaxMs": 2000,
+          "shooters.afterDirectionOrCutOffWeights.CUT_OFF": 25, "shooters.afterDirectionOrCutOffWeights.SHOT": 75,
+          "shooters.afterShotWeights.NOPE": 25, "shooters.afterShotWeights.END": 75 }, // provisional
+        { "shooters.windowMinMs": 1200, "shooters.windowMaxMs": 1800,
+          "shooters.afterDirectionOrCutOffWeights.CUT_OFF": 30, "shooters.afterDirectionOrCutOffWeights.SHOT": 70,
+          "shooters.afterShotWeights.NOPE": 35, "shooters.afterShotWeights.END": 65 }, // provisional
+        { "shooters.windowMinMs": 1050, "shooters.windowMaxMs": 1600,
+          "shooters.afterDirectionOrCutOffWeights.CUT_OFF": 40, "shooters.afterDirectionOrCutOffWeights.SHOT": 60,
+          "shooters.afterShotWeights.NOPE": 40, "shooters.afterShotWeights.END": 60 }, // provisional
+        { "shooters.windowMinMs": 950, "shooters.windowMaxMs": 1400,
+          "shooters.afterDirectionOrCutOffWeights.CUT_OFF": 45, "shooters.afterDirectionOrCutOffWeights.SHOT": 55,
+          "shooters.afterShotWeights.NOPE": 45, "shooters.afterShotWeights.END": 55 }, // provisional
+      ],
+    },
   };
+
+  const LEVEL_COUNT = 5;
+  const LEVEL_DRILLS = ["drive", "shooters"];
+
+  function getSettingPath(obj, path) {
+    return path.split(".").reduce((o, key) => (o == null ? undefined : o[key]), obj);
+  }
+
+  function setSettingPath(obj, path, value) {
+    const keys = path.split(".");
+    const last = keys.pop();
+    keys.reduce((o, key) => o[key], obj)[last] = value;
+  }
+
+  // The settings paths a drill's levels control (e.g. "driveMinMs", "shooters.windowMaxMs").
+  function levelPaths(drill, t) {
+    return Object.keys(t.levels[drill][0]);
+  }
+
+  // A copy of settings s with level `level` of `drill` applied. s is not changed.
+  function applyLevel(s, drill, level, t) {
+    const next = cloneSettings(s);
+    const values = t.levels[drill][level - 1];
+    Object.keys(values).forEach(path => setSettingPath(next, path, values[path]));
+    return next;
+  }
+
+  function isLevel(n) {
+    return Number.isInteger(n) && n >= 1 && n <= LEVEL_COUNT;
+  }
+
+  // Stored levels -> { drive, shooters }, each a valid level (else startLevel).
+  function normalizeLevels(stored, t) {
+    const out = {};
+    LEVEL_DRILLS.forEach(drill => {
+      const v = stored && typeof stored === "object" ? stored[drill] : undefined;
+      out[drill] = isLevel(v) ? v : t.startLevel;
+    });
+    return out;
+  }
+
+  // The adjustment rule after one logged set. Returns { level, change } with
+  // change "up" | "down" | "hold" | "atTop" | "atBottom" (a step clamped to 1-5)
+  // | "tooFew" (fewer than levelMinAttempts shots) | "skipped" (outcomes not logged).
+  function levelDecision(level, set, cfg) {
+    const logged = set && set.made !== null && set.attempted !== null &&
+      set.lostHandles !== null && set.missedCalls !== null && set.reps > 0;
+    if (!logged) return { level, change: "skipped" };
+    if (set.attempted < cfg.levelMinAttempts) return { level, change: "tooFew" };
+    const eps = 1e-9;
+    const success = set.made / set.attempted;
+    const errorRate = (set.lostHandles + set.missedCalls) / set.reps;
+    let change = "hold";
+    if (success >= cfg.levelUpSuccess - eps && errorRate <= cfg.levelUpMaxErrorRate + eps) change = "up";
+    else if (success < cfg.levelDownSuccess - eps || errorRate >= cfg.levelDownErrorRate - eps) change = "down";
+    if (change === "up" && level >= LEVEL_COUNT) return { level: LEVEL_COUNT, change: "atTop" };
+    if (change === "down" && level <= 1) return { level: 1, change: "atBottom" };
+    return { level: level + (change === "up" ? 1 : change === "down" ? -1 : 0), change };
+  }
+
+  function nextLevel(level, set, cfg) {
+    return levelDecision(level, set, cfg).level;
+  }
+
+  // One line for the rest screen, e.g. "Level 3 → 4: nice, timing gets tighter".
+  function levelMessage(from, decision, cfg) {
+    const to = decision.level;
+    switch (decision.change) {
+      case "up": return "Level " + from + " → " + to + ": nice, timing gets tighter";
+      case "down": return "Level " + from + " → " + to + ": easing off so you can lock it in";
+      case "atTop": return "Holding at Level " + to + ", the top level";
+      case "tooFew": return "Holding at Level " + to + " (a set needs at least " + cfg.levelMinAttempts + " shots to adjust)";
+      case "skipped": return "Holding at Level " + to + " (skipped sets don't change the level)";
+      default: return "Holding at Level " + to;
+    }
+  }
 
   // Session settings check. Returns null, or { field: "session", message }.
   function validateSession(t) {
@@ -1730,9 +1937,11 @@ const OffensePlanner = (function () {
     return { set: p.set + 1, rep: 0 };
   }
 
-  // "SET 2 / 4 · REP 5 / 8". Sets past the plan keep counting ("SET 5 / 4").
-  function progressLabel(p, t) {
-    return "SET " + p.set + " / " + t.plannedSets + " · REP " + p.rep + " / " + t.repsPerSet;
+  // "SET 2 / 4 · REP 5 / 8", plus " · LVL 3" when a level is given. Sets past the
+  // plan keep counting ("SET 5 / 4").
+  function progressLabel(p, t, level) {
+    return "SET " + p.set + " / " + t.plannedSets + " · REP " + p.rep + " / " + t.repsPerSet +
+      (isLevel(level) ? " · LVL " + level : "");
   }
 
   // Elapsed session time as mm:ss (minutes keep counting past 59, e.g. "75:03").
@@ -1751,6 +1960,91 @@ const OffensePlanner = (function () {
   }
 
   // ---- Self-test support (only called from ?selftest=1) ----
+
+  // Difficulty levels and the adjustment rule.
+  function levelSelfTest(check, reps) {
+    const t = TRAINING_DEFAULTS;
+    const base = Object.assign(cloneSettings(OFFENSE_DEFAULTS), { training: Object.assign({}, t) });
+    const dur = durationsFor(base, null);
+
+    // 1. Every level of both drills passes validation, and plans reps without error.
+    const vf = [];
+    LEVEL_DRILLS.forEach(drill => {
+      const levels = t.levels[drill];
+      if (levels.length !== LEVEL_COUNT) vf.push(drill + ": " + levels.length + " levels");
+      levelPaths(drill, t).forEach(path => {
+        if (getSettingPath(OFFENSE_DEFAULTS, path) === undefined) vf.push(drill + ": unknown setting " + path);
+      });
+      levels.forEach((values, i) => {
+        if (Object.keys(values).join() !== levelPaths(drill, t).join()) vf.push(drill + " level " + (i + 1) + ": different settings");
+        const s = applyLevel(Object.assign({}, base, { drill }), drill, i + 1, t);
+        const err = PROFILES[drill].validate(s, dur);
+        if (err) vf.push(drill + " level " + (i + 1) + ": " + err.message);
+        else {
+          try {
+            for (let n = 0; n < Math.min(reps, 500); n++) PROFILES[drill].planRep(s, dur, Math.random);
+          } catch (e) {
+            vf.push(drill + " level " + (i + 1) + " planning: " + e.message);
+          }
+        }
+        // Higher levels are never easier: windows never get longer.
+        if (i > 0) {
+          const prev = applyLevel(base, drill, i, t);
+          const win = drill === "drive" ? x => x.driveMaxMs : x => x.shooters.windowMaxMs;
+          if (win(s) > win(prev)) vf.push(drill + " level " + (i + 1) + " has a longer window than level " + i);
+        }
+      });
+    });
+    check("levels: all 5 levels of both drills pass validation (incl. shortest-fit) and plan reps", vf);
+
+    // 2. The adjustment rule.
+    const rf = [];
+    const set = (made, attempted, lost, missed, reps) => ({ made, attempted, lostHandles: lost, missedCalls: missed, reps });
+    [
+      ["up: 8/10, 1 error in 10 reps", 3, set(8, 10, 1, 0, 10), 4, "up"],
+      ["hold: 79% success", 3, set(79, 100, 0, 0, 100), 3, "hold"],
+      ["hold: error rate 0.11", 3, set(9, 10, 11, 0, 100), 3, "hold"],
+      ["down: 49% success", 3, set(49, 100, 0, 0, 100), 2, "down"],
+      ["down: error rate 0.30", 3, set(10, 10, 2, 1, 10), 2, "down"],
+      ["hold: 50% success, error rate 0.29", 3, set(5, 10, 29, 0, 100), 3, "hold"],
+      ["up exactly at both thresholds (4/5, 1/10)", 2, set(4, 5, 1, 0, 10), 3, "up"],
+      ["clamped at 5", 5, set(10, 10, 0, 0, 10), 5, "atTop"],
+      ["clamped at 1", 1, set(0, 10, 5, 5, 10), 1, "atBottom"],
+      ["too few attempts (4)", 3, set(4, 4, 0, 0, 4), 3, "tooFew"],
+      ["skipped set", 3, set(null, null, null, null, 8), 3, "skipped"],
+      ["errors not logged", 3, set(8, 8, null, 0, 8), 3, "skipped"],
+      ["partial set with 5 attempts", 3, set(5, 5, 0, 0, 5), 4, "up"],
+    ].forEach(c => {
+      const d = levelDecision(c[1], c[2], t);
+      if (d.level !== c[3] || d.change !== c[4] || nextLevel(c[1], c[2], t) !== c[3]) {
+        rf.push(c[0] + ": got " + d.level + " " + d.change);
+      }
+    });
+    check("levels: nextLevel steps up at >= 80% and <= 0.10 errors, down below 50% or at >= 0.30, else holds; 1-5", rf);
+
+    // 3. applyLevel, stored levels, labels and messages.
+    const mf = [];
+    const s0 = Object.assign(cloneSettings(base), { drill: "shooters" });
+    const before = JSON.stringify(s0);
+    const s4 = applyLevel(s0, "shooters", 4, t);
+    if (JSON.stringify(s0) !== before) mf.push("applyLevel changed its input");
+    if (s4.shooters.windowMinMs !== 1050 || s4.shooters.afterShotWeights.NOPE !== 40 ||
+        s4.shooters.afterDirectionOrCutOffWeights.SHOT !== 60) mf.push("level 4 values");
+    if (s4.shooters.maxCutOffsPerWindow !== s0.shooters.maxCutOffsPerWindow || s4.driveMinMs !== s0.driveMinMs ||
+        s4.shooters.afterNopeWeights.LEFT !== s0.shooters.afterNopeWeights.LEFT) mf.push("non-level settings changed");
+    const d1 = applyLevel(base, "drive", 1, t);
+    if (d1.readMinMs !== 2000 || d1.afterDriveOrCutOffWeights.CUT_OFF !== 10 || d1.afterDriveOrCutOffWeights.LAY_UP_LEFT_SIDE !== 20) {
+      mf.push("drive level 1 values");
+    }
+    const lv = normalizeLevels({ drive: 5, shooters: 9 }, t);
+    if (lv.drive !== 5 || lv.shooters !== t.startLevel) mf.push("normalizeLevels");
+    if (normalizeLevels(null, t).drive !== t.startLevel || normalizeLevels({ drive: 2.5 }, t).drive !== t.startLevel) mf.push("bad stored levels");
+    if (progressLabel({ set: 2, rep: 5 }, t, 3) !== "SET 2 / 4 · REP 5 / 8 · LVL 3" ||
+        progressLabel({ set: 2, rep: 5 }, t, null) !== "SET 2 / 4 · REP 5 / 8") mf.push("progress label");
+    if (levelMessage(3, { level: 4, change: "up" }, t) !== "Level 3 → 4: nice, timing gets tighter" ||
+        levelMessage(3, { level: 3, change: "hold" }, t) !== "Holding at Level 3") mf.push("messages");
+    check("levels: applyLevel changes only level settings, stored levels are clamped, LVL label and messages", mf);
+  }
 
   // READ -> READY migration and timing-variety defaults.
   function defaultsSelfTest(check) {
@@ -2229,6 +2523,7 @@ const OffensePlanner = (function () {
     });
     trainingSelfTest(check);
     defaultsSelfTest(check);
+    levelSelfTest(check, reps);
     (extraSuites || []).forEach(suite => suite(check));
 
     const passed = results.every(r => r.ok);
@@ -2270,6 +2565,13 @@ const OffensePlanner = (function () {
     formatElapsed,
     sessionWarningDue,
     sessionWarningText,
+    LEVEL_COUNT,
+    levelPaths,
+    applyLevel,
+    normalizeLevels,
+    levelDecision,
+    nextLevel,
+    levelMessage,
     runSelfTest,
   };
 })();
@@ -3140,6 +3442,10 @@ const TrainingLog = (function () {
   const importKeepBtn = document.getElementById("importKeepBtn");
   const backupStatus = document.getElementById("backupStatus");
   const historyBackBtn = document.getElementById("historyBackBtn");
+  const autoLevelBtn = document.getElementById("autoLevelBtn");
+  const levelStatus = document.getElementById("levelStatus");
+  const resetLevelButtons = document.querySelectorAll("button[data-reset-level]");
+  const restLevel = document.getElementById("restLevel");
 
   const STORAGE_MODE = "reactionCaller.mode";
   const STORAGE_DRILL = "reactionCaller.offenseDrill";
@@ -3147,6 +3453,8 @@ const TrainingLog = (function () {
   const STORAGE_LEARNED = "reactionCaller.learnedMs";
   const STORAGE_LAST_EXPORT = "reactionCaller.lastExportAt";
   const STORAGE_MIGRATIONS = "reactionCaller.migrations";
+  const STORAGE_LEVELS = "reactionCaller.levels";
+  const STORAGE_AUTO_LEVEL = "reactionCaller.autoLevel";
 
   // Where each validation error is shown (and which <details> to open for it).
   const ERROR_TARGETS = {
@@ -3428,7 +3736,7 @@ const TrainingLog = (function () {
     startRep() {
       const s = this.settings;
       this.progress = P.beginRep(this.progress);
-      sessionProgress.textContent = P.progressLabel(this.progress, s.training);
+      sessionProgress.textContent = P.progressLabel(this.progress, s.training, s.level);
       const plan = this.profile.planRep(s, s.durations, Math.random);
 
       // Rep clock: t = 0 is when the first call should be heard. Every call is
@@ -3609,15 +3917,96 @@ const TrainingLog = (function () {
     });
   }
 
+  // The manual settings (fields shown "set by Level N" contribute their manual
+  // value; startGame applies the level on top).
   function readOffenseSettings() {
     const s = P.cloneSettings(OFFENSE_DEFAULTS);
-    settingInputs().forEach(input => { setPath(s, input.dataset.setting, parseNumber(input.value)); });
+    settingInputs().forEach(input => { setPath(s, input.dataset.setting, parseNumber(manualValue(input))); });
     weightInputs().forEach(input => {
-      getPath(s, input.dataset.weightTable)[input.dataset.weightId] = parseNumber(input.value);
+      getPath(s, input.dataset.weightTable)[input.dataset.weightId] = parseNumber(manualValue(input));
     });
     s.drill = selectedDrill;
     s.training = readTrainingSettings();
     return s;
+  }
+
+  // ---- Adaptive difficulty: levels and Auto difficulty ----
+
+  const TD = P.TRAINING_DEFAULTS;
+  const LEVEL_DRILLS = ["drive", "shooters"];
+
+  function loadLevels() {
+    let stored = null;
+    try {
+      stored = JSON.parse(storageGet(STORAGE_LEVELS));
+    } catch (e) {}
+    return P.normalizeLevels(stored, TD);
+  }
+
+  let levels = loadLevels();
+  let autoLevel = storageGet(STORAGE_AUTO_LEVEL) !== "off";
+  let lastLevelMessage = null;  // shown on the rest screen after a set is saved
+  let runBaseSettings = null;   // the manual settings of the running session (levels apply on top)
+
+  function saveLevels() {
+    storageSet(STORAGE_LEVELS, JSON.stringify(levels));
+  }
+
+  // A field's own value, even while it shows a level's value.
+  function manualValue(input) {
+    return input.dataset.levelLocked ? input.dataset.manualValue : input.value;
+  }
+
+  function inputPath(input) {
+    if (input.dataset.setting) return input.dataset.setting;
+    return input.dataset.weightTable ? input.dataset.weightTable + "." + input.dataset.weightId : null;
+  }
+
+  function lockInput(input, drill, path) {
+    const level = levels[drill];
+    if (!input.dataset.levelLocked) {
+      input.dataset.manualValue = input.value;
+      input.dataset.levelLocked = "1";
+      input.readOnly = true;
+      input.classList.add("level-locked");
+    }
+    input.value = TD.levels[drill][level - 1][path];
+    const label = input.closest(".field").querySelector("label");
+    let note = label.querySelector(".level-note");
+    if (!note) {
+      note = el("span", "level-note");
+      label.appendChild(note);
+    }
+    note.textContent = "set by Level " + level;
+  }
+
+  function unlockInput(input) {
+    if (!input.dataset.levelLocked) return;
+    input.value = input.dataset.manualValue;
+    delete input.dataset.levelLocked;
+    delete input.dataset.manualValue;
+    input.readOnly = false;
+    input.classList.remove("level-locked");
+    const note = input.closest(".field").querySelector(".level-note");
+    if (note) note.remove();
+  }
+
+  // Show the levels, the toggle, and lock (Auto on) or unlock the fields the levels control.
+  function updateLevelView() {
+    autoLevelBtn.setAttribute("aria-pressed", String(autoLevel));
+    autoLevelBtn.textContent = autoLevel ? "On" : "Off";
+    LEVEL_DRILLS.forEach(drill => {
+      document.getElementById("levelText-" + drill).textContent =
+        DRILL_NAMES[drill] + ": Level " + levels[drill] + (autoLevel ? "" : " (auto off)");
+    });
+    const owner = {};
+    LEVEL_DRILLS.forEach(drill => P.levelPaths(drill, TD).forEach(path => { owner[path] = drill; }));
+    Array.from(settingInputs()).concat(Array.from(weightInputs())).forEach(input => {
+      const path = inputPath(input);
+      if (!owner[path]) return;
+      if (autoLevel) lockInput(input, owner[path], path);
+      else unlockInput(input);
+    });
   }
 
   // ---- Persistence: mode, drill, Defense's Min/Max fields and offense settings only ----
@@ -3631,7 +4020,7 @@ const TrainingLog = (function () {
 
   function saveSettings() {
     const values = {};
-    persistedInputs().forEach(input => { values[input.id] = input.value; });
+    persistedInputs().forEach(input => { values[input.id] = manualValue(input); });
     storageSet(STORAGE_SETTINGS, JSON.stringify(values));
   }
 
@@ -3709,7 +4098,11 @@ const TrainingLog = (function () {
 
     let settings = range;
     if (selectedMode === "offense") {
-      settings = readOffenseSettings();
+      runBaseSettings = readOffenseSettings();
+      settings = autoLevel
+        ? P.applyLevel(runBaseSettings, selectedDrill, levels[selectedDrill], TD)
+        : P.cloneSettings(runBaseSettings);
+      settings.level = autoLevel ? levels[selectedDrill] : null;
       // Spoken lengths are fixed for the whole run (the ones validated here);
       // anything learned during the run takes effect on the next Start.
       settings.durations = P.durationsFor(settings, learnedMs);
@@ -3776,6 +4169,8 @@ const TrainingLog = (function () {
   function showStart() {
     hideAllScreens();
     updateBackupReminder();
+    updateLevelView();
+    levelStatus.textContent = "";
     startScreen.classList.remove("hidden");
   }
 
@@ -3812,7 +4207,7 @@ const TrainingLog = (function () {
     const reps = offenseMode.repsCompleted;
     pendingSet = {
       drill: s.drill,
-      level: null,
+      level: s.level,
       reps,
       startedAt: offenseMode.setStartedAt,
       endedAt: new Date().toISOString(),
@@ -3880,7 +4275,19 @@ const TrainingLog = (function () {
     session.endedAt = set.endedAt;
     persistSession();
     pendingSet = null;
+    adjustLevel(set);
     return true;
+  }
+
+  // Auto difficulty: apply the adjustment rule to the set just logged; the new
+  // level is stored and used from the next set.
+  function adjustLevel(set) {
+    lastLevelMessage = null;
+    if (set.level === null) return;
+    const decision = P.levelDecision(set.level, set, TD);
+    levels[set.drill] = decision.level;
+    saveLevels();
+    lastLevelMessage = P.levelMessage(set.level, decision, TD);
   }
 
   function percent(x) {
@@ -3902,6 +4309,8 @@ const TrainingLog = (function () {
     const endsAt = performance.now() + restMs;
     restSummary.textContent = sessionSummaryText();
     restSaved.textContent = lastSaveOk ? "Set saved." : "Couldn't save to this device. Storage may be blocked or full.";
+    restLevel.textContent = lastLevelMessage || "";
+    restLevel.classList.toggle("hidden", !lastLevelMessage);
     nextSetBtn.classList.add("hidden");
     logScreen.classList.add("hidden");
     restScreen.classList.remove("hidden");
@@ -4309,11 +4718,28 @@ const TrainingLog = (function () {
     read.then(importText, () => { backupStatus.textContent = "Couldn't read that file."; });
   }
 
+  // Auto difficulty: plan the next set at the drill's current level. Spoken
+  // lengths stay the ones validated at Start. If the level's settings don't
+  // validate with them, the previous settings are kept.
+  function applyCurrentLevel() {
+    const current = offenseMode.settings;
+    if (current.level === null) return;
+    const level = levels[current.drill];
+    if (level === current.level) return;
+    const next = P.applyLevel(runBaseSettings, current.drill, level, TD);
+    next.level = level;
+    next.drill = current.drill;
+    next.training = current.training;
+    next.durations = current.durations;
+    if (!P.PROFILES[next.drill].validate(next, next.durations)) offenseMode.settings = next;
+  }
+
   // A fresh tap, so speech is primed again before the set's first call.
   function startNextSet() {
     if (activeMode !== offenseMode) return;
     primeSpeech();
     stopRest();
+    applyCurrentLevel();
     restScreen.classList.add("hidden");
     gameScreen.classList.remove("hidden");
     offenseMode.nextSet();
@@ -4325,6 +4751,20 @@ const TrainingLog = (function () {
   fillOffenseDefaults();
   loadSettings();
   persistedInputs().forEach(input => input.addEventListener("input", saveSettings));
+  updateLevelView();
+  autoLevelBtn.addEventListener("click", () => {
+    autoLevel = !autoLevel;
+    storageSet(STORAGE_AUTO_LEVEL, autoLevel ? "on" : "off");
+    updateLevelView();
+    levelStatus.textContent = autoLevel ? "Auto difficulty on: your level sets the timing." : "Auto difficulty off: your own settings apply.";
+  });
+  resetLevelButtons.forEach(btn => btn.addEventListener("click", () => {
+    const drill = btn.dataset.resetLevel;
+    levels[drill] = TD.startLevel;
+    saveLevels();
+    updateLevelView();
+    levelStatus.textContent = DRILL_NAMES[drill] + " reset to Level " + TD.startLevel + ".";
+  }));
   wireSteppers(offensePanel);
   wireSteppers(logScreen);
   // Made can never exceed attempted: lowering attempted pulls made down with it.
