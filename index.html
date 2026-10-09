@@ -1178,6 +1178,28 @@ const OffensePlanner = (function () {
       CATCH:                    { display: "CATCH",                    spoken: "catch",                    estMs: 400 },
       SHOT:                     { display: "SHOT",                     spoken: "shot",                     estMs: 350 },
       NOPE:                     { display: "NOPE",                     spoken: "nope",                     estMs: 350 },
+      // Move Lab: GO on every rep, and the side announced with the move at set start.
+      // The move names (CROSSOVER, HESI, PULL UP, …) are added to this table from
+      // TRAINING_DEFAULTS.moves, so each move is defined in one place.
+      GO:         { display: "GO",         spoken: "go",         estMs: 250 },
+      LEFT_HAND:  { display: "LEFT HAND",  spoken: "left hand",  estMs: 550 },
+      RIGHT_HAND: { display: "RIGHT HAND", spoken: "right hand", estMs: 550 },
+      ALTERNATE:  { display: "ALTERNATE",  spoken: "alternate",  estMs: 600 },
+    },
+
+    // ---------------------------------------------------------------
+    // Move Lab drill: one move on one side, a steady GO every cadenceSec.
+    // The speech settings above are shared; nothing else from Drive applies.
+    // ---------------------------------------------------------------
+    moveLab: {
+      // The move and side picked on the start screen (a TRAINING_DEFAULTS.moves id;
+      // "left" | "right" | "alternate").
+      moveId: "CROSSOVER",
+      side: "right",
+      // Seconds from one GO to the next (whole number 3-10). The bar drains over it.
+      cadenceSec: 5,
+      // Silence after the set-start announcement ("crossover, right hand") before the first GO (ms).
+      introGapMs: 1500, // provisional
     },
 
     // ---------------------------------------------------------------
@@ -1823,7 +1845,37 @@ const OffensePlanner = (function () {
           "shooters.afterShotWeights.NOPE": 45, "shooters.afterShotWeights.END": 55 }, // provisional
       ],
     },
+
+    // ---- Move Lab: the move vocabulary and the mastery gate. ----
+    // Reps per set for Move Lab (whole number 3-30); the other drills use repsPerSet.
+    moveLabRepsPerSet: 10,
+    // Every move the app can call. Edit freely: id (unique, A-Z and _), display (on
+    // screen), spoken (sent to the voice), type "handle" | "shot", and estMs (rough
+    // spoken length at rate 1.0; learned lengths replace it, as for every phrase).
+    // Each move is added to OFFENSE_DEFAULTS.phrases under its id.
+    moves: [
+      { id: "CROSSOVER",        display: "CROSSOVER",        spoken: "crossover",        type: "handle", estMs: 650 },
+      { id: "BETWEEN_THE_LEGS", display: "BETWEEN THE LEGS", spoken: "between the legs", type: "handle", estMs: 850 },
+      { id: "BEHIND_THE_BACK",  display: "BEHIND THE BACK",  spoken: "behind the back",  type: "handle", estMs: 850 },
+      { id: "HESI",             display: "HESI",             spoken: "hesi",             type: "handle", estMs: 450 },
+      { id: "IN_AND_OUT",       display: "IN AND OUT",       spoken: "in and out",       type: "handle", estMs: 650 },
+      { id: "SPIN",             display: "SPIN",             spoken: "spin",             type: "handle", estMs: 350 },
+      { id: "PULL_UP",          display: "PULL UP",          spoken: "pull up",          type: "shot",   estMs: 450 },
+      { id: "STEP_BACK",        display: "STEP BACK",        spoken: "step back",        type: "shot",   estMs: 550 },
+    ],
+    // A move is fluent on a side when one of the last moveFluentRecentSets logged
+    // Move Lab sets of that move and side has clean reps / reps >= moveFluentShare
+    // (8 of 10, scaled to the set size) and at least moveFluentMinReps reps.
+    // Unlocked = fluent with the left hand and with the right hand.
+    moveFluentShare: 0.8, // provisional
+    moveFluentRecentSets: 3,
+    moveFluentMinReps: 5, // provisional
   };
+
+  // Each move is also a phrase (shared table, so learned lengths work for it too).
+  TRAINING_DEFAULTS.moves.forEach(m => {
+    OFFENSE_DEFAULTS.phrases[m.id] = { display: m.display, spoken: m.spoken, estMs: m.estMs };
+  });
 
   const LEVEL_COUNT = 5;
   const LEVEL_DRILLS = ["drive", "shooters"];
@@ -1919,6 +1971,11 @@ const OffensePlanner = (function () {
     return null;
   }
 
+  // The session settings a drill runs with: Move Lab uses its own reps per set.
+  function sessionForDrill(t, drill) {
+    return drill === "moveLab" ? Object.assign({}, t, { repsPerSet: t.moveLabRepsPerSet }) : t;
+  }
+
   // Session progress { set, rep }: the current set (from 1) and the reps started in it.
   function newSession() {
     return { set: 1, rep: 0 };
@@ -1959,7 +2016,241 @@ const OffensePlanner = (function () {
       "Consider finishing this set and stopping.";
   }
 
+  // ===================================================================
+  // Move Lab: one move on one side, a steady GO. The set's first rep
+  // announces the move and side ("crossover, right hand"); every rep is one
+  // GO, with the countdown draining over the cadence until the next GO.
+  // ===================================================================
+
+  // Side -> the phrase announced with the move.
+  const MOVE_SIDES = { left: "LEFT_HAND", right: "RIGHT_HAND", alternate: "ALTERNATE" };
+  const MOVE_TYPES = ["handle", "shot"];
+
+  function hasKey(obj, key) {
+    return typeof key === "string" && Object.prototype.hasOwnProperty.call(obj, key);
+  }
+
+  function findMove(id, t) {
+    return t.moves.find(m => m.id === id) || null;
+  }
+
+  // ctx (optional, from the runner) = { repInSet, lastMoveId }: the rep's number
+  // in its set (from 1) and the last move called before it. Move Lab announces
+  // only on a set's first rep (or when there is no ctx).
+  function planMoveLabRep(s, dur, rng, onPick, ctx) {
+    const ml = s.moveLab;
+    const base = s.baseRate;
+    const sideId = MOVE_SIDES[ml.side];
+    const calls = [];
+    let goAt = 0;
+    if (!ctx || !(ctx.repInSet > 1)) {
+      const moveDur = dur[ml.moveId] / base;
+      const sideAt = moveDur + s.minGapMs;
+      const sideDur = dur[sideId] / base;
+      calls.push({ id: ml.moveId, atMs: 0, durMs: moveDur, rate: base });
+      calls.push({ id: sideId, atMs: sideAt, durMs: sideDur, rate: base });
+      goAt = sideAt + sideDur + Math.max(s.minGapMs, ml.introGapMs);
+    }
+    calls.push({ id: "GO", atMs: goAt, durMs: dur.GO / base, rate: base });
+    const cadence = ml.cadenceSec * 1000;
+    return {
+      calls,
+      windows: [{ startMs: goAt, durMs: cadence }],
+      endMs: goAt + cadence,
+      restMs: 0,
+      caption: { atMs: 0, ids: [ml.moveId, sideId] },
+      moves: [ml.moveId],
+    };
+  }
+
+  // Move Lab settings check. Returns null, or { field: "speech" | "moveLab", message }.
+  function validateMoveLab(s, dur) {
+    const main = message => ({ field: "moveLab", message });
+    const speechError = validateSpeech(s);
+    if (speechError) return speechError;
+    const ml = s.moveLab;
+    if (!findMove(ml.moveId, TRAINING_DEFAULTS) || !hasKey(s.phrases, ml.moveId)) return main("Pick a move.");
+    if (!hasKey(MOVE_SIDES, ml.side)) return main("Pick a side: left hand, right hand or alternate.");
+    if (!isWhole(ml.cadenceSec) || ml.cadenceSec < 3 || ml.cadenceSec > 10) {
+      return main("GO every must be a whole number from 3 to 10 seconds.");
+    }
+    if (!isWholeNonNegative(ml.introGapMs)) return main("The gap before the first GO must be a whole number of 0 ms or more.");
+    if (dur.GO / s.baseRate + s.minGapMs > ml.cadenceSec * 1000) return main("GO doesn't fit in the cadence.");
+    return null;
+  }
+
+  // Logged Move Lab sets (clean reps entered), oldest first:
+  // [{ moveId, side, reps, cleanReps }]. Sessions are ordered by start time.
+  function moveLabSets(log) {
+    const sessions = (log && Array.isArray(log.sessions) ? log.sessions : [])
+      .filter(x => x && typeof x.startedAt === "string" && Array.isArray(x.sets))
+      .slice().sort((a, b) => (a.startedAt < b.startedAt ? -1 : a.startedAt > b.startedAt ? 1 : 0));
+    const out = [];
+    sessions.forEach(sess => sess.sets.forEach(set => {
+      const x = set && set.extra;
+      if (set && set.drill === "moveLab" && x && Number.isInteger(x.cleanReps) && Number.isInteger(set.reps)) {
+        out.push({ moveId: x.moveId, side: x.side, reps: set.reps, cleanReps: x.cleanReps });
+      }
+    }));
+    return out;
+  }
+
+  // Fluent on a side: one of the last t.moveFluentRecentSets logged sets of that
+  // move and side has >= t.moveFluentMinReps reps and cleanReps / reps >= t.moveFluentShare.
+  function isFluent(sets, moveId, side, t) {
+    return sets.filter(x => x.moveId === moveId && x.side === side)
+      .slice(-t.moveFluentRecentSets)
+      .some(x => x.reps >= t.moveFluentMinReps && x.cleanReps / x.reps >= t.moveFluentShare - 1e-9);
+  }
+
+  // The mastery gate for every move in t.moves:
+  // { [moveId]: { left, right, earned, manual, unlocked } }. earned = fluent on
+  // both sides; manual = marked unlocked by hand (ids in `manual`); unlocked = either.
+  // Alternate-hand sets don't count toward either side.
+  function moveMastery(log, t, manual) {
+    const sets = moveLabSets(log);
+    const marked = Array.isArray(manual) ? manual : [];
+    const out = {};
+    t.moves.forEach(m => {
+      const left = isFluent(sets, m.id, "left", t);
+      const right = isFluent(sets, m.id, "right", t);
+      const isManual = marked.indexOf(m.id) !== -1;
+      out[m.id] = { left, right, earned: left && right, manual: isManual, unlocked: (left && right) || isManual };
+    });
+    return out;
+  }
+
+  // Unlocked move ids, in move-list order.
+  function unlockedMoveIds(mastery, t) {
+    return t.moves.filter(m => mastery[m.id] && mastery[m.id].unlocked).map(m => m.id);
+  }
+
   // ---- Self-test support (only called from ?selftest=1) ----
+
+  // Move Lab: move list, planner, validation and the mastery gate.
+  function moveLabSelfTest(check, reps) {
+    const t = TRAINING_DEFAULTS;
+    const defaults = cloneSettings(OFFENSE_DEFAULTS);
+    const dur = durationsFor(defaults, null);
+
+    // 1. The move list and its phrases.
+    const lf = [];
+    const want = ["CROSSOVER:handle", "BETWEEN_THE_LEGS:handle", "BEHIND_THE_BACK:handle", "HESI:handle",
+      "IN_AND_OUT:handle", "SPIN:handle", "PULL_UP:shot", "STEP_BACK:shot"];
+    if (t.moves.map(m => m.id + ":" + m.type).join() !== want.join()) lf.push("move list " + t.moves.map(m => m.id));
+    const seen = {};
+    t.moves.forEach(m => {
+      if (seen[m.id]) lf.push("duplicate id " + m.id);
+      seen[m.id] = true;
+      if (MOVE_TYPES.indexOf(m.type) === -1) lf.push(m.id + " type " + m.type);
+      const p = OFFENSE_DEFAULTS.phrases[m.id];
+      if (!p || p.display !== m.display || p.spoken !== m.spoken || p.estMs !== m.estMs || !(m.estMs > 0)) lf.push(m.id + " phrase");
+      if (!(dur[m.id] > 0)) lf.push(m.id + " has no length");
+    });
+    ["GO", "LEFT_HAND", "RIGHT_HAND", "ALTERNATE"].forEach(id => { if (!(dur[id] > 0)) lf.push(id + " phrase"); });
+    check("move lab: 8 moves (6 handle, 2 shot), each also a phrase with a length estimate", lf);
+
+    // 2. Validation.
+    const vf = [];
+    const variant = ml => Object.assign(cloneSettings(defaults), { moveLab: Object.assign({}, defaults.moveLab, ml) });
+    t.moves.forEach(m => Object.keys(MOVE_SIDES).forEach(side => {
+      const e = validateMoveLab(variant({ moveId: m.id, side }), dur);
+      if (e) vf.push(m.id + " " + side + ": " + e.message);
+    }));
+    [{ cadenceSec: 3 }, { cadenceSec: 10 }, { introGapMs: 0 }].forEach(c => {
+      if (validateMoveLab(variant(c), dur)) vf.push("rejected " + JSON.stringify(c));
+    });
+    [{ cadenceSec: 2 }, { cadenceSec: 11 }, { cadenceSec: 5.5 }, { cadenceSec: NaN }, { moveId: "DUNK" },
+     { moveId: "GO" }, { side: "both" }, { introGapMs: -1 }].forEach(c => {
+      const e = validateMoveLab(variant(c), dur);
+      if (!e || e.field !== "moveLab") vf.push("accepted " + JSON.stringify(c));
+    });
+    check("move lab: every move and side passes validation; cadence 3-10 s whole, unknown move or side rejected", vf);
+
+    // 3. Plans: the set's first rep announces move + side, then GO; later reps are
+    // one GO at 0. Every cadence 3-10 s, every side, a whole simulated set.
+    const pf = [];
+    for (let cadenceSec = 3; cadenceSec <= 10; cadenceSec++) {
+      Object.keys(MOVE_SIDES).forEach(side => {
+        const s = variant({ cadenceSec, side, moveId: t.moves[cadenceSec % t.moves.length].id });
+        const cadence = cadenceSec * 1000;
+        let clock = 0;
+        const goTimes = [];
+        for (let rep = 1; rep <= 10; rep++) {
+          const plan = planMoveLabRep(s, dur, Math.random, null, { repInSet: rep, lastMoveId: null });
+          const ids = plan.calls.map(c => c.id);
+          const go = plan.calls[plan.calls.length - 1];
+          const where = cadenceSec + " s " + side + " rep " + rep + ": " + ids.join(" > ");
+          if (rep === 1) {
+            if (ids.join() !== [s.moveLab.moveId, MOVE_SIDES[side], "GO"].join()) pf.push(where);
+            const sideCall = plan.calls[1];
+            if (go.atMs < sideCall.atMs + sideCall.durMs + s.moveLab.introGapMs - EPS) pf.push(where + " (GO too soon)");
+          } else if (ids.join() !== "GO" || go.atMs !== 0) {
+            pf.push(where);
+          }
+          plan.calls.forEach((c, i) => {
+            if (c.rate !== s.baseRate || Math.abs(c.durMs - dur[c.id] / s.baseRate) > EPS) pf.push(where + " (rate)");
+            if (i > 0 && c.atMs < plan.calls[i - 1].atMs + plan.calls[i - 1].durMs + s.minGapMs - EPS) pf.push(where + " (overlap)");
+          });
+          const w = plan.windows;
+          if (w.length !== 1 || w[0].startMs !== go.atMs || w[0].durMs !== cadence || plan.endMs !== go.atMs + cadence ||
+              plan.restMs !== 0) pf.push(where + " (window)");
+          if (go.atMs + go.durMs > plan.endMs) pf.push(where + " (GO longer than the cadence)");
+          if (plan.caption.atMs !== 0 || plan.caption.ids.join() !== s.moveLab.moveId + "," + MOVE_SIDES[side] ||
+              plan.moves.join() !== s.moveLab.moveId) pf.push(where + " (caption / moves)");
+          goTimes.push(clock + go.atMs);
+          clock += plan.endMs + plan.restMs;
+        }
+        for (let i = 1; i < goTimes.length; i++) {
+          if (Math.abs(goTimes[i] - goTimes[i - 1] - cadence) > EPS) pf.push(cadenceSec + " s " + side + ": GO gap " + (goTimes[i] - goTimes[i - 1]));
+        }
+      });
+    }
+    if (planMoveLabRep(defaults, dur).calls.length !== 3) pf.push("no ctx: no announcement");
+    check("move lab: first rep says move + side then GO, later reps GO only; GO exactly every cadence (3-10 s)", pf);
+
+    // 4. The mastery gate.
+    const mf = [];
+    let n = 0;
+    const set = (moveId, side, reps, cleanReps) => ({ drill: "moveLab", reps, extra: { moveId, side, cleanReps } });
+    const logOf = (...sessions) => ({ version: 1, sessions: sessions.map(sets => ({
+      id: "m" + (++n), startedAt: "2026-05-" + String(10 + n).padStart(2, "0") + "T10:00:00.000Z", sets })) });
+    const status = (log, manual) => moveMastery(log, t, manual);
+    const expect = (name, log, id, left, right, unlocked, manual) => {
+      const st = status(log, manual)[id];
+      if (st.left !== left || st.right !== right || st.unlocked !== unlocked) {
+        mf.push(name + ": got left " + st.left + " right " + st.right + " unlocked " + st.unlocked);
+      }
+    };
+    expect("8/10 both sides", logOf([set("SPIN", "left", 10, 8), set("SPIN", "right", 10, 8)]), "SPIN", true, true, true);
+    expect("7/10", logOf([set("SPIN", "left", 10, 7), set("SPIN", "right", 10, 10)]), "SPIN", false, true, false);
+    expect("left only", logOf([set("HESI", "left", 10, 10)]), "HESI", true, false, false);
+    expect("scaled 4/5", logOf([set("HESI", "left", 5, 4), set("HESI", "right", 15, 12)]), "HESI", true, true, true);
+    expect("scaled 11/15", logOf([set("HESI", "left", 15, 11), set("HESI", "right", 15, 12)]), "HESI", false, true, false);
+    expect("4/4 below min reps", logOf([set("HESI", "left", 4, 4), set("HESI", "right", 10, 9)]), "HESI", false, true, false);
+    // The good set is the 4th-last (pushed out by three later sets), then 3rd-last.
+    const good = set("SPIN", "left", 10, 9);
+    const bad = () => set("SPIN", "left", 10, 2);
+    expect("outside last 3", logOf([good], [bad(), bad()], [bad()]), "SPIN", false, false, false);
+    expect("inside last 3", logOf([good], [bad(), bad()]), "SPIN", true, false, false);
+    // Skipped sets (clean reps not entered) are not logged sets: they don't push good sets out.
+    expect("skipped sets ignored", logOf([good, set("SPIN", "left", 10, null), set("SPIN", "left", 10, null),
+      set("SPIN", "left", 10, null), bad(), bad()]), "SPIN", true, false, false);
+    expect("alternate doesn't count", logOf([set("SPIN", "alternate", 10, 10)]), "SPIN", false, false, false);
+    expect("other move doesn't count", logOf([set("HESI", "left", 10, 10), set("HESI", "right", 10, 10)]), "SPIN", false, false, false);
+    expect("other drill doesn't count", { version: 1, sessions: [{ id: "x", startedAt: "2026-05-01T10:00:00.000Z",
+      sets: [{ drill: "drive", reps: 10, extra: { moveId: "SPIN", side: "left", cleanReps: 10 } }] }] }, "SPIN", false, false, false);
+    // Sessions are ordered by start time, not by their order in the log.
+    const late = { id: "late", startedAt: "2026-06-30T10:00:00.000Z", sets: [bad(), bad(), bad()] };
+    const early = { id: "early", startedAt: "2026-06-01T10:00:00.000Z", sets: [good] };
+    expect("ordered by session start", { version: 1, sessions: [late, early] }, "SPIN", false, false, false);
+    expect("manual unlock", logOf([]), "STEP_BACK", false, false, true, ["STEP_BACK", "NOT_A_MOVE"]);
+    const all = status({ version: 1, sessions: [] }, ["PULL_UP"]);
+    if (Object.keys(all).length !== t.moves.length || unlockedMoveIds(all, t).join() !== "PULL_UP") mf.push("unlockedMoveIds");
+    if (unlockedMoveIds(status(null, null), t).length !== 0) mf.push("empty log");
+    check("move lab: fluent = one of the last 3 logged sets per side >= 80% clean (min 5 reps); unlocked = both sides or marked", mf);
+    return null;
+  }
 
   // Difficulty levels and the adjustment rule.
   function levelSelfTest(check, reps) {
@@ -2099,6 +2390,13 @@ const OffensePlanner = (function () {
       if (validateSession(Object.assign({}, t, c))) vf.push("rejected " + JSON.stringify(c));
     });
     check("session: validation rejects out-of-range or non-whole values, accepts the bounds", vf);
+
+    const df = [];
+    const ml = sessionForDrill(t, "moveLab");
+    if (ml.repsPerSet !== 10 || t.repsPerSet !== 8 || sessionForDrill(t, "drive").repsPerSet !== 8) df.push("reps per set");
+    if (validateSession(sessionForDrill(Object.assign({}, t, { moveLabRepsPerSet: 31 }), "moveLab")) === null) df.push("31 accepted");
+    if (validateSession(sessionForDrill(Object.assign({}, t, { moveLabRepsPerSet: 31 }), "drive")) !== null) df.push("drive checks Move Lab reps");
+    check("session: Move Lab uses its own reps per set (default 10), the other drills keep repsPerSet", df);
 
     // Walk 6 sets (past the 4 planned) for several set sizes.
     const cf = [];
@@ -2471,15 +2769,19 @@ const OffensePlanner = (function () {
 
   // ---- Drill profiles ----
   // A profile bundles one drill: its phrase ids, state table, weight tables,
-  // a pure planRep(settings, durations, rng), validate(settings, durations),
+  // a pure planRep(settings, durations, rng, onPick, ctx), validate(settings, durations),
   // its fit table and its self-test. Phrases (and learned lengths) are shared by id.
+  // ctx (optional) = { repInSet, lastMoveId } is what the runner knows about earlier reps.
   //
   // planRep returns one rep plan, the only shape the runner executes:
   //   {
   //     calls:   [{ id, atMs, durMs, rate }],  // every spoken call, ms from the rep start
   //     windows: [{ startMs, durMs }],         // countdown windows the bar draws
   //     endMs,                                 // when the rep's last window ends
-  //     restMs                                 // pause after endMs before the next rep
+  //     restMs,                                // pause after endMs before the next rep
+  //     caption: { atMs, ids },                // optional: phrases shown small under the
+  //                                            // call from atMs to the end of the rep
+  //     moves: [moveId, …]                     // optional: moves called in this rep
   //   }
   // A future mixed drill only has to pick a profile per rep and call its planRep.
   const PROFILES = {
@@ -2502,6 +2804,16 @@ const OffensePlanner = (function () {
       validate: validateShooters,
       fitTable: shootersFitTable,
       selfTest: shootersSelfTest,
+    },
+    moveLab: {
+      id: "moveLab",
+      phraseIds: TRAINING_DEFAULTS.moves.map(m => m.id).concat(Object.keys(MOVE_SIDES).map(k => MOVE_SIDES[k]), "GO"),
+      next: null,
+      weightTables: [],
+      planRep: planMoveLabRep,
+      validate: validateMoveLab,
+      fitTable: null,
+      selfTest: moveLabSelfTest,
     },
   };
 
@@ -2557,6 +2869,7 @@ const OffensePlanner = (function () {
     shootersFitTable,
     TRAINING_DEFAULTS,
     validateSession,
+    sessionForDrill,
     newSession,
     beginRep,
     isSetComplete,
@@ -2572,6 +2885,11 @@ const OffensePlanner = (function () {
     levelDecision,
     nextLevel,
     levelMessage,
+    MOVE_SIDES,
+    planMoveLabRep,
+    validateMoveLab,
+    moveMastery,
+    unlockedMoveIds,
     runSelfTest,
   };
 })();
@@ -2593,7 +2911,9 @@ const TrainingLog = (function () {
   const LOG_VERSION = 1;
   const LOG_KEY = "reactionCaller.log";
   const BACKUP_PREFIX = LOG_KEY + ".backup.";
-  const DRILLS = ["drive", "shooters"];
+  const DRILLS = ["drive", "shooters", "moveLab"];
+  // Move Lab sides (extra.side).
+  const SIDES = ["left", "right", "alternate"];
   // "How did the set feel?" One of these, or null (not rated).
   const QUALITIES = ["clean", "rushed", "off_balance"];
   const NOTE_MAX = 500;
@@ -2644,6 +2964,14 @@ const TrainingLog = (function () {
     }
     if (!isPlainObject(set.settingsSnapshot)) return bad("settingsSnapshot", "Settings snapshot is missing.");
     if (!isPlainObject(set.extra)) return bad("extra", "extra must be an object.");
+    if (set.drill === "moveLab") {
+      const x = set.extra;
+      if (typeof x.moveId !== "string" || x.moveId === "") return bad("extra", "A Move Lab set needs its move.");
+      if (SIDES.indexOf(x.side) === -1) return bad("extra", "A Move Lab set needs its side.");
+      if (x.cleanReps !== null && (!isCount(x.cleanReps) || x.cleanReps > set.reps)) {
+        return bad("cleanReps", "Clean reps must be a whole number from 0 to the reps in the set.");
+      }
+    }
     return null;
   }
 
@@ -2655,6 +2983,7 @@ const TrainingLog = (function () {
       repsPerSet: s.training ? s.training.repsPerSet : null,
     };
     if (s.drill === "shooters") return clone(Object.assign({ shooters: s.shooters }, shared));
+    if (s.drill === "moveLab") return clone(Object.assign({ moveLab: s.moveLab }, shared));
     return clone(Object.assign({
       readMinMs: s.readMinMs, readMaxMs: s.readMaxMs,
       driveMinMs: s.driveMinMs, driveMaxMs: s.driveMaxMs,
@@ -2702,10 +3031,16 @@ const TrainingLog = (function () {
       made: 0, attempted: 0, lostHandles: 0, missedCalls: 0,
       makePct: null, errorsPerRep: null, lostPer10: null, missedPer10: null,
       ratedSets: 0, cleanSets: 0, cleanShare: null,
+      // Move Lab: clean reps over the reps of sets where they were entered.
+      cleanReps: 0, cleanRepsOf: 0, cleanRepShare: null,
     };
     let errorReps = 0;
     sets.forEach(set => {
       sum.reps += set.reps;
+      if (set.extra && Number.isInteger(set.extra.cleanReps)) {
+        sum.cleanReps += set.extra.cleanReps;
+        sum.cleanRepsOf += set.reps;
+      }
       if (set.made !== null && set.attempted !== null) {
         sum.loggedSets++;
         sum.made += set.made;
@@ -2728,6 +3063,7 @@ const TrainingLog = (function () {
       sum.missedPer10 = sum.missedCalls / errorReps * 10;
     }
     if (sum.ratedSets > 0) sum.cleanShare = sum.cleanSets / sum.ratedSets;
+    if (sum.cleanRepsOf > 0) sum.cleanRepShare = sum.cleanReps / sum.cleanRepsOf;
     return sum;
   }
 
@@ -3052,6 +3388,29 @@ const TrainingLog = (function () {
     settings.afterLayUpWeights.CUT_OFF = 1;
     if (shooters.shooters.getSetMs.CATCH.minMs === 1 || drive.afterLayUpWeights.CUT_OFF === 1) snap.push("snapshot is not a copy");
     check("log: settings snapshot holds the drill's timing, weights and caps as a copy", snap);
+
+    const mlf = [];
+    const ml = changes => withSet(Object.assign({ drill: "moveLab", reps: 10, made: null, attempted: null,
+      extra: { moveId: "SPIN", side: "right", cleanReps: 8 } }, changes));
+    [["handle move, no shots", ml({})], ["shot move with shots", ml({ made: 6, attempted: 10 })],
+     ["skipped", ml({ lostHandles: null, missedCalls: null, quality: null, extra: { moveId: "SPIN", side: "left", cleanReps: null } })],
+     ["all clean", ml({ extra: { moveId: "HESI", side: "alternate", cleanReps: 10 } })]].forEach(c => {
+      const e = validateSet(c[1]);
+      if (e) mlf.push(c[0] + ": " + e.message);
+    });
+    [["clean > reps", { cleanReps: 11 }], ["negative clean", { cleanReps: -1 }], ["fractional clean", { cleanReps: 7.5 }],
+     ["clean missing", { cleanReps: undefined }], ["no move", { moveId: "" }], ["bad side", { side: "both" }]].forEach(c => {
+      if (!validateSet(ml({ extra: Object.assign({ moveId: "SPIN", side: "right", cleanReps: 8 }, c[1]) }))) mlf.push("accepted " + c[0]);
+    });
+    const mlSnap = snapshotSettings(Object.assign({}, settings, { drill: "moveLab" }));
+    if (!mlSnap.moveLab || mlSnap.moveLab.cadenceSec !== 5 || mlSnap.shooters !== undefined || mlSnap.driveMinMs !== undefined) {
+      mlf.push("snapshot");
+    }
+    const mlSum = summarizeSets([ml({}), ml({ reps: 5, extra: { moveId: "SPIN", side: "left", cleanReps: 5 } }),
+      ml({ extra: { moveId: "SPIN", side: "left", cleanReps: null } }), withSet({})]);
+    if (mlSum.cleanReps !== 13 || mlSum.cleanRepsOf !== 15 || !near(mlSum.cleanRepShare, 13 / 15)) mlf.push("clean rep totals");
+    if (summarizeSets([base]).cleanRepShare !== null) mlf.push("clean share without Move Lab sets");
+    check("log: Move Lab sets need move, side and clean reps 0..reps (or null); snapshot and clean-rep totals", mlf);
 
     const up = [];
     const log0 = emptyLog();
