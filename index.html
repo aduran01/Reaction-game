@@ -708,6 +708,59 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* Move Lab: move picker (2 columns of 52px buttons) and its confirmation. */
+  .title-hint {
+    color: var(--muted);
+    font-size: 0.8rem;
+    font-weight: 400;
+    margin-left: 6px;
+  }
+
+  .move-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .move-grid button {
+    min-height: 52px;
+    padding: 8px;
+    background: var(--bg);
+    border: 1px solid #2a2e38;
+    color: var(--muted);
+    font-size: 0.95rem;
+  }
+
+  .move-grid button[aria-pressed="true"] {
+    background: #2a2e38;
+    border-color: var(--accent);
+    color: var(--text);
+  }
+
+  .move-grid .check { color: #4fd87c; margin-left: 4px; }
+
+  .confirm.plain { border-color: #2a2e38; }
+
+  #markUnlockedYes { background: var(--accent); min-height: 52px; }
+  #markUnlockedYes:active { background: var(--accent-down); }
+
+  /* Game screen: the named move, small under the call, for the whole rep. */
+  .word-stage {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .caption {
+    font-size: clamp(1.4rem, 7vw, 2.4rem);
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    line-height: 1.1;
+    text-align: center;
+    color: #45d6e0;
+  }
+
+  .word-move { color: #45d6e0; }
+  .word-go { color: var(--text); }
   .word-read { color: var(--text); }
   .word-sprint { color: #ff7a4f; }
   .word-catch { color: var(--text); }
@@ -753,9 +806,10 @@
       <div class="segmented" role="group" aria-label="Offense drill">
         <button type="button" data-drill="drive" aria-pressed="true">Drive</button>
         <button type="button" data-drill="shooters" aria-pressed="false">Shooters only</button>
+        <button type="button" data-drill="moveLab" aria-pressed="false">Move Lab</button>
       </div>
 
-      <!-- Adaptive difficulty, shared by both drills -->
+      <!-- Adaptive difficulty, Drive and Shooters only -->
       <div class="panel-section" id="levelSettings">
         <div class="toggle-row">
           <span class="toggle-label">Auto difficulty<span class="hint">Sets the timing from your level, and adjusts the level after each logged set</span></span>
@@ -881,10 +935,48 @@
         </details>
       </div>
 
-      <!-- Session structure, shared by both drills -->
+      <!-- Move Lab drill only -->
+      <div class="panel-section hidden" id="moveLabSettings">
+        <p class="panel-title">Move <span class="title-hint">✓ = unlocked for the other drills</span></p>
+        <div class="move-grid" id="movePicker" role="group" aria-label="Move"></div>
+        <p class="muted-text" id="moveStatus" role="status"></p>
+        <button type="button" class="small-btn" id="markUnlockedBtn">Mark as unlocked</button>
+        <div class="confirm plain hidden" id="markUnlockedConfirm">
+          <p id="markUnlockedText"></p>
+          <div class="button-row">
+            <button type="button" id="markUnlockedYes">Mark unlocked</button>
+            <button type="button" class="secondary-btn" id="markUnlockedNo">Cancel</button>
+          </div>
+        </div>
+        <p class="panel-title">Side</p>
+        <div class="segmented choice" role="group" aria-label="Side">
+          <button type="button" data-side="left" aria-pressed="false">Left hand</button>
+          <button type="button" data-side="right" aria-pressed="true">Right hand</button>
+          <button type="button" data-side="alternate" aria-pressed="false">Alternate</button>
+        </div>
+        <div class="field">
+          <label for="mlCadenceSec">GO every (s)</label>
+          <div class="stepper">
+            <button type="button" data-step="-1" aria-label="GO more often">−</button>
+            <input type="number" id="mlCadenceSec" min="3" max="10" step="1" inputmode="numeric" data-setting="moveLab.cadenceSec">
+            <button type="button" data-step="1" aria-label="GO less often">+</button>
+          </div>
+        </div>
+        <div class="error" id="moveLabError"></div>
+      </div>
+
+      <!-- Session structure, shared by every drill -->
       <div class="panel-section" id="sessionSettings">
         <p class="panel-title">Session</p>
-        <div class="field">
+        <div class="field hidden" id="moveLabRepsField">
+          <label for="moveLabRepsPerSet">Reps per set (Move Lab)</label>
+          <div class="stepper">
+            <button type="button" data-step="-1" aria-label="Fewer Move Lab reps per set">−</button>
+            <input type="number" id="moveLabRepsPerSet" min="3" max="30" step="1" inputmode="numeric" data-training="moveLabRepsPerSet">
+            <button type="button" data-step="1" aria-label="More Move Lab reps per set">+</button>
+          </div>
+        </div>
+        <div class="field" id="repsPerSetField">
           <label for="repsPerSet">Reps per set</label>
           <div class="stepper">
             <button type="button" data-step="-1" aria-label="Fewer reps per set">−</button>
@@ -919,9 +1011,9 @@
         <div class="error" id="sessionError"></div>
       </div>
 
-      <!-- Shared by both drills -->
+      <!-- Shared by every drill -->
       <details class="advanced" id="speech">
-        <summary>Speech (both drills)</summary>
+        <summary>Speech (every drill)</summary>
         <div class="advanced-body">
           <div class="field-grid">
             <div class="field">
@@ -960,6 +1052,7 @@
     </div>
     <div class="word-stage">
       <div id="word">&nbsp;</div>
+      <div id="caption" class="caption hidden"></div>
     </div>
     <div class="countdown idle hidden" id="countdown">
       <div class="countdown-track"><div class="countdown-fill" id="countdownFill"></div></div>
@@ -975,7 +1068,15 @@
       <h1 id="logTitle">Set 1 · 8 reps</h1>
     </div>
     <div class="panel log-panel">
-      <div class="log-row">
+      <div class="log-row hidden" id="logCleanRow">
+        <label for="logClean">Clean reps<span class="hint">controlled, on balance, eyes up</span></label>
+        <div class="stepper">
+          <button type="button" data-step="-1" aria-label="Fewer clean reps">−</button>
+          <input type="number" id="logClean" min="0" max="99" step="1" inputmode="numeric">
+          <button type="button" data-step="1" aria-label="More clean reps">+</button>
+        </div>
+      </div>
+      <div class="log-row" id="logMadeRow">
         <label for="logMade">Shots made</label>
         <div class="stepper">
           <button type="button" data-step="-1" aria-label="Fewer shots made">−</button>
@@ -983,7 +1084,7 @@
           <button type="button" data-step="1" aria-label="More shots made">+</button>
         </div>
       </div>
-      <div class="log-row">
+      <div class="log-row" id="logAttemptedRow">
         <label for="logAttempted">Shots attempted</label>
         <div class="stepper">
           <button type="button" data-step="-1" aria-label="Fewer shots attempted">−</button>
@@ -3680,7 +3781,10 @@ const TrainingLog = (function () {
     CATCH: "word-catch",
     SHOT: "word-shot",
     NOPE: "word-nope",
+    GO: "word-go",
+    LEFT_HAND: "word-left", RIGHT_HAND: "word-right", ALTERNATE: "word-center",
   };
+  P.TRAINING_DEFAULTS.moves.forEach(m => { PHRASE_CLASS[m.id] = "word-move"; });
 
   const WEIGHT_TABLE_TITLES = {
     startWeights: "Start weights (after READY)",
@@ -3716,6 +3820,11 @@ const TrainingLog = (function () {
       label: "OFFENSE · SHOOTERS",
       subtitle: "Call & Execute: move fluency and readiness under unpredictable timing. " +
         "Sprint or catch, then create space and shoot on the calls.",
+    },
+    moveLab: {
+      label: "OFFENSE · MOVE LAB",
+      subtitle: "Build one move at a time: clean reps on a steady GO. " +
+        "Unlock a move here before the reactive drills call it.",
     },
   };
 
@@ -3805,6 +3914,24 @@ const TrainingLog = (function () {
   const levelStatus = document.getElementById("levelStatus");
   const resetLevelButtons = document.querySelectorAll("button[data-reset-level]");
   const restLevel = document.getElementById("restLevel");
+  const levelSettings = document.getElementById("levelSettings");
+  const moveLabSettings = document.getElementById("moveLabSettings");
+  const movePicker = document.getElementById("movePicker");
+  const moveStatus = document.getElementById("moveStatus");
+  const markUnlockedBtn = document.getElementById("markUnlockedBtn");
+  const markUnlockedConfirm = document.getElementById("markUnlockedConfirm");
+  const markUnlockedText = document.getElementById("markUnlockedText");
+  const markUnlockedYes = document.getElementById("markUnlockedYes");
+  const markUnlockedNo = document.getElementById("markUnlockedNo");
+  const sideButtons = document.querySelectorAll("button[data-side]");
+  const moveLabError = document.getElementById("moveLabError");
+  const moveLabRepsField = document.getElementById("moveLabRepsField");
+  const repsPerSetField = document.getElementById("repsPerSetField");
+  const captionEl = document.getElementById("caption");
+  const logCleanRow = document.getElementById("logCleanRow");
+  const logClean = document.getElementById("logClean");
+  const logMadeRow = document.getElementById("logMadeRow");
+  const logAttemptedRow = document.getElementById("logAttemptedRow");
 
   const STORAGE_MODE = "reactionCaller.mode";
   const STORAGE_DRILL = "reactionCaller.offenseDrill";
@@ -3814,6 +3941,8 @@ const TrainingLog = (function () {
   const STORAGE_MIGRATIONS = "reactionCaller.migrations";
   const STORAGE_LEVELS = "reactionCaller.levels";
   const STORAGE_AUTO_LEVEL = "reactionCaller.autoLevel";
+  const STORAGE_MOVE_LAB = "reactionCaller.moveLab";
+  const STORAGE_MOVE_UNLOCKS = "reactionCaller.moveUnlocks";
 
   // Where each validation error is shown (and which <details> to open for it).
   const ERROR_TARGETS = {
@@ -3822,6 +3951,7 @@ const TrainingLog = (function () {
     speech: { el: speechError, details: speechEl },
     shooters: { el: shootersError },
     shootersAdvanced: { el: shootersAdvancedError, details: shootersAdvancedEl },
+    moveLab: { el: moveLabError },
     session: { el: sessionError },
   };
 
@@ -3975,6 +4105,17 @@ const TrainingLog = (function () {
     storageSet(STORAGE_LEARNED, JSON.stringify(learnedMs));
   }
 
+  // The small line under the call, e.g. "CROSSOVER · RIGHT HAND" or a named move.
+  function showCaption(ids) {
+    captionEl.textContent = ids.map(id => OFFENSE_DEFAULTS.phrases[id].display).join(" · ");
+    captionEl.classList.remove("hidden");
+  }
+
+  function hideCaption() {
+    captionEl.textContent = "";
+    captionEl.classList.add("hidden");
+  }
+
   function renderCountdown(remainingMs, totalMs) {
     countdownFill.style.transform = "scaleX(" + (totalMs > 0 ? remainingMs / totalMs : 0) + ")";
     countdownText.textContent = (remainingMs / 1000).toFixed(1) + " s";
@@ -3994,12 +4135,15 @@ const TrainingLog = (function () {
     warned: false,
     setStartedAt: null,  // ISO time the current set started
     repsCompleted: 0,    // reps of the current set whose endMs has passed
+    repMoves: [],        // moves called in each rep of the current set (from plan.moves)
+    lastMoveId: null,    // the last move called this session (so planners never repeat it)
 
     start(settings) {
       this.settings = settings;
       this.profile = P.PROFILES[settings.drill];
       this.runId++;
       this.progress = P.newSession();
+      this.lastMoveId = null;
       countdownEl.classList.remove("hidden");
       this.startClock();
       this.beginSetClock();
@@ -4009,6 +4153,7 @@ const TrainingLog = (function () {
     beginSetClock() {
       this.setStartedAt = new Date().toISOString();
       this.repsCompleted = 0;
+      this.repMoves = [];
     },
 
     // Session clock (mm:ss) and the one-time fatigue warning. Runs for the
@@ -4057,6 +4202,7 @@ const TrainingLog = (function () {
       this.timers = [];
       this.stopCountdown();
       countdownEl.classList.add("idle");
+      hideCaption();
     },
 
     // Every timer goes through here so Stop can clear all of them.
@@ -4096,7 +4242,11 @@ const TrainingLog = (function () {
       const s = this.settings;
       this.progress = P.beginRep(this.progress);
       sessionProgress.textContent = P.progressLabel(this.progress, s.training, s.level);
-      const plan = this.profile.planRep(s, s.durations, Math.random);
+      const plan = this.profile.planRep(s, s.durations, Math.random, null,
+        { repInSet: this.progress.rep, lastMoveId: this.lastMoveId });
+      const moves = plan.moves || [];
+      this.repMoves.push(moves);
+      if (moves.length) this.lastMoveId = moves[moves.length - 1];
 
       // Rep clock: t = 0 is when the first call should be heard. Every call is
       // spoken speechLeadMs before its planned time to cover TTS start-up, so the
@@ -4106,6 +4256,14 @@ const TrainingLog = (function () {
       const at = ms => origin + ms - s.speechLeadMs - performance.now();
 
       countdownEl.classList.add("idle");
+      // The caption (e.g. the named move) stays from its atMs until the next rep.
+      hideCaption();
+      if (plan.caption) {
+        const ids = plan.caption.ids;
+        const delay = at(plan.caption.atMs);
+        if (delay <= 0) showCaption(ids);
+        else this.later(() => showCaption(ids), delay);
+      }
       plan.calls.forEach(call => {
         const delay = at(call.atMs);
         if (delay <= 0) this.say(call.id, call.rate);
@@ -4285,14 +4443,16 @@ const TrainingLog = (function () {
       getPath(s, input.dataset.weightTable)[input.dataset.weightId] = parseNumber(manualValue(input));
     });
     s.drill = selectedDrill;
-    s.training = readTrainingSettings();
+    s.moveLab.moveId = moveLabChoice.moveId;
+    s.moveLab.side = moveLabChoice.side;
+    s.training = P.sessionForDrill(readTrainingSettings(), selectedDrill);
     return s;
   }
 
   // ---- Adaptive difficulty: levels and Auto difficulty ----
 
   const TD = P.TRAINING_DEFAULTS;
-  const LEVEL_DRILLS = ["drive", "shooters"];
+  const LEVEL_DRILLS = ["drive", "shooters"];  // drills with levels (not Move Lab)
 
   function loadLevels() {
     let stored = null;
@@ -4368,6 +4528,129 @@ const TrainingLog = (function () {
     });
   }
 
+  // ---- Move Lab: move picker, side and the mastery gate ----
+
+  const SIDE_NAMES = { left: "Left hand", right: "Right hand", alternate: "Alternate" };
+
+  // The picked move and side, kept in reactionCaller.moveLab as { moveId, side }.
+  function loadMoveLabChoice() {
+    const d = OFFENSE_DEFAULTS.moveLab;
+    let stored = null;
+    try {
+      stored = JSON.parse(storageGet(STORAGE_MOVE_LAB));
+    } catch (e) {}
+    const ok = stored !== null && typeof stored === "object";
+    return {
+      moveId: ok && TD.moves.some(m => m.id === stored.moveId) ? stored.moveId : d.moveId,
+      side: ok && has(P.MOVE_SIDES, stored.side) ? stored.side : d.side,
+    };
+  }
+
+  let moveLabChoice = loadMoveLabChoice();
+
+  function saveMoveLabChoice() {
+    storageSet(STORAGE_MOVE_LAB, JSON.stringify(moveLabChoice));
+  }
+
+  // Moves marked unlocked by hand, stored as { version: 1, manual: [ids] }. Text
+  // that can't be read is kept: it is copied to a backup key before the first write.
+  function loadManualUnlocks() {
+    const raw = storageGet(STORAGE_MOVE_UNLOCKS);
+    let parsed = null;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (e) {}
+    if (parsed && typeof parsed === "object" && parsed.version === 1 && Array.isArray(parsed.manual)) {
+      return { ids: parsed.manual.filter(x => typeof x === "string"), keepRaw: null };
+    }
+    return { ids: [], keepRaw: raw === null || raw === "" ? null : raw };
+  }
+
+  let manualUnlocks = loadManualUnlocks();
+
+  function saveManualUnlocks() {
+    if (manualUnlocks.keepRaw !== null) {
+      const key = STORAGE_MOVE_UNLOCKS + ".backup." + Date.now();
+      storageSet(key, manualUnlocks.keepRaw);
+      if (storageGet(key) !== manualUnlocks.keepRaw) return;
+      manualUnlocks.keepRaw = null;
+    }
+    storageSet(STORAGE_MOVE_UNLOCKS, JSON.stringify({ version: 1, manual: manualUnlocks.ids }));
+  }
+
+  function currentMastery() {
+    return P.moveMastery(trainingLog.log, TD, manualUnlocks.ids);
+  }
+
+  function moveById(id) {
+    return TD.moves.find(m => m.id === id);
+  }
+
+  // One button per move; renderMoveLab() keeps labels and check marks current.
+  function buildMovePicker() {
+    TD.moves.forEach(m => {
+      const btn = el("button");
+      btn.type = "button";
+      btn.dataset.move = m.id;
+      btn.addEventListener("click", () => {
+        moveLabChoice.moveId = m.id;
+        saveMoveLabChoice();
+        markUnlockedConfirm.classList.add("hidden");
+        renderMoveLab();
+      });
+      movePicker.appendChild(btn);
+    });
+  }
+
+  function renderMoveLab() {
+    const mastery = currentMastery();
+    movePicker.querySelectorAll("button[data-move]").forEach(btn => {
+      const m = moveById(btn.dataset.move);
+      const unlocked = mastery[m.id].unlocked;
+      btn.replaceChildren(document.createTextNode(m.display));
+      if (unlocked) btn.appendChild(el("span", "check", "✓"));
+      btn.setAttribute("aria-label", m.display + (unlocked ? ", unlocked" : ""));
+      btn.setAttribute("aria-pressed", String(m.id === moveLabChoice.moveId));
+    });
+    sideButtons.forEach(btn => btn.setAttribute("aria-pressed", String(btn.dataset.side === moveLabChoice.side)));
+    const move = moveById(moveLabChoice.moveId);
+    const st = mastery[move.id];
+    const side = name => SIDE_NAMES[name] + (st[name] ? " fluent ✓" : " not yet");
+    const state = st.earned ? "Unlocked."
+      : st.manual ? "Marked unlocked by hand."
+      : "Unlocks at " + Math.round(TD.moveFluentShare * 100) + "% clean reps in one of your last " +
+        TD.moveFluentRecentSets + " sets with each hand.";
+    moveStatus.textContent = move.display + (move.type === "shot" ? " (shot move)" : "") + ": " +
+      side("left") + " · " + side("right") + ". " + state;
+    markUnlockedBtn.textContent = st.manual ? "Remove manual unlock" : "Mark as unlocked";
+    markUnlockedBtn.classList.toggle("hidden", st.earned || !markUnlockedConfirm.classList.contains("hidden"));
+  }
+
+  // "Mark as unlocked" asks first; removing a manual unlock doesn't need to.
+  function markUnlockedPressed() {
+    const id = moveLabChoice.moveId;
+    if (manualUnlocks.ids.indexOf(id) !== -1) {
+      manualUnlocks.ids = manualUnlocks.ids.filter(x => x !== id);
+      saveManualUnlocks();
+      renderMoveLab();
+      return;
+    }
+    markUnlockedText.textContent = "Mark " + moveById(id).display + " as unlocked without the clean-rep test? " +
+      "Drive and Shooters can then call it.";
+    markUnlockedConfirm.classList.remove("hidden");
+    renderMoveLab();
+  }
+
+  function confirmMarkUnlocked(yes) {
+    const id = moveLabChoice.moveId;
+    if (yes && manualUnlocks.ids.indexOf(id) === -1) {
+      manualUnlocks.ids = manualUnlocks.ids.concat(id);
+      saveManualUnlocks();
+    }
+    markUnlockedConfirm.classList.add("hidden");
+    renderMoveLab();
+  }
+
   // ---- Persistence: mode, drill, Defense's Min/Max fields and offense settings only ----
   // Values are saved by input id, so settings saved before a field existed
   // simply keep that field's default.
@@ -4426,7 +4709,7 @@ const TrainingLog = (function () {
   // Show the panels, labels and subtitle for the selected mode and drill.
   function updateView() {
     const offense = selectedMode === "offense";
-    const shooters = selectedDrill === "shooters";
+    const moveLab = selectedDrill === "moveLab";
     const info = MODES[selectedMode];
     modeButtons.forEach(btn => btn.setAttribute("aria-pressed", String(btn.dataset.mode === selectedMode)));
     drillButtons.forEach(btn => btn.setAttribute("aria-pressed", String(btn.dataset.drill === selectedDrill)));
@@ -4434,8 +4717,13 @@ const TrainingLog = (function () {
     offensePanel.classList.toggle("hidden", !offense);
     // The Min/Max delay fields are Defense only (Drive has its own read time fields).
     rangePanel.classList.toggle("hidden", offense);
-    driveSettings.classList.toggle("hidden", shooters);
-    shootersSettings.classList.toggle("hidden", !shooters);
+    driveSettings.classList.toggle("hidden", selectedDrill !== "drive");
+    shootersSettings.classList.toggle("hidden", selectedDrill !== "shooters");
+    moveLabSettings.classList.toggle("hidden", !moveLab);
+    // Move Lab has no levels, and its own reps per set.
+    levelSettings.classList.toggle("hidden", moveLab);
+    moveLabRepsField.classList.toggle("hidden", !moveLab);
+    repsPerSetField.classList.toggle("hidden", moveLab);
     clearErrors();
   }
 
@@ -4458,10 +4746,11 @@ const TrainingLog = (function () {
     let settings = range;
     if (selectedMode === "offense") {
       runBaseSettings = readOffenseSettings();
-      settings = autoLevel
+      const levelled = autoLevel && LEVEL_DRILLS.indexOf(selectedDrill) !== -1;
+      settings = levelled
         ? P.applyLevel(runBaseSettings, selectedDrill, levels[selectedDrill], TD)
         : P.cloneSettings(runBaseSettings);
-      settings.level = autoLevel ? levels[selectedDrill] : null;
+      settings.level = levelled ? levels[selectedDrill] : null;
       // Spoken lengths are fixed for the whole run (the ones validated here);
       // anything learned during the run takes effect on the next Start.
       settings.durations = P.durationsFor(settings, learnedMs);
@@ -4486,6 +4775,7 @@ const TrainingLog = (function () {
     sessionBanner.classList.add("hidden");
     wordEl.textContent = " ";
     wordEl.className = "";
+    hideCaption();
 
     if (offense) {
       session = {
@@ -4529,6 +4819,7 @@ const TrainingLog = (function () {
     hideAllScreens();
     updateBackupReminder();
     updateLevelView();
+    renderMoveLab();
     levelStatus.textContent = "";
     startScreen.classList.remove("hidden");
   }
@@ -4551,6 +4842,7 @@ const TrainingLog = (function () {
   let session = null;     // current Offense session { id, startedAt, endedAt, sets }
   let pendingSet = null;  // the set shown in the log form (without its outcome fields)
   let selectedQuality = null;
+  let logHasShots = true;  // false for a Move Lab set of a handle move: no made / attempted
   let lastSaveOk = true;
   let restTimerId = null;
 
@@ -4564,6 +4856,9 @@ const TrainingLog = (function () {
     const s = offenseMode.settings;
     const p = offenseMode.progress;
     const reps = offenseMode.repsCompleted;
+    const moveLab = s.drill === "moveLab";
+    const move = moveLab ? moveById(s.moveLab.moveId) : null;
+    logHasShots = !moveLab || move.type === "shot";
     pendingSet = {
       drill: s.drill,
       level: s.level,
@@ -4571,11 +4866,19 @@ const TrainingLog = (function () {
       startedAt: offenseMode.setStartedAt,
       endedAt: new Date().toISOString(),
       settingsSnapshot: TrainingLog.snapshotSettings(s),
-      extra: {},
+      extra: moveLab ? { moveId: move.id, side: s.moveLab.side, cleanReps: null } : {},
     };
+    logDrill.textContent = DRILLS[s.drill].label +
+      (moveLab ? " · " + move.display + " · " + SIDE_NAMES[s.moveLab.side].toUpperCase() : "");
     logTitle.textContent = partial
       ? "Partial set " + p.set + " · " + reps + " of " + s.training.repsPerSet + " reps"
       : "Set " + p.set + " · " + reps + (reps === 1 ? " rep" : " reps");
+    // Move Lab: clean reps for every move; shots only for shot moves.
+    logCleanRow.classList.toggle("hidden", !moveLab);
+    logClean.max = String(reps);
+    logClean.value = 0;
+    logMadeRow.classList.toggle("hidden", !logHasShots);
+    logAttemptedRow.classList.toggle("hidden", !logHasShots);
     logAttempted.value = reps;
     logMade.max = String(reps);
     logMade.value = 0;
@@ -4593,14 +4896,16 @@ const TrainingLog = (function () {
 
   function readLoggedSet() {
     const note = logNote.value.trim();
-    return Object.assign({}, pendingSet, {
-      made: parseNumber(logMade.value),
-      attempted: parseNumber(logAttempted.value),
+    const set = Object.assign({}, pendingSet, {
+      made: logHasShots ? parseNumber(logMade.value) : null,
+      attempted: logHasShots ? parseNumber(logAttempted.value) : null,
       lostHandles: parseNumber(logLost.value),
       missedCalls: parseNumber(logMissed.value),
       quality: selectedQuality,
       note: note === "" ? null : note,
     });
+    if (set.drill === "moveLab") set.extra = Object.assign({}, set.extra, { cleanReps: parseNumber(logClean.value) });
+    return set;
   }
 
   function skippedSet() {
@@ -4706,7 +5011,7 @@ const TrainingLog = (function () {
 
   // ---- Session summary ----
 
-  const DRILL_NAMES = { drive: "Drive", shooters: "Shooters only" };
+  const DRILL_NAMES = { drive: "Drive", shooters: "Shooters only", moveLab: "Move Lab" };
   const QUALITY_NAMES = { clean: "Clean", rushed: "Rushed", off_balance: "Off-balance" };
 
   function el(tag, className, text) {
@@ -4728,14 +5033,19 @@ const TrainingLog = (function () {
     const card = el("div", "panel drill-card");
     card.appendChild(el("h2", "", DRILL_NAMES[drill] || drill));
     const grid = el("dl", "stat-grid");
-    [
+    const rows = [
       ["Sets", String(sum.sets)],
       ["Reps", String(sum.reps)],
       ["Made", sum.makePct === null ? "not logged" : sum.made + "/" + sum.attempted + " · " + pctText(sum.makePct)],
       ["Lost handles / 10 reps", per10Text(sum.lostPer10)],
       ["Missed calls / 10 reps", per10Text(sum.missedPer10)],
       ["Sets rated Clean", sum.cleanShare === null ? "–" : pctText(sum.cleanShare) + " of " + sum.ratedSets],
-    ].forEach(row => {
+    ];
+    if (drill === "moveLab") {
+      rows.splice(2, 0, ["Clean reps", sum.cleanRepShare === null ? "–"
+        : sum.cleanReps + "/" + sum.cleanRepsOf + " · " + pctText(sum.cleanRepShare)]);
+    }
+    rows.forEach(row => {
       const cell = el("div");
       cell.append(el("dt", "", row[0]), el("dd", "", row[1]));
       grid.appendChild(cell);
@@ -4812,7 +5122,7 @@ const TrainingLog = (function () {
 
   function renderTrends() {
     const t = P.TRAINING_DEFAULTS;
-    historyTrends.replaceChildren(...["drive", "shooters"].map(drill => {
+    historyTrends.replaceChildren(...["drive", "shooters", "moveLab"].map(drill => {
       const card = el("div", "panel drill-card");
       card.appendChild(el("h2", "", DRILL_NAMES[drill] + " trend"));
       const series = TrainingLog.trendSeries(trainingLog.log, drill, t.trendSessions);
@@ -4837,8 +5147,13 @@ const TrainingLog = (function () {
 
   function setLine(set, i) {
     const parts = ["Set " + (i + 1), DRILL_NAMES[set.drill] || set.drill];
+    if (set.drill === "moveLab") {
+      const move = moveById(set.extra.moveId);
+      parts.push((move ? move.display : set.extra.moveId) + " " + (SIDE_NAMES[set.extra.side] || "").toLowerCase());
+    }
     if (set.level !== null) parts.push("L" + set.level);
     parts.push(set.reps + (set.reps === 1 ? " rep" : " reps"));
+    if (set.drill === "moveLab" && set.extra.cleanReps !== null) parts.push(set.extra.cleanReps + "/" + set.reps + " clean");
     if (set.made === null) parts.push("not logged");
     else parts.push(set.made + "/" + set.attempted + " made");
     if (set.lostHandles !== null) parts.push(set.lostHandles + " lost");
@@ -5107,6 +5422,16 @@ const TrainingLog = (function () {
   buildWeightTables(weightTablesEl, P.WEIGHT_TABLES, "", WEIGHT_TABLE_TITLES);
   buildGetSetFields();
   buildWeightTables(shootersWeightTablesEl, P.SHOOTERS_WEIGHT_TABLES, "shooters.", SHOOTERS_WEIGHT_TABLE_TITLES);
+  buildMovePicker();
+  renderMoveLab();
+  sideButtons.forEach(btn => btn.addEventListener("click", () => {
+    moveLabChoice.side = btn.dataset.side;
+    saveMoveLabChoice();
+    renderMoveLab();
+  }));
+  markUnlockedBtn.addEventListener("click", markUnlockedPressed);
+  markUnlockedYes.addEventListener("click", () => confirmMarkUnlocked(true));
+  markUnlockedNo.addEventListener("click", () => confirmMarkUnlocked(false));
   fillOffenseDefaults();
   loadSettings();
   persistedInputs().forEach(input => input.addEventListener("input", saveSettings));
