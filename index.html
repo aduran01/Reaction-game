@@ -694,6 +694,16 @@
       <div class="panel-section" id="driveSettings">
         <div class="range-row">
           <div class="field">
+            <label for="readMinMs">Min read time (ms)</label>
+            <input type="number" id="readMinMs" min="100" step="100" data-setting="readMinMs">
+          </div>
+          <div class="field">
+            <label for="readMaxMs">Max read time (ms)</label>
+            <input type="number" id="readMaxMs" min="100" step="100" data-setting="readMaxMs">
+          </div>
+        </div>
+        <div class="range-row">
+          <div class="field">
             <label for="driveMinMs">Min drive window (ms)</label>
             <input type="number" id="driveMinMs" min="600" step="100" data-setting="driveMinMs">
           </div>
@@ -1014,15 +1024,20 @@ const OffensePlanner = (function () {
   // ===================================================================
   // OFFENSE_DEFAULTS: every tunable offense number lives here.
   // The start screen shows these as defaults; saved values override them.
-  // The read dwell (wait after READ before a drive starts) is NOT here:
-  // it comes from the shared Min/Max read time fields (1000-3000 ms).
+  // The call with id READ is displayed and spoken as READY: get in your stance,
+  // live dribble, wait for the call. (The id stays READ so saved data keeps working.)
   // ===================================================================
   const OFFENSE_DEFAULTS = {
     // Drive window D (ms). Picked uniformly in this range each time LEFT/RIGHT is called.
     driveMinMs: 1400,
     driveMaxMs: 2000,
 
-    // Wait after a drive ends before READ is called again (ms).
+    // Read time: wait after READY before the drive starts (ms), uniform in this range.
+    // A wide range keeps the drive call unpredictable.
+    readMinMs: 800, // provisional
+    readMaxMs: 3500, // provisional
+
+    // Wait after a drive ends before READY is called again (ms).
     resetPauseMs: 1000,
 
     // Speech rate. A whole drive is spoken at one rate: baseRate, raised
@@ -1062,7 +1077,7 @@ const OffensePlanner = (function () {
     // pronunciation here); estMs = rough spoken length at rate 1.0.
     // Measured lengths, once learned on a device, replace estMs.
     phrases: {
-      READ:               { display: "READ",               spoken: "read",               estMs: 350 },
+      READ:               { display: "READY",              spoken: "ready",              estMs: 350 },
       LEFT:               { display: "LEFT",               spoken: "left",               estMs: 350 },
       RIGHT:              { display: "RIGHT",              spoken: "right",              estMs: 350 },
       CUT_OFF:            { display: "CUT OFF",            spoken: "cut off",            estMs: 450 },
@@ -1096,11 +1111,13 @@ const OffensePlanner = (function () {
 
       // Get-set time (ms) from the start of the start call to the first LEFT/RIGHT.
       // Silently raised to at least the start call's length (at baseRate) + minGapMs.
+      // Wide ranges keep the first call unpredictable; each min is at least the
+      // start call's estimated length at baseRate + minGapMs (1.25, 120 ms).
       getSetMs: {
-        SPRINT_FROM_PAINT:        { minMs: 1500, maxMs: 2200 },
-        SPRINT_FROM_LEFT_CORNER:  { minMs: 1300, maxMs: 2000 },
-        SPRINT_FROM_RIGHT_CORNER: { minMs: 1300, maxMs: 2000 },
-        CATCH:                    { minMs: 400,  maxMs: 800 },
+        SPRINT_FROM_PAINT:        { minMs: 1200, maxMs: 2500 }, // provisional
+        SPRINT_FROM_LEFT_CORNER:  { minMs: 1000, maxMs: 2300 }, // provisional
+        SPRINT_FROM_RIGHT_CORNER: { minMs: 1040, maxMs: 2300 }, // provisional
+        CATCH:                    { minMs: 440,  maxMs: 1100 }, // provisional
       },
 
       // SHOT must finish being spoken this long before D ends (ms).
@@ -1296,8 +1313,8 @@ const OffensePlanner = (function () {
     return { D, rate, calls: scheduleCalls(path, D, rate, s.finisherBufferMs, dur) };
   }
 
-  // One Drive rep: READ at 0, the read time (s.readMinMs..s.readMaxMs, from the
-  // shared Min/Max fields), then the drive window, then the reset pause.
+  // One Drive rep: READY (id READ) at 0, the read time (s.readMinMs..s.readMaxMs),
+  // then the drive window, then the reset pause.
   function planDriveRep(s, dur, rng, onPick) {
     rng = rng || Math.random;
     const readMs = randomInt(s.readMinMs, s.readMaxMs, rng);
@@ -1335,11 +1352,15 @@ const OffensePlanner = (function () {
   };
 
   // Drive settings check. Returns null, or { field: "drive" | "advanced" | "speech", message }.
-  // The shared Min/Max read time fields are validated separately.
   function validateOffense(s, dur) {
     const drive = message => ({ field: "drive", message });
     const advanced = message => ({ field: "advanced", message });
     const speech = message => ({ field: "speech", message });
+
+    if (!isWhole(s.readMinMs) || !isWhole(s.readMaxMs) || s.readMinMs < 100 || s.readMaxMs < 100) {
+      return drive("Read times must be whole numbers of at least 100 ms.");
+    }
+    if (s.readMinMs > s.readMaxMs) return drive("Min read time must not exceed max read time.");
 
     if (!isWhole(s.driveMinMs) || s.driveMinMs < 600) {
       return drive("Min drive window must be a whole number of at least 600 ms.");
@@ -1380,6 +1401,27 @@ const OffensePlanner = (function () {
         " ms at max speech rate " + s.maxRate + ". Raise the min drive window or the max speech rate.");
     }
     return null;
+  }
+
+  // One-time changes to learned spoken lengths, applied in order on load. A phrase
+  // whose spoken text changed has to be learned again from its estimate.
+  const LEARNED_MIGRATIONS = [
+    { id: "read-to-ready", drop: ["READ"] },  // READ is now spoken "ready", not "read"
+  ];
+
+  // Apply every migration not yet in `done`. Returns { learned, done, changed };
+  // the caller stores `done` so each migration runs only once.
+  function migrateLearned(learned, done) {
+    const next = Object.assign({}, learned);
+    const applied = done.slice();
+    let changed = false;
+    LEARNED_MIGRATIONS.forEach(m => {
+      if (applied.indexOf(m.id) !== -1) return;
+      m.drop.forEach(id => { delete next[id]; });
+      applied.push(m.id);
+      changed = true;
+    });
+    return { learned: next, done: applied, changed };
   }
 
   // New learned length (ms at rate 1.0) after one measurement, or null to ignore it.
@@ -1710,6 +1752,34 @@ const OffensePlanner = (function () {
 
   // ---- Self-test support (only called from ?selftest=1) ----
 
+  // READ -> READY migration and timing-variety defaults.
+  function defaultsSelfTest(check) {
+    const s = OFFENSE_DEFAULTS;
+    const mf = [];
+    if (s.phrases.READ.display !== "READY" || s.phrases.READ.spoken !== "ready") mf.push("READ is not shown/spoken as READY");
+    const first = migrateLearned({ READ: 520, LEFT: 300 }, []);
+    if (!first.changed || "READ" in first.learned || first.learned.LEFT !== 300 || first.done.indexOf("read-to-ready") === -1) {
+      mf.push("first load");
+    }
+    const relearned = Object.assign({}, first.learned, { READ: 410 });
+    const second = migrateLearned(relearned, first.done);
+    if (second.changed || second.learned.READ !== 410 || second.done.length !== first.done.length) mf.push("ran twice");
+    const empty = migrateLearned({}, []);
+    if (!empty.changed || empty.done.length !== 1) mf.push("marker not set without a learned READ");
+    check("migration: READY's old learned length dropped once, other phrases kept, marker stops a rerun", mf);
+
+    const gf = [];
+    const dur = durationsFor(s, null);
+    START_CALLS.forEach(id => {
+      const range = s.shooters.getSetMs[id];
+      const need = dur[id] / s.baseRate + s.minGapMs;
+      if (range.minMs < need - 1e-9) gf.push(id + " min " + range.minMs + " < " + need);
+      if (range.maxMs - range.minMs < 600) gf.push(id + " range only " + (range.maxMs - range.minMs) + " ms");
+    });
+    if (s.readMaxMs - s.readMinMs < 2000) gf.push("read time range " + s.readMinMs + "-" + s.readMaxMs);
+    check("defaults: get-set mins clear the start call + min gap; get-set and read time ranges are wide", gf);
+  }
+
   // Session helpers self-test.
   function trainingSelfTest(check) {
     const t = Object.assign({}, TRAINING_DEFAULTS);
@@ -1860,7 +1930,7 @@ const OffensePlanner = (function () {
       }
 
       check(label + ": every drive could be planned", f.plan);
-      check(label + ": 1. drive starts with LEFT or RIGHT after READ", f[1]);
+      check(label + ": 1. drive starts with LEFT or RIGHT after READY", f[1]);
       check(label + ": 2. every transition is legal, nothing after a finisher", f[2]);
       check(label + ": 3. exactly one finisher, legal for the previous call", f[3]);
       check(label + ": 4. cut-offs <= " + s.maxCutOffsPerDrive + ", lay-ups <= " + s.maxLayUpsPerDrive, f[4]);
@@ -1899,22 +1969,34 @@ const OffensePlanner = (function () {
     });
     check("loose: 7. pick frequencies match the weights (within 2 points)", freqFailures);
 
-    // The rep wrapper the runner executes: READ at 0, then the drive inside its window.
-    const repSettings = Object.assign(cloneSettings(defaults), { readMinMs: 1000, readMaxMs: 3000 });
+    // The rep wrapper the runner executes: READY at 0, then the drive inside its window.
+    const repSettings = defaults;
     const repFailures = [];
+    let shortestRead = Infinity;
+    let longestRead = 0;
     for (let n = 0; n < drives; n++) {
       const rep = planDriveRep(repSettings, dur, Math.random);
       const w = rep.windows[0];
       const first = rep.calls[0];
-      if (first.id !== "READ" || first.atMs !== 0 || first.rate !== repSettings.baseRate) repFailures.push("READ not first");
-      if (rep.windows.length !== 1 || w.startMs < 1000 || w.startMs > 3000) repFailures.push("read time " + w.startMs);
+      shortestRead = Math.min(shortestRead, w.startMs);
+      longestRead = Math.max(longestRead, w.startMs);
+      if (first.id !== "READ" || first.atMs !== 0 || first.rate !== repSettings.baseRate) repFailures.push("READY not first");
+      if (rep.windows.length !== 1 || w.startMs < repSettings.readMinMs || w.startMs > repSettings.readMaxMs) {
+        repFailures.push("read time " + w.startMs);
+      }
       if (rep.calls[1].atMs !== w.startMs) repFailures.push("LEFT/RIGHT not at window start");
       if (rep.endMs !== w.startMs + w.durMs || rep.restMs !== repSettings.resetPauseMs) repFailures.push("endMs/restMs");
       rep.calls.slice(1).forEach(c => {
         if (c.atMs < w.startMs - EPS || c.atMs + c.durMs > w.startMs + w.durMs + EPS) repFailures.push(c.id + " outside window");
       });
     }
-    check("drive rep: READ at 0, read time in range, calls inside the window", repFailures);
+    // The read time should use (nearly) the whole range, not cluster in the middle.
+    const span = repSettings.readMaxMs - repSettings.readMinMs;
+    if (shortestRead > repSettings.readMinMs + span * 0.02 || longestRead < repSettings.readMaxMs - span * 0.02) {
+      repFailures.push("read times only spread " + shortestRead + "-" + longestRead);
+    }
+    check("drive rep: READY at 0, read time spread over " + repSettings.readMinMs + "-" + repSettings.readMaxMs +
+      " ms, calls inside the window", repFailures);
 
     return fitTable(defaults, dur);
   }
@@ -2146,6 +2228,7 @@ const OffensePlanner = (function () {
       fitTables[id] = PROFILES[id].selfTest(check, reps);
     });
     trainingSelfTest(check);
+    defaultsSelfTest(check);
     (extraSuites || []).forEach(suite => suite(check));
 
     const passed = results.every(r => r.ok);
@@ -2164,6 +2247,7 @@ const OffensePlanner = (function () {
     cloneSettings,
     durationsFor,
     learnDuration,
+    migrateLearned,
     fitRate,
     minWindowFor,
     planDrive,
@@ -2651,7 +2735,7 @@ const TrainingLog = (function () {
 
     const snap = [];
     const settings = P.cloneSettings(P.OFFENSE_DEFAULTS);
-    Object.assign(settings, { readMinMs: 1000, readMaxMs: 3000, training: Object.assign({}, P.TRAINING_DEFAULTS) });
+    Object.assign(settings, { training: Object.assign({}, P.TRAINING_DEFAULTS) });
     const drive = snapshotSettings(Object.assign({}, settings, { drill: "drive" }));
     ["readMinMs", "driveMinMs", "driveMaxMs", "maxCutOffsPerDrive", "afterLayUpWeights", "maxRate", "repsPerSet"].forEach(k => {
       if (drive[k] === undefined) snap.push("drive snapshot missing " + k);
@@ -2938,7 +3022,7 @@ const TrainingLog = (function () {
   };
 
   const WEIGHT_TABLE_TITLES = {
-    startWeights: "Start weights (after READ)",
+    startWeights: "Start weights (after READY)",
     afterDriveOrCutOffWeights: "Weights after LEFT / RIGHT / CUT OFF",
     afterLayUpWeights: "Weights after LAY UP",
   };
@@ -2964,11 +3048,13 @@ const TrainingLog = (function () {
   const DRILLS = {
     drive: {
       label: "OFFENSE · DRIVE",
-      subtitle: "Read the court, drive, react to the defense, and finish before the clock runs out.",
+      subtitle: "Call & Execute: move fluency and readiness under unpredictable timing. " +
+        "Stay ready, then drive, counter and finish on the calls.",
     },
     shooters: {
       label: "OFFENSE · SHOOTERS",
-      subtitle: "Sprint to your spot or catch, create space, and shoot when you're open.",
+      subtitle: "Call & Execute: move fluency and readiness under unpredictable timing. " +
+        "Sprint or catch, then create space and shoot on the calls.",
     },
   };
 
@@ -2981,8 +3067,6 @@ const TrainingLog = (function () {
   const rangeError = document.getElementById("rangeError");
   const wordEl = document.getElementById("word");
   const subtitleEl = document.getElementById("subtitle");
-  const minMsLabel = document.getElementById("minMsLabel");
-  const maxMsLabel = document.getElementById("maxMsLabel");
   const modeLabel = document.getElementById("modeLabel");
   const modeButtons = document.querySelectorAll(".segmented button[data-mode]");
   const drillButtons = document.querySelectorAll(".segmented button[data-drill]");
@@ -3062,6 +3146,7 @@ const TrainingLog = (function () {
   const STORAGE_SETTINGS = "reactionCaller.settings";
   const STORAGE_LEARNED = "reactionCaller.learnedMs";
   const STORAGE_LAST_EXPORT = "reactionCaller.lastExportAt";
+  const STORAGE_MIGRATIONS = "reactionCaller.migrations";
 
   // Where each validation error is shown (and which <details> to open for it).
   const ERROR_TARGETS = {
@@ -3122,8 +3207,8 @@ const TrainingLog = (function () {
     return utter;
   }
 
+  // Defense's Min/Max delay fields.
   function validateRange() {
-    const offense = selectedMode === "offense";
     const min = parseInt(minMsInput.value, 10);
     const max = parseInt(maxMsInput.value, 10);
     if (isNaN(min) || isNaN(max) || min < 100 || max < 100) {
@@ -3131,9 +3216,7 @@ const TrainingLog = (function () {
       return null;
     }
     if (min > max) {
-      rangeError.textContent = offense
-        ? "Min read time must not exceed max read time."
-        : "Min delay must not exceed max delay.";
+      rangeError.textContent = "Min delay must not exceed max delay.";
       return null;
     }
     rangeError.textContent = "";
@@ -3185,19 +3268,32 @@ const TrainingLog = (function () {
     },
   };
 
-  // ---- Offense mode: READ -> LEFT/RIGHT -> CUT OFF / LAY UP ... -> finisher ----
+  // ---- Offense mode: READY -> LEFT/RIGHT -> CUT OFF / LAY UP ... -> finisher (Drive) ----
 
   // Learned spoken lengths per phrase (ms at rate 1.0), kept in localStorage.
+  // One-time migrations (e.g. READ now spoken "ready") drop stale values; the
+  // applied migration ids are stored so each runs once.
   function loadLearned() {
     let stored = null;
+    let done = [];
     try {
       stored = JSON.parse(storageGet(STORAGE_LEARNED));
     } catch (e) {}
-    const learned = {};
+    try {
+      const d = JSON.parse(storageGet(STORAGE_MIGRATIONS));
+      if (Array.isArray(d)) done = d.filter(x => typeof x === "string");
+    } catch (e) {}
+    let learned = {};
     if (stored && typeof stored === "object") {
       Object.keys(OFFENSE_DEFAULTS.phrases).forEach(id => {
         if (typeof stored[id] === "number" && stored[id] > 0) learned[id] = stored[id];
       });
+    }
+    const migrated = P.migrateLearned(learned, done);
+    if (migrated.changed) {
+      learned = migrated.learned;
+      if (stored && typeof stored === "object") storageSet(STORAGE_LEARNED, JSON.stringify(learned));
+      storageSet(STORAGE_MIGRATIONS, JSON.stringify(migrated.done));
     }
     return learned;
   }
@@ -3513,23 +3609,18 @@ const TrainingLog = (function () {
     });
   }
 
-  // range is the shared Min/Max read time (Drive only; null for Shooters).
-  function readOffenseSettings(range) {
+  function readOffenseSettings() {
     const s = P.cloneSettings(OFFENSE_DEFAULTS);
     settingInputs().forEach(input => { setPath(s, input.dataset.setting, parseNumber(input.value)); });
     weightInputs().forEach(input => {
       getPath(s, input.dataset.weightTable)[input.dataset.weightId] = parseNumber(input.value);
     });
-    if (range) {
-      s.readMinMs = range.min;
-      s.readMaxMs = range.max;
-    }
     s.drill = selectedDrill;
     s.training = readTrainingSettings();
     return s;
   }
 
-  // ---- Persistence: mode, drill, shared Min/Max fields and offense settings only ----
+  // ---- Persistence: mode, drill, Defense's Min/Max fields and offense settings only ----
   // Values are saved by input id, so settings saved before a field existed
   // simply keep that field's default.
 
@@ -3562,14 +3653,10 @@ const TrainingLog = (function () {
       mode: defenseMode,
       label: "DEFENSE",
       subtitle: "A voice randomly calls Left, Right, Up, or Back. React fast.",
-      minLabel: "Min delay (ms)",
-      maxLabel: "Max delay (ms)",
     },
     offense: {
       mode: offenseMode,
       // Label and subtitle come from DRILLS.
-      minLabel: "Min read time (ms)",
-      maxLabel: "Max read time (ms)",
     },
   };
 
@@ -3596,11 +3683,9 @@ const TrainingLog = (function () {
     modeButtons.forEach(btn => btn.setAttribute("aria-pressed", String(btn.dataset.mode === selectedMode)));
     drillButtons.forEach(btn => btn.setAttribute("aria-pressed", String(btn.dataset.drill === selectedDrill)));
     subtitleEl.textContent = offense ? DRILLS[selectedDrill].subtitle : info.subtitle;
-    minMsLabel.textContent = info.minLabel;
-    maxMsLabel.textContent = info.maxLabel;
     offensePanel.classList.toggle("hidden", !offense);
-    // The read time only applies to Drive.
-    rangePanel.classList.toggle("hidden", offense && shooters);
+    // The Min/Max delay fields are Defense only (Drive has its own read time fields).
+    rangePanel.classList.toggle("hidden", offense);
     driveSettings.classList.toggle("hidden", shooters);
     shootersSettings.classList.toggle("hidden", !shooters);
     clearErrors();
@@ -3618,13 +3703,13 @@ const TrainingLog = (function () {
 
   function startGame() {
     clearErrors();
-    const usesRange = selectedMode === "defense" || selectedDrill === "drive";
+    const usesRange = selectedMode === "defense";
     const range = usesRange ? validateRange() : null;
     if (usesRange && !range) return;
 
     let settings = range;
     if (selectedMode === "offense") {
-      settings = readOffenseSettings(range);
+      settings = readOffenseSettings();
       // Spoken lengths are fixed for the whole run (the ones validated here);
       // anything learned during the run takes effect on the next Start.
       settings.durations = P.durationsFor(settings, learnedMs);
