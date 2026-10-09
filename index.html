@@ -458,6 +458,185 @@
 
   #discardBtn { color: var(--danger); }
 
+  /* Summary, history and backup. */
+  .stack {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .secondary-btn,
+  #historyBackBtn {
+    background: #2a2e38;
+    min-height: 52px;
+  }
+  .secondary-btn:active,
+  #historyBackBtn:active { background: #3a3f4b; }
+
+  .danger-btn {
+    background: var(--danger);
+    min-height: 52px;
+  }
+  .danger-btn:active { background: var(--danger-down); }
+
+  #summaryDoneBtn {
+    background: var(--accent);
+    min-height: 64px;
+  }
+  #summaryDoneBtn:active { background: var(--accent-down); }
+
+  .button-row {
+    display: flex;
+    gap: 10px;
+  }
+  .button-row button {
+    flex: 1;
+    padding-left: 8px;
+    padding-right: 8px;
+    font-size: 0.95rem;
+  }
+
+  .reminder {
+    width: 100%;
+    margin: 0;
+    background: var(--panel);
+    border-left: 4px solid #ffd24f;
+    border-radius: 12px;
+    padding: 12px 14px;
+    font-size: 0.95rem;
+    line-height: 1.35;
+  }
+
+  .muted-text {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+    line-height: 1.4;
+  }
+
+  .status-text {
+    margin: 0;
+    min-height: 1.2em;
+    font-size: 0.9rem;
+    line-height: 1.4;
+  }
+
+  .confirm {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid var(--danger);
+    border-radius: 12px;
+  }
+  .confirm p { margin: 0; line-height: 1.4; }
+
+  .drill-card h2 {
+    margin: 0;
+    font-size: 1.1rem;
+  }
+
+  .stat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 12px;
+    margin: 0;
+  }
+  .stat-grid dt {
+    color: var(--muted);
+    font-size: 0.8rem;
+  }
+  .stat-grid dd {
+    margin: 2px 0 0;
+    font-size: 1.15rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .compare-line {
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.4;
+  }
+
+  .chart svg {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+  .chart .axis { stroke: #2a2e38; stroke-width: 1; }
+  .chart .tick { fill: var(--muted); font-size: 10px; }
+  .chart .line-make { fill: none; stroke: var(--accent); stroke-width: 2.5; }
+  .chart .line-lost { fill: none; stroke: #ff7a4f; stroke-width: 2.5; stroke-dasharray: 5 4; }
+  .chart .dot-make { fill: var(--accent); }
+  .chart .dot-lost { fill: #ff7a4f; }
+  .chart .title-make { fill: var(--accent); font-weight: 700; }
+  .chart .title-lost { fill: #ff7a4f; font-weight: 700; }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+  .legend .swatch {
+    display: inline-block;
+    width: 18px;
+    height: 3px;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+
+  .history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .history-item {
+    border: 1px solid #2a2e38;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .history-item > button {
+    background: transparent;
+    color: var(--text);
+    text-align: left;
+    font-size: 0.95rem;
+    font-weight: 400;
+    padding: 12px 14px;
+    min-height: 56px;
+    border-radius: 0;
+  }
+  .history-item > button:active { transform: none; background: #1f232c; }
+  .history-item .item-date { display: block; font-weight: 700; }
+  .history-item .item-meta { display: block; color: var(--muted); font-size: 0.85rem; margin-top: 2px; }
+
+  .history-detail {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 0 14px 14px;
+  }
+
+  .set-line {
+    margin: 0;
+    font-size: 0.9rem;
+    line-height: 1.4;
+    font-variant-numeric: tabular-nums;
+  }
+  .set-line .note {
+    display: block;
+    color: var(--muted);
+    font-style: italic;
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
   .rest-count {
     font-size: clamp(4rem, 22vw, 7rem);
     font-weight: 800;
@@ -676,6 +855,8 @@
     </div>
 
     <button id="startBtn">Start</button>
+    <button id="historyBtn" class="secondary-btn">History</button>
+    <p class="reminder hidden" id="backupReminder"></p>
   </div>
 
   <div id="gameScreen" class="screen hidden">
@@ -767,6 +948,59 @@
     <p class="subtitle" id="restSaved"></p>
     <button id="nextSetBtn" class="hidden">Next set</button>
     <button id="endSessionBtn">End session</button>
+  </div>
+
+  <!-- Offense: summary shown when a session with logged sets ends. -->
+  <div id="summaryScreen" class="screen hidden">
+    <div class="mode-label">SESSION SUMMARY</div>
+    <h1>Session done</h1>
+    <p class="subtitle" id="summaryLength"></p>
+    <div id="summaryDrills" class="stack"></div>
+    <button id="summaryDoneBtn">Done</button>
+  </div>
+
+  <!-- Past sessions, trends and backup. -->
+  <div id="historyScreen" class="screen hidden">
+    <h1>History</h1>
+    <div id="historyTrends" class="stack"></div>
+
+    <div class="panel">
+      <p class="panel-title">Sessions</p>
+      <div id="historyList" class="history-list"></div>
+    </div>
+
+    <div class="panel">
+      <p class="panel-title">Backup</p>
+      <p class="muted-text" id="lastExportText"></p>
+      <p class="muted-text">Saved data lives only in this browser, at this address. Safari may clear it after weeks without a visit, so export a copy now and then.</p>
+      <div class="button-row">
+        <button id="exportJsonBtn" class="secondary-btn">Export log (JSON)</button>
+        <button id="exportCsvBtn" class="secondary-btn">Export sets (CSV)</button>
+      </div>
+      <div class="button-row">
+        <button id="importBtn" class="secondary-btn">Import JSON file</button>
+        <button id="showTextBtn" class="secondary-btn">Backup as text</button>
+      </div>
+      <input type="file" id="importFile" accept=".json,application/json" class="hidden">
+      <div id="backupTextBox" class="stack hidden">
+        <p class="muted-text" id="backupTextNote">Copy this text and keep it somewhere safe, or paste a backup here to import it.</p>
+        <textarea id="backupText" rows="6" spellcheck="false" aria-label="Backup text"></textarea>
+        <div class="button-row">
+          <button id="copyTextBtn" class="secondary-btn">Copy</button>
+          <button id="importTextBtn" class="secondary-btn">Import this text</button>
+        </div>
+      </div>
+      <div id="importConfirm" class="confirm hidden">
+        <p id="importConfirmText"></p>
+        <div class="button-row">
+          <button id="importReplaceBtn" class="danger-btn">Replace them</button>
+          <button id="importKeepBtn" class="secondary-btn">Keep mine</button>
+        </div>
+      </div>
+      <p class="status-text" id="backupStatus" role="status"></p>
+    </div>
+
+    <button id="historyBackBtn">Back</button>
   </div>
 
 </div>
@@ -1405,6 +1639,14 @@ const OffensePlanner = (function () {
 
     // Rest countdown after "Save & rest" on the set log, in seconds (whole number 0-600).
     restSec: 60, // provisional
+
+    // Session summary: compare today with the mean of this many earlier sessions of the same drill.
+    compareSessions: 5,
+    // History: trend charts cover this many latest sessions per drill, and need at least trendMinSessions.
+    trendSessions: 20,
+    trendMinSessions: 3,
+    // Start screen: remind to export once more than this many sessions are not backed up.
+    backupReminderSessions: 10, // provisional
 
     // Spoken when a set ends (at baseRate, queued behind the last call, never cancelling it).
     setDoneSpoken: "set done",
@@ -2788,11 +3030,38 @@ const TrainingLog = (function () {
   const restSaved = document.getElementById("restSaved");
   const nextSetBtn = document.getElementById("nextSetBtn");
   const endSessionBtn = document.getElementById("endSessionBtn");
+  const historyBtn = document.getElementById("historyBtn");
+  const backupReminder = document.getElementById("backupReminder");
+  const summaryScreen = document.getElementById("summaryScreen");
+  const summaryLength = document.getElementById("summaryLength");
+  const summaryDrills = document.getElementById("summaryDrills");
+  const summaryDoneBtn = document.getElementById("summaryDoneBtn");
+  const historyScreen = document.getElementById("historyScreen");
+  const historyTrends = document.getElementById("historyTrends");
+  const historyList = document.getElementById("historyList");
+  const lastExportText = document.getElementById("lastExportText");
+  const exportJsonBtn = document.getElementById("exportJsonBtn");
+  const exportCsvBtn = document.getElementById("exportCsvBtn");
+  const importBtn = document.getElementById("importBtn");
+  const importFile = document.getElementById("importFile");
+  const showTextBtn = document.getElementById("showTextBtn");
+  const backupTextBox = document.getElementById("backupTextBox");
+  const backupTextNote = document.getElementById("backupTextNote");
+  const backupText = document.getElementById("backupText");
+  const copyTextBtn = document.getElementById("copyTextBtn");
+  const importTextBtn = document.getElementById("importTextBtn");
+  const importConfirm = document.getElementById("importConfirm");
+  const importConfirmText = document.getElementById("importConfirmText");
+  const importReplaceBtn = document.getElementById("importReplaceBtn");
+  const importKeepBtn = document.getElementById("importKeepBtn");
+  const backupStatus = document.getElementById("backupStatus");
+  const historyBackBtn = document.getElementById("historyBackBtn");
 
   const STORAGE_MODE = "reactionCaller.mode";
   const STORAGE_DRILL = "reactionCaller.offenseDrill";
   const STORAGE_SETTINGS = "reactionCaller.settings";
   const STORAGE_LEARNED = "reactionCaller.learnedMs";
+  const STORAGE_LAST_EXPORT = "reactionCaller.lastExportAt";
 
   // Where each validation error is shown (and which <details> to open for it).
   const ERROR_TARGETS = {
@@ -3403,16 +3672,25 @@ const TrainingLog = (function () {
     }
     if (window.speechSynthesis) window.speechSynthesis.cancel();
     stopRest();
-    if (session && session.sets.length > 0) {
-      session.endedAt = new Date().toISOString();
+    const ended = session && session.sets.length > 0 ? session : null;
+    if (ended) {
+      ended.endedAt = new Date().toISOString();
       persistSession();
     }
     session = null;
     pendingSet = null;
 
-    gameScreen.classList.add("hidden");
-    logScreen.classList.add("hidden");
-    restScreen.classList.add("hidden");
+    if (ended) showSummary(ended);
+    else showStart();
+  }
+
+  function hideAllScreens() {
+    [startScreen, gameScreen, logScreen, restScreen, summaryScreen, historyScreen].forEach(el => el.classList.add("hidden"));
+  }
+
+  function showStart() {
+    hideAllScreens();
+    updateBackupReminder();
     startScreen.classList.remove("hidden");
   }
 
@@ -3493,10 +3771,16 @@ const TrainingLog = (function () {
   }
 
   function persistSession() {
-    trainingLog = Object.assign({}, trainingLog, { log: TrainingLog.upsertSession(trainingLog.log, session) });
+    saveTrainingLog(TrainingLog.upsertSession(trainingLog.log, session));
+  }
+
+  // Replace the in-memory log and save it. Returns whether it was stored.
+  function saveTrainingLog(log) {
+    trainingLog = Object.assign({}, trainingLog, { log });
     const result = TrainingLog.saveLog(trainingLog, logStore, Date.now());
     trainingLog = result.state;
     lastSaveOk = result.saved;
+    return result.saved;
   }
 
   // Validate, add the set to the session and save the whole log right away, so
@@ -3567,6 +3851,379 @@ const TrainingLog = (function () {
     if (commitSet(skippedSet())) showRest();
   }
 
+  // ---- Session summary ----
+
+  const DRILL_NAMES = { drive: "Drive", shooters: "Shooters only" };
+  const QUALITY_NAMES = { clean: "Clean", rushed: "Rushed", off_balance: "Off-balance" };
+
+  function el(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+
+  function pctText(x) {
+    return x === null ? "–" : Math.round(x * 100) + "%";
+  }
+
+  function per10Text(x) {
+    return x === null ? "–" : x.toFixed(1);
+  }
+
+  function drillCard(drill, sum, sess) {
+    const card = el("div", "panel drill-card");
+    card.appendChild(el("h2", "", DRILL_NAMES[drill] || drill));
+    const grid = el("dl", "stat-grid");
+    [
+      ["Sets", String(sum.sets)],
+      ["Reps", String(sum.reps)],
+      ["Made", sum.makePct === null ? "not logged" : sum.made + "/" + sum.attempted + " · " + pctText(sum.makePct)],
+      ["Lost handles / 10 reps", per10Text(sum.lostPer10)],
+      ["Missed calls / 10 reps", per10Text(sum.missedPer10)],
+      ["Sets rated Clean", sum.cleanShare === null ? "–" : pctText(sum.cleanShare) + " of " + sum.ratedSets],
+    ].forEach(row => {
+      const cell = el("div");
+      cell.append(el("dt", "", row[0]), el("dd", "", row[1]));
+      grid.appendChild(cell);
+    });
+    card.appendChild(grid);
+    const cmp = TrainingLog.compareWithPrevious(trainingLog.log, sess, drill, P.TRAINING_DEFAULTS.compareSessions);
+    card.appendChild(el("p", "compare-line", TrainingLog.comparisonText(cmp)));
+    return card;
+  }
+
+  function showSummary(sess) {
+    const len = TrainingLog.sessionLengthMs(sess);
+    summaryLength.textContent = "Session length " + (len === null ? "unknown" : P.formatElapsed(len));
+    summaryDrills.replaceChildren(...TrainingLog.summarizeByDrill(sess).map(d => drillCard(d.drill, d.summary, sess)));
+    hideAllScreens();
+    summaryScreen.classList.remove("hidden");
+    window.scrollTo(0, 0);
+  }
+
+  // ---- History ----
+
+  function formatDate(iso) {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return String(iso);
+    return d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" }) +
+      ", " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  }
+
+  function shortDate(iso) {
+    const d = new Date(iso);
+    return isNaN(d.getTime()) ? "" : d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  }
+
+  const SVG_NS = "http://www.w3.org/2000/svg";
+
+  function svg(tag, attrs, text) {
+    const node = document.createElementNS(SVG_NS, tag);
+    Object.keys(attrs).forEach(k => node.setAttribute(k, attrs[k]));
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+
+  // Make % (solid, left axis) and lost handles per 10 reps (dashed, right axis).
+  function trendChart(series) {
+    const box = { width: 320, height: 200, left: 38, right: 34, top: 24, bottom: 40 };
+    const g = TrainingLog.trendGeometry(series, box);
+    const p = g.plot;
+    const root = svg("svg", {
+      viewBox: "0 0 " + box.width + " " + box.height, role: "img",
+      "aria-label": "Make percent and lost handles per 10 reps over the last " + series.length + " sessions",
+    });
+    [0, 0.5, 1].forEach(f => {
+      const y = p.y1 - (p.y1 - p.y0) * f;
+      root.appendChild(svg("line", { class: "axis", x1: p.x0, x2: p.x1, y1: y, y2: y }));
+      root.appendChild(svg("text", { class: "tick", x: p.x0 - 5, y: y + 3, "text-anchor": "end" }, Math.round(f * 100) + "%"));
+      root.appendChild(svg("text", { class: "tick", x: p.x1 + 5, y: y + 3, "text-anchor": "start" }, String(+(g.lostMax * f).toFixed(1))));
+    });
+    root.appendChild(svg("line", { class: "axis", x1: p.x0, x2: p.x0, y1: p.y0, y2: p.y1 }));
+    root.appendChild(svg("line", { class: "axis", x1: p.x1, x2: p.x1, y1: p.y0, y2: p.y1 }));
+    // Axis titles.
+    root.appendChild(svg("text", { class: "tick title-make", x: 2, y: 12, "text-anchor": "start" }, "Make %"));
+    root.appendChild(svg("text", { class: "tick title-lost", x: box.width - 2, y: 12, "text-anchor": "end" }, "Lost handles / 10 reps"));
+    root.appendChild(svg("text", { class: "tick", x: p.x0, y: p.y1 + 14, "text-anchor": "start" }, shortDate(series[0].startedAt)));
+    root.appendChild(svg("text", { class: "tick", x: p.x1, y: p.y1 + 14, "text-anchor": "end" }, shortDate(series[series.length - 1].startedAt)));
+    root.appendChild(svg("text", { class: "tick", x: (p.x0 + p.x1) / 2, y: box.height - 6, "text-anchor": "middle" },
+      "Last " + series.length + " sessions, oldest → newest"));
+    const pts = list => list.map(q => q.x.toFixed(1) + "," + q.y.toFixed(1)).join(" ");
+    if (g.make.length > 1) root.appendChild(svg("polyline", { class: "line-make", points: pts(g.make) }));
+    if (g.lost.length > 1) root.appendChild(svg("polyline", { class: "line-lost", points: pts(g.lost) }));
+    g.make.forEach(q => root.appendChild(svg("circle", { class: "dot-make", cx: q.x, cy: q.y, r: 3 })));
+    g.lost.forEach(q => root.appendChild(svg("circle", { class: "dot-lost", cx: q.x, cy: q.y, r: 3 })));
+    return root;
+  }
+
+  function renderTrends() {
+    const t = P.TRAINING_DEFAULTS;
+    historyTrends.replaceChildren(...["drive", "shooters"].map(drill => {
+      const card = el("div", "panel drill-card");
+      card.appendChild(el("h2", "", DRILL_NAMES[drill] + " trend"));
+      const series = TrainingLog.trendSeries(trainingLog.log, drill, t.trendSessions);
+      if (series.length < t.trendMinSessions) {
+        card.appendChild(el("p", "muted-text", "Not enough data (" + series.length + " of " + t.trendMinSessions + " sessions)."));
+        return card;
+      }
+      const chart = el("div", "chart");
+      chart.appendChild(trendChart(series));
+      const legend = el("p", "legend");
+      [["#4f8cff", "Make % (left)"], ["#ff7a4f", "Lost handles per 10 reps (right, dashed)"]].forEach(item => {
+        const span = el("span");
+        const sw = el("span", "swatch");
+        sw.style.background = item[0];
+        span.append(sw, item[1]);
+        legend.appendChild(span);
+      });
+      card.append(chart, legend);
+      return card;
+    }));
+  }
+
+  function setLine(set, i) {
+    const parts = ["Set " + (i + 1), DRILL_NAMES[set.drill] || set.drill];
+    if (set.level !== null) parts.push("L" + set.level);
+    parts.push(set.reps + (set.reps === 1 ? " rep" : " reps"));
+    if (set.made === null) parts.push("not logged");
+    else parts.push(set.made + "/" + set.attempted + " made");
+    if (set.lostHandles !== null) parts.push(set.lostHandles + " lost");
+    if (set.missedCalls !== null) parts.push(set.missedCalls + " missed");
+    if (set.quality !== null) parts.push(QUALITY_NAMES[set.quality]);
+    const line = el("p", "set-line", parts.join(" · "));
+    if (set.note) line.appendChild(el("span", "note", set.note));
+    return line;
+  }
+
+  function sessionDetail(s, item) {
+    const detail = el("div", "history-detail");
+    s.sets.forEach((set, i) => detail.appendChild(setLine(set, i)));
+    const del = el("button", "danger-btn", "Delete session");
+    del.type = "button";
+    const confirm = el("div", "confirm hidden");
+    confirm.appendChild(el("p", "", "Delete this session (" + s.sets.length + (s.sets.length === 1 ? " set" : " sets") +
+      ")? This can't be undone, unless it is in an exported backup."));
+    const row = el("div", "button-row");
+    const yes = el("button", "danger-btn", "Delete");
+    const no = el("button", "secondary-btn", "Cancel");
+    yes.type = no.type = "button";
+    row.append(yes, no);
+    confirm.appendChild(row);
+    del.addEventListener("click", () => { del.classList.add("hidden"); confirm.classList.remove("hidden"); });
+    no.addEventListener("click", () => { confirm.classList.add("hidden"); del.classList.remove("hidden"); });
+    yes.addEventListener("click", () => {
+      const saved = saveTrainingLog(TrainingLog.deleteSession(trainingLog.log, s.id));
+      item.remove();
+      renderTrends();
+      if (!historyList.children.length) renderSessionList();
+      backupStatus.textContent = saved ? "Session deleted." : "Deleted here, but couldn't save to this device.";
+    });
+    detail.append(del, confirm);
+    return detail;
+  }
+
+  function renderSessionList() {
+    const sessions = trainingLog.log.sessions.filter(s => s && Array.isArray(s.sets)).slice().reverse()
+      .sort((a, b) => (a.startedAt < b.startedAt ? 1 : a.startedAt > b.startedAt ? -1 : 0));
+    if (!sessions.length) {
+      historyList.replaceChildren(el("p", "muted-text", "No sessions yet. Log an Offense set to start your history."));
+      return;
+    }
+    historyList.replaceChildren(...sessions.map(s => {
+      const sum = TrainingLog.summarizeSession(s);
+      const item = el("div", "history-item");
+      const btn = el("button");
+      btn.type = "button";
+      btn.setAttribute("aria-expanded", "false");
+      const meta = [
+        TrainingLog.sessionDrills(s).map(d => DRILL_NAMES[d] || d).join(" + "),
+        sum.sets + (sum.sets === 1 ? " set" : " sets"),
+        sum.makePct === null ? "make % not logged" : pctText(sum.makePct) + " made",
+        sum.errorsPerRep === null ? "errors not logged" : (sum.errorsPerRep * 10).toFixed(1) + " errors / 10 reps",
+      ];
+      btn.append(el("span", "item-date", formatDate(s.startedAt)), el("span", "item-meta", meta.join(" · ")));
+      let detail = null;
+      btn.addEventListener("click", () => {
+        if (!detail) {
+          detail = sessionDetail(s, item);
+          item.appendChild(detail);
+        } else {
+          detail.classList.toggle("hidden");
+        }
+        btn.setAttribute("aria-expanded", String(!detail.classList.contains("hidden")));
+      });
+      item.appendChild(btn);
+      return item;
+    }));
+  }
+
+  function lastExportAt() {
+    return storageGet(STORAGE_LAST_EXPORT);
+  }
+
+  function renderLastExport() {
+    const at = lastExportAt();
+    lastExportText.textContent = at ? "Last export: " + formatDate(at) : "Never exported.";
+  }
+
+  function updateBackupReminder() {
+    const n = TrainingLog.unexportedCount(trainingLog.log, lastExportAt());
+    const show = n > P.TRAINING_DEFAULTS.backupReminderSessions;
+    backupReminder.textContent = show
+      ? n + " sessions aren't backed up yet. Open History and tap Export log to keep a copy." : "";
+    backupReminder.classList.toggle("hidden", !show);
+  }
+
+  function openHistory() {
+    renderTrends();
+    renderSessionList();
+    renderLastExport();
+    backupStatus.textContent = "";
+    backupTextBox.classList.add("hidden");
+    importConfirm.classList.add("hidden");
+    hideAllScreens();
+    historyScreen.classList.remove("hidden");
+    window.scrollTo(0, 0);
+  }
+
+  // ---- Backup: export and import ----
+
+  let backupTextIsLog = false;  // the text box holds the JSON log (copying it counts as an export)
+  let pendingImport = null;     // parsed backup waiting for "Replace them" / "Keep mine"
+
+  function markExported() {
+    storageSet(STORAGE_LAST_EXPORT, new Date().toISOString());
+    renderLastExport();
+  }
+
+  // Start a file download. Returns false if this browser can't.
+  function downloadText(name, text, type) {
+    try {
+      const a = document.createElement("a");
+      if (!("download" in a) || !window.URL || !URL.createObjectURL || !window.Blob) return false;
+      const url = URL.createObjectURL(new Blob([text], { type }));
+      a.href = url;
+      a.download = name;
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function showBackupText(text, note, isLog) {
+    backupTextIsLog = isLog;
+    backupText.value = text;
+    backupTextNote.textContent = note;
+    backupTextBox.classList.remove("hidden");
+  }
+
+  function logJson() {
+    return JSON.stringify(trainingLog.log, null, 2);
+  }
+
+  function exportJson() {
+    const name = TrainingLog.exportFileName(new Date(), "reaction-caller-log", "json");
+    if (downloadText(name, logJson(), "application/json")) {
+      markExported();
+      backupStatus.textContent = "Downloading " + name + ".";
+    } else {
+      showBackupText(logJson(), "This browser can't download files. Copy this text and keep it somewhere safe.", true);
+      backupStatus.textContent = "";
+    }
+  }
+
+  function exportCsv() {
+    const name = TrainingLog.exportFileName(new Date(), "reaction-caller-sets", "csv");
+    const csv = TrainingLog.setsToCsv(trainingLog.log);
+    if (downloadText(name, csv, "text/csv")) {
+      backupStatus.textContent = "Downloading " + name + ".";
+    } else {
+      showBackupText(csv, "This browser can't download files. Copy this CSV text instead.", false);
+      backupStatus.textContent = "";
+    }
+  }
+
+  function copyBackupText() {
+    const done = ok => {
+      if (ok && backupTextIsLog) markExported();
+      backupStatus.textContent = ok ? "Copied." : "Select the text and copy it.";
+    };
+    backupText.select();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(backupText.value).then(() => done(true), () => done(false));
+    } else {
+      let ok = false;
+      try {
+        ok = document.execCommand("copy");
+      } catch (e) {}
+      done(ok);
+    }
+  }
+
+  function plural(n, word) {
+    return n + " " + word + (n === 1 ? "" : "s");
+  }
+
+  // Merge a backup: new sessions are added; sessions that differ from saved ones
+  // are only replaced after "Replace them".
+  function importText(text) {
+    importConfirm.classList.add("hidden");
+    const parsed = TrainingLog.parseImport(text);
+    if (parsed.error) {
+      backupStatus.textContent = parsed.error;
+      return;
+    }
+    pendingImport = parsed;
+    const preview = TrainingLog.mergeLogs(trainingLog.log, parsed.log, false);
+    if (preview.conflicts.length) {
+      importConfirmText.textContent = plural(preview.conflicts.length, "session") + " in the backup " +
+        (preview.conflicts.length === 1 ? "differs" : "differ") + " from the version saved here. Replace " +
+        (preview.conflicts.length === 1 ? "it" : "them") + " with the backup's version?";
+      importConfirm.classList.remove("hidden");
+      backupStatus.textContent = "";
+      return;
+    }
+    applyImport(false);
+  }
+
+  function applyImport(replace) {
+    if (!pendingImport) return;
+    const result = TrainingLog.mergeLogs(trainingLog.log, pendingImport.log, replace);
+    const skipped = pendingImport.skipped;
+    pendingImport = null;
+    importConfirm.classList.add("hidden");
+    const saved = saveTrainingLog(result.log);
+    const parts = ["Imported " + plural(result.added.length, "new session") + "."];
+    if (result.identical.length) parts.push(plural(result.identical.length, "session") + " already here.");
+    if (result.conflicts.length) {
+      parts.push((replace ? "Replaced " : "Kept your version of ") + plural(result.conflicts.length, "session") + ".");
+    }
+    if (skipped) parts.push(plural(skipped, "invalid session") + " skipped.");
+    if (!saved) parts.push("Couldn't save to this device.");
+    backupStatus.textContent = parts.join(" ");
+    renderTrends();
+    renderSessionList();
+  }
+
+  function importChosenFile() {
+    const file = importFile.files && importFile.files[0];
+    importFile.value = "";
+    if (!file) return;
+    const read = file.text ? file.text() : new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsText(file);
+    });
+    read.then(importText, () => { backupStatus.textContent = "Couldn't read that file."; });
+  }
+
   // A fresh tap, so speech is primed again before the set's first call.
   function startNextSet() {
     if (activeMode !== offenseMode) return;
@@ -3617,6 +4274,22 @@ const TrainingLog = (function () {
   discardBtn.addEventListener("click", stopGame);
   nextSetBtn.addEventListener("click", startNextSet);
   endSessionBtn.addEventListener("click", stopGame);
+  summaryDoneBtn.addEventListener("click", showStart);
+  historyBtn.addEventListener("click", openHistory);
+  historyBackBtn.addEventListener("click", showStart);
+  exportJsonBtn.addEventListener("click", exportJson);
+  exportCsvBtn.addEventListener("click", exportCsv);
+  importBtn.addEventListener("click", () => importFile.click());
+  importFile.addEventListener("change", importChosenFile);
+  showTextBtn.addEventListener("click", () => {
+    showBackupText(logJson(), "Copy this text and keep it somewhere safe, or paste a backup here and tap Import this text.", true);
+  });
+  copyTextBtn.addEventListener("click", copyBackupText);
+  backupText.addEventListener("input", () => { backupTextIsLog = false; });
+  importTextBtn.addEventListener("click", () => importText(backupText.value));
+  importReplaceBtn.addEventListener("click", () => applyImport(true));
+  importKeepBtn.addEventListener("click", () => applyImport(false));
+  updateBackupReminder();
 })();
 </script>
 <script>
