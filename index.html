@@ -2511,7 +2511,7 @@ const OffensePlanner = (function () {
     lines.push(line);
   };
 
-  log("Reaction Caller offense self-test (Drive and Shooters)\n");
+  log("Reaction Caller offense self-test (Drive, Shooters and Session)\n");
   const result = OffensePlanner.runSelfTest(log, 10000);
   console.table(result.fitTables.drive);
   console.table(result.fitTables.shooters);
