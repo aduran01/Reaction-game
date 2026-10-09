@@ -280,6 +280,92 @@
     font-size: clamp(1.6rem, 8vw, 3rem);
   }
 
+  /* Number stepper (− / +) for fields filled in by hand: 48px+ touch targets. */
+  .stepper {
+    display: flex;
+    gap: 8px;
+  }
+
+  .stepper button {
+    flex: none;
+    width: 56px;
+    min-height: 48px;
+    padding: 0;
+    background: #2a2e38;
+    color: var(--text);
+    font-size: 1.6rem;
+    line-height: 1;
+    border-radius: 10px;
+  }
+
+  .stepper button:active { background: #3a3f4b; }
+
+  .field .stepper input[type="number"] {
+    flex: 1;
+    min-width: 0;
+    min-height: 48px;
+    text-align: center;
+    font-size: 1.25rem;
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+
+  .stepper input::-webkit-outer-spin-button,
+  .stepper input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  /* Game screen header: mode label, set/rep progress, session clock in the corner. */
+  .game-header {
+    position: relative;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .session-progress {
+    color: var(--muted);
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .session-clock {
+    position: absolute;
+    top: 0;
+    right: 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .session-banner {
+    width: 100%;
+    background: var(--panel);
+    border-left: 4px solid #ffd24f;
+    border-radius: 12px;
+    padding: 12px 14px;
+    font-size: 0.95rem;
+    line-height: 1.35;
+  }
+
+  #nextSetBtn {
+    background: var(--accent);
+    min-height: 80px;
+    font-size: clamp(1.3rem, 6vw, 1.6rem);
+  }
+  #nextSetBtn:active { background: var(--accent-down); }
+
+  #endSessionBtn {
+    background: #2a2e38;
+    min-height: 56px;
+  }
+
   .word-read { color: var(--text); }
   .word-sprint { color: #ff7a4f; }
   .word-catch { color: var(--text); }
@@ -426,6 +512,36 @@
         </details>
       </div>
 
+      <!-- Session structure, shared by both drills -->
+      <div class="panel-section" id="sessionSettings">
+        <p class="panel-title">Session</p>
+        <div class="field">
+          <label for="repsPerSet">Reps per set</label>
+          <div class="stepper">
+            <button type="button" data-step="-1" aria-label="Fewer reps per set">−</button>
+            <input type="number" id="repsPerSet" min="3" max="30" step="1" inputmode="numeric" data-training="repsPerSet">
+            <button type="button" data-step="1" aria-label="More reps per set">+</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="plannedSets">Planned sets</label>
+          <div class="stepper">
+            <button type="button" data-step="-1" aria-label="Fewer planned sets">−</button>
+            <input type="number" id="plannedSets" min="1" max="20" step="1" inputmode="numeric" data-training="plannedSets">
+            <button type="button" data-step="1" aria-label="More planned sets">+</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="sessionWarningMin">Session time warning (min, 0 = off)</label>
+          <div class="stepper">
+            <button type="button" data-step="-1" aria-label="Earlier session time warning">−</button>
+            <input type="number" id="sessionWarningMin" min="0" step="5" inputmode="numeric" data-training="sessionWarningMin">
+            <button type="button" data-step="1" aria-label="Later session time warning">+</button>
+          </div>
+        </div>
+        <div class="error" id="sessionError"></div>
+      </div>
+
       <!-- Shared by both drills -->
       <details class="advanced" id="speech">
         <summary>Speech (both drills)</summary>
@@ -457,7 +573,12 @@
   </div>
 
   <div id="gameScreen" class="screen hidden">
-    <div class="mode-label" id="modeLabel">DEFENSE</div>
+    <div class="session-banner hidden" id="sessionBanner" role="status"></div>
+    <div class="game-header">
+      <div class="session-clock hidden" id="sessionClock">00:00</div>
+      <div class="mode-label" id="modeLabel">DEFENSE</div>
+      <div class="session-progress hidden" id="sessionProgress"></div>
+    </div>
     <div class="word-stage">
       <div id="word">&nbsp;</div>
     </div>
@@ -466,6 +587,15 @@
       <div class="countdown-text" id="countdownText">0.0 s</div>
     </div>
     <button id="stopBtn">Stop</button>
+  </div>
+
+  <!-- Offense: shown when a set ends. Placeholder; a log form replaces it later. -->
+  <div id="setScreen" class="screen hidden">
+    <div class="mode-label" id="setScreenLabel">OFFENSE</div>
+    <h1>Set complete</h1>
+    <p class="subtitle" id="setDoneText"></p>
+    <button id="nextSetBtn">Next set</button>
+    <button id="endSessionBtn">End session</button>
   </div>
 
 </div>
@@ -1728,6 +1858,15 @@ const OffensePlanner = (function () {
   const countdownEl = document.getElementById("countdown");
   const countdownFill = document.getElementById("countdownFill");
   const countdownText = document.getElementById("countdownText");
+  const sessionError = document.getElementById("sessionError");
+  const sessionBanner = document.getElementById("sessionBanner");
+  const sessionClock = document.getElementById("sessionClock");
+  const sessionProgress = document.getElementById("sessionProgress");
+  const setScreen = document.getElementById("setScreen");
+  const setScreenLabel = document.getElementById("setScreenLabel");
+  const setDoneText = document.getElementById("setDoneText");
+  const nextSetBtn = document.getElementById("nextSetBtn");
+  const endSessionBtn = document.getElementById("endSessionBtn");
 
   const STORAGE_MODE = "reactionCaller.mode";
   const STORAGE_DRILL = "reactionCaller.offenseDrill";
@@ -1741,6 +1880,7 @@ const OffensePlanner = (function () {
     speech: { el: speechError, details: speechEl },
     shooters: { el: shootersError },
     shootersAdvanced: { el: shootersAdvancedError, details: shootersAdvancedEl },
+    session: { el: sessionError },
   };
 
   let voices = [];
@@ -1884,20 +2024,63 @@ const OffensePlanner = (function () {
     countdownText.textContent = (remainingMs / 1000).toFixed(1) + " s";
   }
 
-  // Runs rep plans from the active drill profile (see OffensePlanner.PROFILES).
+  // Runs rep plans from the active drill profile (see OffensePlanner.PROFILES),
+  // grouped into sets of settings.training.repsPerSet reps.
   const offenseMode = {
     settings: null,
     profile: null,
     timers: [],
     rafId: null,
     runId: 0,
+    progress: null,
+    sessionStart: 0,
+    clockId: null,
+    warned: false,
 
     start(settings) {
       this.settings = settings;
       this.profile = P.PROFILES[settings.drill];
       this.runId++;
+      this.progress = P.newSession();
       countdownEl.classList.remove("hidden");
+      this.startClock();
       this.startRep();
+    },
+
+    // Session clock (mm:ss) and the one-time fatigue warning. Runs for the
+    // whole session, including the set complete screen, until Stop.
+    startClock() {
+      const t = this.settings.training;
+      this.sessionStart = performance.now();
+      this.warned = false;
+      sessionBanner.classList.add("hidden");
+      const tick = () => {
+        const elapsed = performance.now() - this.sessionStart;
+        sessionClock.textContent = P.formatElapsed(elapsed);
+        if (!this.warned && P.sessionWarningDue(elapsed, t)) {
+          this.warned = true;
+          sessionBanner.textContent = P.sessionWarningText(t);
+          sessionBanner.classList.remove("hidden");
+        }
+      };
+      tick();
+      this.clockId = setInterval(tick, 250);
+    },
+
+    // Called from the "Next set" tap (speech is primed there).
+    nextSet() {
+      this.progress = P.beginSet(this.progress);
+      wordEl.textContent = " ";
+      wordEl.className = "";
+      this.startRep();
+    },
+
+    // The set's last rep has reached its endMs: no more reps are scheduled.
+    finishSet() {
+      this.stopCountdown();
+      countdownEl.classList.add("idle");
+      speak(this.settings.training.setDoneSpoken, { rate: this.settings.baseRate, cancel: false });
+      showSetComplete(this.progress, this.settings.training);
     },
 
     // Every timer goes through here so Stop can clear all of them.
@@ -1935,6 +2118,8 @@ const OffensePlanner = (function () {
     // Plan one rep and schedule all of it from a single clock origin.
     startRep() {
       const s = this.settings;
+      this.progress = P.beginRep(this.progress);
+      sessionProgress.textContent = P.progressLabel(this.progress, s.training);
       const plan = this.profile.planRep(s, s.durations, Math.random);
 
       // Rep clock: t = 0 is when the first call should be heard. Every call is
@@ -1956,7 +2141,12 @@ const OffensePlanner = (function () {
         this.later(() => this.runCountdown(origin + w.startMs, w.durMs), at(w.startMs));
       });
 
-      this.later(() => this.startRep(), origin + plan.endMs + plan.restMs - performance.now());
+      // The last rep of a set ends the set at its endMs, without waiting for its rest.
+      if (P.isSetComplete(this.progress, s.training)) {
+        this.later(() => this.finishSet(), origin + plan.endMs - performance.now());
+      } else {
+        this.later(() => this.startRep(), origin + plan.endMs + plan.restMs - performance.now());
+      }
     },
 
     // Drain the bar from durMs to 0 starting at windowStart; it then sits empty at 0.0 s.
@@ -1983,7 +2173,12 @@ const OffensePlanner = (function () {
       this.timers.forEach(clearTimeout);
       this.timers = [];
       this.stopCountdown();
+      if (this.clockId !== null) {
+        clearInterval(this.clockId);
+        this.clockId = null;
+      }
       countdownEl.classList.add("hidden", "idle");
+      sessionBanner.classList.add("hidden");
     },
   };
 
@@ -2069,10 +2264,39 @@ const OffensePlanner = (function () {
     return offensePanel.querySelectorAll("input[data-weight-table]");
   }
 
+  // Session inputs: data-training keys into TRAINING_DEFAULTS.
+  function trainingInputs() {
+    return offensePanel.querySelectorAll("input[data-training]");
+  }
+
   function fillOffenseDefaults() {
     settingInputs().forEach(input => { input.value = getPath(OFFENSE_DEFAULTS, input.dataset.setting); });
     weightInputs().forEach(input => {
       input.value = getPath(OFFENSE_DEFAULTS, input.dataset.weightTable)[input.dataset.weightId];
+    });
+    trainingInputs().forEach(input => { input.value = P.TRAINING_DEFAULTS[input.dataset.training]; });
+  }
+
+  function readTrainingSettings() {
+    const t = Object.assign({}, P.TRAINING_DEFAULTS);
+    trainingInputs().forEach(input => { t[input.dataset.training] = parseNumber(input.value); });
+    return t;
+  }
+
+  // − / + buttons: step the input by its step, clamped to its min/max, then
+  // fire "input" so the change is saved like typing.
+  function wireSteppers() {
+    offensePanel.querySelectorAll(".stepper").forEach(stepper => {
+      const input = stepper.querySelector("input");
+      stepper.querySelectorAll("button[data-step]").forEach(btn => btn.addEventListener("click", () => {
+        const step = Number(input.step) || 1;
+        const min = input.min === "" ? -Infinity : Number(input.min);
+        const max = input.max === "" ? Infinity : Number(input.max);
+        const current = parseNumber(input.value);
+        const base = isNaN(current) ? P.TRAINING_DEFAULTS[input.dataset.training] : current;
+        input.value = Math.min(max, Math.max(min, base + Number(btn.dataset.step) * step));
+        input.dispatchEvent(new Event("input"));
+      }));
     });
   }
 
@@ -2088,6 +2312,7 @@ const OffensePlanner = (function () {
       s.readMaxMs = range.max;
     }
     s.drill = selectedDrill;
+    s.training = readTrainingSettings();
     return s;
   }
 
@@ -2096,7 +2321,8 @@ const OffensePlanner = (function () {
   // simply keep that field's default.
 
   function persistedInputs() {
-    return [minMsInput, maxMsInput].concat(Array.from(settingInputs()), Array.from(weightInputs()));
+    return [minMsInput, maxMsInput].concat(
+      Array.from(settingInputs()), Array.from(weightInputs()), Array.from(trainingInputs()));
   }
 
   function saveSettings() {
@@ -2189,7 +2415,8 @@ const OffensePlanner = (function () {
       // Spoken lengths are fixed for the whole run (the ones validated here);
       // anything learned during the run takes effect on the next Start.
       settings.durations = P.durationsFor(settings, learnedMs);
-      const error = P.PROFILES[settings.drill].validate(settings, settings.durations);
+      const error = P.PROFILES[settings.drill].validate(settings, settings.durations) ||
+        P.validateSession(settings.training);
       if (error) {
         showError(error);
         return;
@@ -2198,9 +2425,14 @@ const OffensePlanner = (function () {
 
     primeSpeech();
 
+    const offense = selectedMode === "offense";
     startScreen.classList.add("hidden");
     gameScreen.classList.remove("hidden");
-    modeLabel.textContent = selectedMode === "offense" ? DRILLS[selectedDrill].label : MODES[selectedMode].label;
+    modeLabel.textContent = offense ? DRILLS[selectedDrill].label : MODES[selectedMode].label;
+    setScreenLabel.textContent = modeLabel.textContent;
+    sessionClock.classList.toggle("hidden", !offense);
+    sessionProgress.classList.toggle("hidden", !offense);
+    sessionBanner.classList.add("hidden");
     wordEl.textContent = " ";
     wordEl.className = "";
 
@@ -2216,7 +2448,25 @@ const OffensePlanner = (function () {
     if (window.speechSynthesis) window.speechSynthesis.cancel();
 
     gameScreen.classList.add("hidden");
+    setScreen.classList.add("hidden");
     startScreen.classList.remove("hidden");
+  }
+
+  // Offense: the set's last rep has ended. Placeholder until the set log form exists.
+  function showSetComplete(progress, t) {
+    setDoneText.textContent = "Set " + progress.set + " of " + t.plannedSets + " done." +
+      (progress.set >= t.plannedSets ? " That's every planned set. End the session, or keep going." : "");
+    gameScreen.classList.add("hidden");
+    setScreen.classList.remove("hidden");
+  }
+
+  // A fresh tap, so speech is primed again before the set's first call.
+  function startNextSet() {
+    if (activeMode !== offenseMode) return;
+    primeSpeech();
+    setScreen.classList.add("hidden");
+    gameScreen.classList.remove("hidden");
+    offenseMode.nextSet();
   }
 
   buildWeightTables(weightTablesEl, P.WEIGHT_TABLES, "", WEIGHT_TABLE_TITLES);
@@ -2225,6 +2475,7 @@ const OffensePlanner = (function () {
   fillOffenseDefaults();
   loadSettings();
   persistedInputs().forEach(input => input.addEventListener("input", saveSettings));
+  wireSteppers();
 
   modeButtons.forEach(btn => btn.addEventListener("click", () => {
     selectMode(btn.dataset.mode);
@@ -2240,6 +2491,8 @@ const OffensePlanner = (function () {
 
   startBtn.addEventListener("click", startGame);
   stopBtn.addEventListener("click", stopGame);
+  nextSetBtn.addEventListener("click", startNextSet);
+  endSessionBtn.addEventListener("click", stopGame);
 })();
 </script>
 <script>
