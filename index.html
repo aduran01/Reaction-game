@@ -361,9 +361,107 @@
   }
   #nextSetBtn:active { background: var(--accent-down); }
 
-  #endSessionBtn {
+  #endSessionBtn,
+  #saveEndBtn {
     background: #2a2e38;
     min-height: 56px;
+  }
+
+  /* Set log form: label and stepper share a row when there is room, else stack. */
+  .log-head {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .log-panel { gap: 14px; }
+
+  .log-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+  }
+
+  .log-row label {
+    flex: 1 1 110px;
+    font-size: 1rem;
+    color: var(--text);
+  }
+
+  .log-row .hint {
+    display: block;
+    color: var(--muted);
+    font-size: 0.8rem;
+  }
+
+  .log-row .stepper { flex: 0 0 auto; }
+
+  .log-row .stepper input[type="number"] {
+    width: 72px;
+    min-height: 56px;
+    background: #0f1115;
+    border: 1px solid #2a2e38;
+    border-radius: 10px;
+    color: var(--text);
+    font-size: 1.4rem;
+    font-weight: 700;
+    text-align: center;
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+
+  .log-row .stepper button { min-height: 56px; }
+
+  .segmented.choice button { min-height: 52px; }
+
+  textarea {
+    width: 100%;
+    background: #0f1115;
+    border: 1px solid #2a2e38;
+    border-radius: 10px;
+    color: var(--text);
+    font: inherit;
+    font-size: 1rem;
+    padding: 12px 14px;
+    resize: vertical;
+  }
+
+  textarea:focus { outline: none; border-color: var(--accent); }
+
+  input, textarea {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
+  #saveRestBtn {
+    background: var(--accent);
+    min-height: 64px;
+    font-size: clamp(1.15rem, 5vw, 1.35rem);
+  }
+  #saveRestBtn:active { background: var(--accent-down); }
+
+  .log-minor {
+    display: flex;
+    gap: 12px;
+    width: 100%;
+  }
+
+  .log-minor button {
+    flex: 1;
+    min-height: 48px;
+    background: transparent;
+    border: 1px solid #2a2e38;
+    color: var(--muted);
+  }
+
+  #discardBtn { color: var(--danger); }
+
+  .rest-count {
+    font-size: clamp(4rem, 22vw, 7rem);
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
   }
 
   .word-read { color: var(--text); }
@@ -539,6 +637,14 @@
             <button type="button" data-step="1" aria-label="Later session time warning">+</button>
           </div>
         </div>
+        <div class="field">
+          <label for="restSec">Rest between sets (s)</label>
+          <div class="stepper">
+            <button type="button" data-step="-1" aria-label="Shorter rest">−</button>
+            <input type="number" id="restSec" min="0" max="600" step="15" inputmode="numeric" data-training="restSec">
+            <button type="button" data-step="1" aria-label="Longer rest">+</button>
+          </div>
+        </div>
         <div class="error" id="sessionError"></div>
       </div>
 
@@ -589,12 +695,77 @@
     <button id="stopBtn">Stop</button>
   </div>
 
-  <!-- Offense: shown when a set ends. Placeholder; a log form replaces it later. -->
-  <div id="setScreen" class="screen hidden">
-    <div class="mode-label" id="setScreenLabel">OFFENSE</div>
-    <h1>Set complete</h1>
-    <p class="subtitle" id="setDoneText"></p>
-    <button id="nextSetBtn">Next set</button>
+  <!-- Offense: set log, shown when a set ends (or after Stop mid-set). Filled in by hand. -->
+  <div id="logScreen" class="screen hidden">
+    <div class="log-head">
+      <div class="mode-label" id="logDrill">OFFENSE</div>
+      <h1 id="logTitle">Set 1 · 8 reps</h1>
+    </div>
+    <div class="panel log-panel">
+      <div class="log-row">
+        <label for="logMade">Shots made</label>
+        <div class="stepper">
+          <button type="button" data-step="-1" aria-label="Fewer shots made">−</button>
+          <input type="number" id="logMade" min="0" max="99" step="1" inputmode="numeric">
+          <button type="button" data-step="1" aria-label="More shots made">+</button>
+        </div>
+      </div>
+      <div class="log-row">
+        <label for="logAttempted">Shots attempted</label>
+        <div class="stepper">
+          <button type="button" data-step="-1" aria-label="Fewer shots attempted">−</button>
+          <input type="number" id="logAttempted" min="0" max="99" step="1" inputmode="numeric">
+          <button type="button" data-step="1" aria-label="More shots attempted">+</button>
+        </div>
+      </div>
+      <div class="log-row">
+        <label for="logLost">Lost handles<span class="hint">lost dribble, travel, early pickup</span></label>
+        <div class="stepper">
+          <button type="button" data-step="-1" aria-label="Fewer lost handles">−</button>
+          <input type="number" id="logLost" min="0" max="99" step="1" inputmode="numeric">
+          <button type="button" data-step="1" aria-label="More lost handles">+</button>
+        </div>
+      </div>
+      <div class="log-row">
+        <label for="logMissed">Missed or late calls<span class="hint">didn't react in time</span></label>
+        <div class="stepper">
+          <button type="button" data-step="-1" aria-label="Fewer missed calls">−</button>
+          <input type="number" id="logMissed" min="0" max="99" step="1" inputmode="numeric">
+          <button type="button" data-step="1" aria-label="More missed calls">+</button>
+        </div>
+      </div>
+      <div>
+        <p class="weight-title">How did the set feel? (optional)</p>
+        <div class="segmented choice" role="group" aria-label="How did the set feel?">
+          <button type="button" data-quality="clean" aria-pressed="false">Clean</button>
+          <button type="button" data-quality="rushed" aria-pressed="false">Rushed</button>
+          <button type="button" data-quality="off_balance" aria-pressed="false">Off-balance</button>
+        </div>
+      </div>
+      <details class="advanced" id="logNoteDetails">
+        <summary>Add a note (optional)</summary>
+        <div class="advanced-body">
+          <textarea id="logNote" rows="3" maxlength="500" aria-label="Note"></textarea>
+        </div>
+      </details>
+      <div class="error" id="logError"></div>
+    </div>
+    <button id="saveRestBtn">Save &amp; rest</button>
+    <button id="saveEndBtn">Save &amp; end session</button>
+    <div class="log-minor">
+      <button id="skipLogBtn">Skip logging</button>
+      <button id="discardBtn" class="hidden">Discard</button>
+    </div>
+  </div>
+
+  <!-- Offense: rest countdown between sets, then Next set. -->
+  <div id="restScreen" class="screen hidden">
+    <div class="mode-label" id="restDrill">OFFENSE</div>
+    <h1>Rest</h1>
+    <div class="rest-count" id="restCount">01:00</div>
+    <p class="subtitle" id="restSummary"></p>
+    <p class="subtitle" id="restSaved"></p>
+    <button id="nextSetBtn" class="hidden">Next set</button>
     <button id="endSessionBtn">End session</button>
   </div>
 
@@ -2234,9 +2405,26 @@ const TrainingLog = (function () {
   const sessionBanner = document.getElementById("sessionBanner");
   const sessionClock = document.getElementById("sessionClock");
   const sessionProgress = document.getElementById("sessionProgress");
-  const setScreen = document.getElementById("setScreen");
-  const setScreenLabel = document.getElementById("setScreenLabel");
-  const setDoneText = document.getElementById("setDoneText");
+  const logScreen = document.getElementById("logScreen");
+  const logDrill = document.getElementById("logDrill");
+  const logTitle = document.getElementById("logTitle");
+  const logMade = document.getElementById("logMade");
+  const logAttempted = document.getElementById("logAttempted");
+  const logLost = document.getElementById("logLost");
+  const logMissed = document.getElementById("logMissed");
+  const qualityButtons = document.querySelectorAll("button[data-quality]");
+  const logNoteDetails = document.getElementById("logNoteDetails");
+  const logNote = document.getElementById("logNote");
+  const logError = document.getElementById("logError");
+  const saveRestBtn = document.getElementById("saveRestBtn");
+  const saveEndBtn = document.getElementById("saveEndBtn");
+  const skipLogBtn = document.getElementById("skipLogBtn");
+  const discardBtn = document.getElementById("discardBtn");
+  const restScreen = document.getElementById("restScreen");
+  const restDrill = document.getElementById("restDrill");
+  const restCount = document.getElementById("restCount");
+  const restSummary = document.getElementById("restSummary");
+  const restSaved = document.getElementById("restSaved");
   const nextSetBtn = document.getElementById("nextSetBtn");
   const endSessionBtn = document.getElementById("endSessionBtn");
 
@@ -2273,6 +2461,9 @@ const TrainingLog = (function () {
       window.localStorage.setItem(key, value);
     } catch (e) {}
   }
+
+  // The store TrainingLog reads and writes through (reactionCaller.log and its backups).
+  const logStore = { get: storageGet, set: storageSet };
 
   function loadVoices() {
     voices = window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
@@ -2408,6 +2599,8 @@ const TrainingLog = (function () {
     sessionStart: 0,
     clockId: null,
     warned: false,
+    setStartedAt: null,  // ISO time the current set started
+    repsCompleted: 0,    // reps of the current set whose endMs has passed
 
     start(settings) {
       this.settings = settings;
@@ -2416,11 +2609,17 @@ const TrainingLog = (function () {
       this.progress = P.newSession();
       countdownEl.classList.remove("hidden");
       this.startClock();
+      this.beginSetClock();
       this.startRep();
     },
 
+    beginSetClock() {
+      this.setStartedAt = new Date().toISOString();
+      this.repsCompleted = 0;
+    },
+
     // Session clock (mm:ss) and the one-time fatigue warning. Runs for the
-    // whole session, including the set complete screen, until Stop.
+    // whole session, including the set log and rest screens, until it ends.
     startClock() {
       const t = this.settings.training;
       this.sessionStart = performance.now();
@@ -2442,6 +2641,7 @@ const TrainingLog = (function () {
     // Called from the "Next set" tap (speech is primed there).
     nextSet() {
       this.progress = P.beginSet(this.progress);
+      this.beginSetClock();
       wordEl.textContent = " ";
       wordEl.className = "";
       this.startRep();
@@ -2449,10 +2649,21 @@ const TrainingLog = (function () {
 
     // The set's last rep has reached its endMs: no more reps are scheduled.
     finishSet() {
+      this.repsCompleted = this.progress.rep;
       this.stopCountdown();
       countdownEl.classList.add("idle");
       speak(this.settings.training.setDoneSpoken, { rate: this.settings.baseRate, cancel: false });
-      showSetComplete(this.progress, this.settings.training);
+      openSetLog(false);
+    },
+
+    // Stop mid-set: clear every pending call and the countdown, but keep the
+    // session (and its clock) going so the partial set can be logged.
+    haltSet() {
+      this.runId++;
+      this.timers.forEach(clearTimeout);
+      this.timers = [];
+      this.stopCountdown();
+      countdownEl.classList.add("idle");
     },
 
     // Every timer goes through here so Stop can clear all of them.
@@ -2517,6 +2728,7 @@ const TrainingLog = (function () {
       if (P.isSetComplete(this.progress, s.training)) {
         this.later(() => this.finishSet(), origin + plan.endMs - performance.now());
       } else {
+        this.later(() => { this.repsCompleted++; }, origin + plan.endMs - performance.now());
         this.later(() => this.startRep(), origin + plan.endMs + plan.restMs - performance.now());
       }
     },
@@ -2541,10 +2753,7 @@ const TrainingLog = (function () {
     },
 
     stop() {
-      this.runId++;
-      this.timers.forEach(clearTimeout);
-      this.timers = [];
-      this.stopCountdown();
+      this.haltSet();
       if (this.clockId !== null) {
         clearInterval(this.clockId);
         this.clockId = null;
@@ -2655,17 +2864,19 @@ const TrainingLog = (function () {
     return t;
   }
 
-  // − / + buttons: step the input by its step, clamped to its min/max, then
-  // fire "input" so the change is saved like typing.
-  function wireSteppers() {
-    offensePanel.querySelectorAll(".stepper").forEach(stepper => {
+  // − / + buttons inside root: step the input by its step, clamped to its
+  // min/max, then fire "input" so the change is handled like typing. An empty
+  // field steps from its default (Session fields) or from 0.
+  function wireSteppers(root) {
+    root.querySelectorAll(".stepper").forEach(stepper => {
       const input = stepper.querySelector("input");
       stepper.querySelectorAll("button[data-step]").forEach(btn => btn.addEventListener("click", () => {
         const step = Number(input.step) || 1;
         const min = input.min === "" ? -Infinity : Number(input.min);
         const max = input.max === "" ? Infinity : Number(input.max);
         const current = parseNumber(input.value);
-        const base = isNaN(current) ? P.TRAINING_DEFAULTS[input.dataset.training] : current;
+        const base = !isNaN(current) ? current
+          : input.dataset.training ? P.TRAINING_DEFAULTS[input.dataset.training] : 0;
         input.value = Math.min(max, Math.max(min, base + Number(btn.dataset.step) * step));
         input.dispatchEvent(new Event("input"));
       }));
@@ -2801,42 +3012,206 @@ const TrainingLog = (function () {
     startScreen.classList.add("hidden");
     gameScreen.classList.remove("hidden");
     modeLabel.textContent = offense ? DRILLS[selectedDrill].label : MODES[selectedMode].label;
-    setScreenLabel.textContent = modeLabel.textContent;
+    logDrill.textContent = modeLabel.textContent;
+    restDrill.textContent = modeLabel.textContent;
     sessionClock.classList.toggle("hidden", !offense);
     sessionProgress.classList.toggle("hidden", !offense);
     sessionBanner.classList.add("hidden");
     wordEl.textContent = " ";
     wordEl.className = "";
 
+    if (offense) {
+      session = {
+        id: "s" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        startedAt: new Date().toISOString(),
+        endedAt: null,
+        sets: [],
+      };
+    }
+
     activeMode = MODES[selectedMode].mode;
     activeMode.start(settings);
   }
 
+  // Ends the session (Defense Stop, End session, Discard). Offense sessions
+  // with saved sets get their end time written to the log.
   function stopGame() {
     if (activeMode) {
       activeMode.stop();
       activeMode = null;
     }
     if (window.speechSynthesis) window.speechSynthesis.cancel();
+    stopRest();
+    if (session && session.sets.length > 0) {
+      session.endedAt = new Date().toISOString();
+      persistSession();
+    }
+    session = null;
+    pendingSet = null;
 
     gameScreen.classList.add("hidden");
-    setScreen.classList.add("hidden");
+    logScreen.classList.add("hidden");
+    restScreen.classList.add("hidden");
     startScreen.classList.remove("hidden");
   }
 
-  // Offense: the set's last rep has ended. Placeholder until the set log form exists.
-  function showSetComplete(progress, t) {
-    setDoneText.textContent = "Set " + progress.set + " of " + t.plannedSets + " done." +
-      (progress.set >= t.plannedSets ? " That's every planned set. End the session, or keep going." : "");
+  // Stop button. Mid-set in Offense with at least one finished rep, the set is
+  // halted and its log form shown for the partial set; otherwise the session ends.
+  function stopPressed() {
+    if (activeMode === offenseMode && offenseMode.repsCompleted > 0) {
+      offenseMode.haltSet();
+      if (window.speechSynthesis) window.speechSynthesis.cancel();
+      openSetLog(true);
+      return;
+    }
+    stopGame();
+  }
+
+  // ---- Set log ----
+
+  let trainingLog = TrainingLog.openLog(logStore);
+  let session = null;     // current Offense session { id, startedAt, endedAt, sets }
+  let pendingSet = null;  // the set shown in the log form (without its outcome fields)
+  let selectedQuality = null;
+  let lastSaveOk = true;
+  let restTimerId = null;
+
+  function selectQuality(quality) {
+    selectedQuality = quality;
+    qualityButtons.forEach(btn => btn.setAttribute("aria-pressed", String(btn.dataset.quality === quality)));
+  }
+
+  // Show the log form for the set that just ended (partial: after Stop mid-set).
+  function openSetLog(partial) {
+    const s = offenseMode.settings;
+    const p = offenseMode.progress;
+    const reps = offenseMode.repsCompleted;
+    pendingSet = {
+      drill: s.drill,
+      level: null,
+      reps,
+      startedAt: offenseMode.setStartedAt,
+      endedAt: new Date().toISOString(),
+      settingsSnapshot: TrainingLog.snapshotSettings(s),
+      extra: {},
+    };
+    logTitle.textContent = partial
+      ? "Partial set " + p.set + " · " + reps + " of " + s.training.repsPerSet + " reps"
+      : "Set " + p.set + " · " + reps + (reps === 1 ? " rep" : " reps");
+    logAttempted.value = reps;
+    logMade.max = String(reps);
+    logMade.value = 0;
+    logLost.value = 0;
+    logMissed.value = 0;
+    selectQuality(null);
+    logNote.value = "";
+    logNoteDetails.open = false;
+    logError.textContent = "";
+    discardBtn.classList.toggle("hidden", !partial);
     gameScreen.classList.add("hidden");
-    setScreen.classList.remove("hidden");
+    logScreen.classList.remove("hidden");
+    window.scrollTo(0, 0);
+  }
+
+  function readLoggedSet() {
+    const note = logNote.value.trim();
+    return Object.assign({}, pendingSet, {
+      made: parseNumber(logMade.value),
+      attempted: parseNumber(logAttempted.value),
+      lostHandles: parseNumber(logLost.value),
+      missedCalls: parseNumber(logMissed.value),
+      quality: selectedQuality,
+      note: note === "" ? null : note,
+    });
+  }
+
+  function skippedSet() {
+    return Object.assign({}, pendingSet, {
+      made: null, attempted: null, lostHandles: null, missedCalls: null, quality: null, note: null,
+    });
+  }
+
+  function persistSession() {
+    trainingLog = Object.assign({}, trainingLog, { log: TrainingLog.upsertSession(trainingLog.log, session) });
+    const result = TrainingLog.saveLog(trainingLog, logStore, Date.now());
+    trainingLog = result.state;
+    lastSaveOk = result.saved;
+  }
+
+  // Validate, add the set to the session and save the whole log right away, so
+  // nothing is lost if the tab closes. Returns false (and shows why) if invalid.
+  function commitSet(set) {
+    const error = TrainingLog.validateSet(set);
+    if (error) {
+      logError.textContent = error.message;
+      return false;
+    }
+    session.sets.push(set);
+    session.endedAt = set.endedAt;
+    persistSession();
+    pendingSet = null;
+    return true;
+  }
+
+  function percent(x) {
+    return Math.round(x * 100) + "%";
+  }
+
+  function sessionSummaryText() {
+    const sum = TrainingLog.summarizeSession(session);
+    const parts = [sum.sets + (sum.sets === 1 ? " set" : " sets")];
+    if (sum.makePct !== null) parts.push(sum.made + "/" + sum.attempted + " made (" + percent(sum.makePct) + ")");
+    if (sum.errorsPerRep !== null) parts.push(sum.errorsPerRep.toFixed(2) + " errors per rep");
+    if (sum.cleanShare !== null) parts.push(sum.cleanSets + " of " + sum.ratedSets + " rated sets clean");
+    return "This session: " + parts.join(" · ");
+  }
+
+  // Rest countdown, then the Next set button.
+  function showRest() {
+    const restMs = offenseMode.settings.training.restSec * 1000;
+    const endsAt = performance.now() + restMs;
+    restSummary.textContent = sessionSummaryText();
+    restSaved.textContent = lastSaveOk ? "Set saved." : "Couldn't save to this device. Storage may be blocked or full.";
+    nextSetBtn.classList.add("hidden");
+    logScreen.classList.add("hidden");
+    restScreen.classList.remove("hidden");
+    const tick = () => {
+      const left = Math.max(0, endsAt - performance.now());
+      restCount.textContent = P.formatElapsed(Math.ceil(left / 1000) * 1000);
+      if (left <= 0) {
+        stopRest();
+        nextSetBtn.classList.remove("hidden");
+      }
+    };
+    tick();
+    if (restMs > 0) restTimerId = setInterval(tick, 250);
+  }
+
+  function stopRest() {
+    if (restTimerId !== null) {
+      clearInterval(restTimerId);
+      restTimerId = null;
+    }
+  }
+
+  function saveAndRest() {
+    if (commitSet(readLoggedSet())) showRest();
+  }
+
+  function saveAndEnd() {
+    if (commitSet(readLoggedSet())) stopGame();
+  }
+
+  function skipLogging() {
+    if (commitSet(skippedSet())) showRest();
   }
 
   // A fresh tap, so speech is primed again before the set's first call.
   function startNextSet() {
     if (activeMode !== offenseMode) return;
     primeSpeech();
-    setScreen.classList.add("hidden");
+    stopRest();
+    restScreen.classList.add("hidden");
     gameScreen.classList.remove("hidden");
     offenseMode.nextSet();
   }
@@ -2847,7 +3222,19 @@ const TrainingLog = (function () {
   fillOffenseDefaults();
   loadSettings();
   persistedInputs().forEach(input => input.addEventListener("input", saveSettings));
-  wireSteppers();
+  wireSteppers(offensePanel);
+  wireSteppers(logScreen);
+  // Made can never exceed attempted: lowering attempted pulls made down with it.
+  logAttempted.addEventListener("input", () => {
+    const attempted = parseNumber(logAttempted.value);
+    if (Number.isInteger(attempted) && attempted >= 0) {
+      logMade.max = String(attempted);
+      if (parseNumber(logMade.value) > attempted) logMade.value = attempted;
+    }
+  });
+  qualityButtons.forEach(btn => btn.addEventListener("click", () => {
+    selectQuality(selectedQuality === btn.dataset.quality ? null : btn.dataset.quality);
+  }));
 
   modeButtons.forEach(btn => btn.addEventListener("click", () => {
     selectMode(btn.dataset.mode);
@@ -2862,7 +3249,11 @@ const TrainingLog = (function () {
   selectMode(storageGet(STORAGE_MODE));
 
   startBtn.addEventListener("click", startGame);
-  stopBtn.addEventListener("click", stopGame);
+  stopBtn.addEventListener("click", stopPressed);
+  saveRestBtn.addEventListener("click", saveAndRest);
+  saveEndBtn.addEventListener("click", saveAndEnd);
+  skipLogBtn.addEventListener("click", skipLogging);
+  discardBtn.addEventListener("click", stopGame);
   nextSetBtn.addEventListener("click", startNextSet);
   endSessionBtn.addEventListener("click", stopGame);
 })();
