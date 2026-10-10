@@ -47,17 +47,25 @@ There is no build step, no `package.json`, no framework and no third-party libra
    - [Running a rep](#running-a-rep)
    - [Learned spoken lengths](#learned-spoken-lengths)
    - [Validation](#validation)
-4. [Drill profiles and rep plans](#drill-profiles-and-rep-plans)
+4. [Read the D drill in depth](#read-the-d-drill-in-depth)
+   - [Read the D vocabulary](#read-the-d-vocabulary)
+   - [The rules (correctAction)](#the-rules-correctaction)
+   - [Call order and the rep plan](#call-order-and-the-rep-plan)
+   - [Sampling states](#sampling-states)
+   - [Read the D levels](#read-the-d-levels)
+   - [Read the D validation](#read-the-d-validation)
+   - [What three words can't capture](#what-three-words-cant-capture)
+5. [Drill profiles and rep plans](#drill-profiles-and-rep-plans)
    - [The training log](#the-training-log)
-5. [Tuning offense mode](#tuning-offense-mode)
-6. [Project structure](#project-structure)
-7. [Architecture overview](#architecture-overview)
-8. [`server.js` in detail](#serverjs-in-detail)
-9. [`index.html` in detail](#indexhtml-in-detail)
-10. [Browser APIs used](#browser-apis-used)
-11. [Known limitations and quirks](#known-limitations-and-quirks)
-12. [Troubleshooting](#troubleshooting)
-13. [Ideas for future work](#ideas-for-future-work)
+6. [Tuning offense mode](#tuning-offense-mode)
+7. [Project structure](#project-structure)
+8. [Architecture overview](#architecture-overview)
+9. [`server.js` in detail](#serverjs-in-detail)
+10. [`index.html` in detail](#indexhtml-in-detail)
+11. [Browser APIs used](#browser-apis-used)
+12. [Known limitations and quirks](#known-limitations-and-quirks)
+13. [Troubleshooting](#troubleshooting)
+14. [Ideas for future work](#ideas-for-future-work)
 
 ---
 
@@ -567,20 +575,139 @@ If the error is in Advanced or Speech, that section opens automatically.
 
 ---
 
+## Read the D drill in depth
+
+Read the D is the one offense drill that is **not** Call & Execute. A short spoken sequence describes the defender's state, and nothing names the move: you combine the calls and decide whether to drive (and which way), pull up, or create space. It covers drive decisions only, no passing reads.
+
+### Read the D vocabulary
+
+The defender's state, always from the attacker's point of view:
+
+| Key | Values | Meaning |
+|---|---|---|
+| `momentum` | `closing`, `set`, `retreating` | Coming at you, standing in his stance, or backing off |
+| `distance` | `tight`, `cushion`, `sag` | Inside arm's reach, about an arm's length, or well off (near the free-throw line) |
+| `leadFoot` | `left`, `right` | The side his forward foot is on |
+| `hands` (Level 3+) | `up`, `down` | A pure distractor: it never changes the correct answer |
+
+The calls are in the shared phrase table (rough estimates at rate 1.0; the app learns the real lengths like every other call):
+
+| id | display / spoken | est. ms | role |
+|---|---|---|---|
+| D_CLOSING | CLOSING | 500 | momentum |
+| D_SET | SET | 300 | momentum |
+| D_RETREATING | RETREATING | 650 | momentum |
+| D_TIGHT | TIGHT | 350 | distance |
+| D_CUSHION | CUSHION | 500 | distance |
+| D_SAG | SAGGING | 500 | distance |
+| D_LEFT_FOOT | LEFT FOOT | 550 | lead foot |
+| D_RIGHT_FOOT | RIGHT FOOT | 550 | lead foot |
+| D_HANDS_UP | HANDS UP | 550 | distractor |
+| D_HANDS_DOWN | HANDS DOWN | 600 | distractor |
+| D_NOW | NOW | 300 | go signal |
+| D_LIVE | LIVE | 350 | mid-dribble lead-in (Levels 4–5) |
+
+The Levels 1–3 lead-in is the Drive drill's READY (id `READ`), spoken once at the base rate.
+
+### The rules (correctAction)
+
+`correctAction(state, rules)` (pure) returns `{ action, ruleId, situation, answer, why, evidence }`. The rules live in `TRAINING_DEFAULTS.readTheD.rules`, so you can edit them, and are checked **in this order**; the first match decides:
+
+| # | Rule id | When | Correct action | Why | Evidence |
+|---|---|---|---|---|---|
+| 1 | `closing` | momentum closing | DRIVE to the lead-foot side | attack the closeout past his front foot | coaching heuristic |
+| 2 | `gaveShot` | distance sag, **or** momentum retreating | PULL UP | he gave you the shot | coaching heuristic |
+| 3 | `tightSet` | tight **and** set | DRIVE to the lead-foot side | attack his front foot | study-based |
+| 4 | `cushionSet` | cushion **and** set | CREATE SPACE: hesi or step-back into a jumper | his foot doesn't matter at this distance | coaching heuristic |
+
+The actions are `DRIVE_LEFT`, `DRIVE_RIGHT`, `PULL_UP` and `CREATE_SPACE`. A rule's action `DRIVE_LEAD_SIDE` becomes DRIVE_LEFT when the lead foot is on the left and DRIVE_RIGHT when it is on the right. The four rules cover all 18 states (rule 1 catches every closing state, including a closing defender who is sagging).
+
+Each rule has `when`, a list of entries; an entry matches when every key in its `match` holds one of the listed values. Each entry has a `situation` (e.g. "sagging defender" or "retreating defender" for rule 2) used in feedback, and each rule has an `answer`, a `why` and an `evidence` tag. Rules can only look at momentum, distance and lead foot, never at hands, so the distractor can't change an answer.
+
+"Study-based" marks the one rule backed by studies of defenders' stance (attacking the side of the lead foot of a tight, set defender). Everything else is a **coaching heuristic**: a common teaching rule, not a measured result.
+
+### Call order and the rep plan
+
+Every rep calls **all three** of momentum, distance and lead foot, in that fixed order, even when the rule that decides doesn't use one of them, so silence never becomes a tell. From Level 3 a hands call (HANDS UP / HANDS DOWN) is inserted at a random place among them (first, between two of them or last, each equally likely). NOW always comes last.
+
+```
+READY ──(read time)──▶ momentum ▶ distance ▶ lead foot ▶ NOW ──(decision window)──▶ reset pause
+                       └─ a hands call can go anywhere in here from Level 3 ─┘    └─ countdown bar ─┘
+
+Levels 4-5 (mid-dribble):
+LIVE ──(600-1500 ms)──▶ momentum ▶ distance ▶ lead foot ▶ NOW ──(decision window)──▶ …
+```
+
+`planReadTheDRep(s, dur, rng, onPick, ctx)` (pure) builds the rep plan:
+
+1. **Lead-in** at 0, at `baseRate`: READY (Levels 1–3, "before the move") or LIVE (Levels 4–5, "mid-dribble": start dribbling, the read comes while you're live).
+2. **Wait**: the read time (`readTheD.readMinMs`–`readMaxMs`, 800–3500 ms) after READY, or the LIVE delay (`liveDelayMinMs`–`liveDelayMaxMs`, 600–1500 ms) after LIVE, measured from the rep start and clamped so the first cue never overlaps the lead-in.
+3. **The cue sequence and NOW**, laid out with the same per-window rate-fit math as a drive window (`fitRateIn` and `scheduleCalls`): the window is exactly long enough for the calls at the level's cue rate with the cue gap between every two calls, so each call is spoken at that rate and none can overlap or clip another.
+4. **The decision window** starts at NOW and lasts the level's decision time: make the move and shoot. The countdown bar drains over it.
+5. **Rest**: `readTheD.resetPauseMs` (1000 ms), then the next lead-in.
+
+The plan has the usual `calls`, `windows`, `endMs` (the end of the decision window) and `restMs`, plus the optional field `cues`, one entry per decision:
+
+```js
+cues: [{ atMs, durMs,     // the decision window (same as its windows entry)
+         state,           // { momentum, distance, leadFoot, hands? }
+         ids,             // the cue calls in the order spoken, without NOW
+         correct,         // "DRIVE_LEFT" | "DRIVE_RIGHT" | "PULL_UP" | "CREATE_SPACE"
+         ruleId }]        // the rule that decided
+```
+
+Other drills don't have `cues`.
+
+### Sampling states
+
+`sampleState(cfg, withHands, prev, rng)` draws the state in two steps: first a correct action by `TRAINING_DEFAULTS.readTheD.actionWeights` (25 each, provisional), then one of that action's states at random. So the four actions come up about equally often (the self-test checks within 2 points over 40,000 reps), the lead foot is random, and every state comes up. The state of the previous rep (`ctx.lastState`, passed by the runner) is never drawn again, so the exact same state never comes twice in a row.
+
+### Read the D levels
+
+Difficulty comes from the speech rate, the gaps and the decision window, not from how long anything is shown. All values are provisional (`TRAINING_DEFAULTS.levels.readTheD`); the start level is 3, as for Drive.
+
+| Level | Cue speech rate | Cue gap (ms) | Decision window (ms) | Hands distractor | Cue timing | Longest sequence spoken in |
+|---|---|---|---|---|---|---|
+| 1 | 1.0 | 300 | 3000 | no | before the move (READY, read time) | 2900 ms |
+| 2 | 1.15 | 250 | 2500 | no | before | 2489 ms |
+| 3 | 1.3 | 200 | 2200 | yes | before | 2800 ms |
+| 4 | 1.45 | 150 | 2000 | yes | mid-dribble (LIVE, 600–1500 ms) | 2393 ms |
+| 5 | 1.6 (the max rate) | 120 | 1700 | yes | mid-dribble | 2105 ms |
+
+"Longest sequence" is RETREATING > CUSHION > LEFT FOOT (> HANDS DOWN) > NOW with the estimates, from the first cue to the end of NOW (the self-test page prints this table). The cue rate only applies to the cue calls and NOW; the lead-in stays at the base rate.
+
+The level values are the settings `readTheD.rate`, `cueGapMs`, `decisionMs`, `hands` and `midDribble` in `OFFENSE_DEFAULTS.readTheD`. Their defaults there (used with Auto difficulty off) are the Level 3 values.
+
+### Read the D validation
+
+`validateReadTheD(s, dur)` checks the speech settings, then:
+
+- the cue speech rate is between 0.5 and 2.0 and **not above the max speech rate** (Level 5 uses exactly 1.6, the default max);
+- the cue gap is a whole number ≥ 0 and the decision window a whole number ≥ 500 ms;
+- hands and mid-dribble are each off (0) or on (1);
+- the read time (whole numbers ≥ 100 ms, min ≤ max), the LIVE delay (whole numbers ≥ 0, min ≤ max) and the reset pause (whole number ≥ 0);
+- the rule table: every rule has a known action, an answer, a why, an evidence tag and `when` entries that only match momentum, distance and lead foot values; and **every state has an answer** (e.g. "No rule covers SET · CUSHION · LEFT FOOT.");
+- the action weights are numbers ≥ 0 that add up to more than 0;
+- the longest cue sequence fits at the cue rate.
+
+### What three words can't capture
+
+Three spoken words in a fixed order simplify something a real defender shows you almost all at once: his momentum, distance, stance and hands arrive together, change continuously, and come with fakes. The drill trains the decision rules and makes them fast, so the read is automatic when you see it. Reading a real defender on the court still needs practice against a real defender.
+
 ## Drill profiles and rep plans
 
 Offense is built around two ideas, so that a future **mixed** drill (a random drill per rep) is a small addition:
 
-**A drill profile** (`OffensePlanner.PROFILES.drive`, `PROFILES.moveLab`) bundles one drill:
+**A drill profile** (`OffensePlanner.PROFILES.drive`, `PROFILES.moveLab`, `PROFILES.readTheD`) bundles one drill:
 
-| Field | Drive | Move Lab |
-|-------|-------|----------|
-| `phraseIds` | READ (shown READY), LEFT, RIGHT, CUT_OFF, LAY_UP, finishers | the three Move Lab start calls, LEFT, RIGHT, the moves, SHOT |
-| `next` (state table) | `NEXT` | `MOVE_LAB_NEXT` (MOVE stands for any picked move) |
-| `weightTables` | `WEIGHT_TABLES` | `afterMoveWeights` (under `settings.moveLab`) |
-| `planRep(settings, durations, rng)` | `planDriveRep` | `planMoveLabRep` |
-| `validate(settings, durations)` | `validateOffense` | `validateMoveLab` |
-| `fitTable` / `selfTest` | `fitTable` / Drive checks | none / Move Lab checks |
+| Field | Drive | Move Lab | Read the D |
+|-------|-------|----------|------------|
+| `phraseIds` | READ (shown READY), LEFT, RIGHT, CUT_OFF, LAY_UP, finishers | the three Move Lab start calls, LEFT, RIGHT, the moves, SHOT | READ (READY), D_LIVE, the ten cue calls, D_NOW |
+| `next` (state table) | `NEXT` | `MOVE_LAB_NEXT` (MOVE stands for any picked move) | none: a fixed call order (`RTD_ORDER`) |
+| `weightTables` | `WEIGHT_TABLES` | `afterMoveWeights` (under `settings.moveLab`) | none (action weights are in `TRAINING_DEFAULTS.readTheD`) |
+| `planRep(settings, durations, rng, onPick, ctx)` | `planDriveRep` | `planMoveLabRep` | `planReadTheDRep` |
+| `validate(settings, durations)` | `validateOffense` | `validateMoveLab` | `validateReadTheD` |
+| `fitTable` / `selfTest` | `fitTable` / Drive checks | none / Move Lab checks | `readTheDFitTable` (per level) / Read the D checks |
 
 Phrases stay in one shared table keyed by id, so LEFT, RIGHT and CUT_OFF are shared, and so are their learned lengths.
 
@@ -591,9 +718,12 @@ Phrases stay in one shared table keyed by id, so LEFT, RIGHT and CUT_OFF are sha
   calls:   [{ id, atMs, durMs, rate }],  // every spoken call, ms from the rep start
   windows: [{ startMs, durMs }],         // countdown windows the bar draws
   endMs,                                 // when the rep's last window ends
-  restMs                                 // pause after endMs before the next rep
+  restMs,                                // pause after endMs before the next rep
+  cues                                   // optional (Read the D): one entry per decision
 }
 ```
+
+`ctx` is what the runner knows about earlier reps: `{ repInSet, lastMoveId, lastState }` (`lastState` is the previous Read the D state). Every plan must satisfy the **runner contract**, which `repPlanProblems(plan, phrases)` checks: known phrases, calls in time order that never overlap, a positive length and a rate of 0.5–2 for each, windows inside `[0, endMs]`, `endMs` at or after the last call ends, `restMs` ≥ 0, and (when present) one `cues` entry per window with the same start and length.
 
 The runner ([Running a rep](#running-a-rep)) knows nothing about drills: it speaks `calls`, draws `windows` and starts the next rep after `endMs + restMs`. The countdown bar covers each window. A single bar over the whole rep would be a change to what the planner puts in `windows`, not a runner change.
 
@@ -685,6 +815,14 @@ const OFFENSE_DEFAULTS = {
     afterMoveWeights: { MOVE: 50, SHOT: 50 }, // provisional
     resetPauseMs: 1000,
   },
+
+  // Read the D drill (the Level 3 values; with Auto difficulty on the level sets the first five)
+  readTheD: {
+    rate: 1.3, cueGapMs: 200, decisionMs: 2200, hands: 1, midDribble: 0,
+    readMinMs: 800, readMaxMs: 3500,          // provisional
+    liveDelayMinMs: 600, liveDelayMaxMs: 1500, // provisional
+    resetPauseMs: 1000,
+  },
 };
 ```
 
@@ -692,6 +830,7 @@ const OFFENSE_DEFAULTS = {
 - The **phrase table** (`phrases`) is where you fix pronunciation (`spoken`), change on-screen text (`display`) or adjust the length estimates (`estMs`). Learned lengths (`reactionCaller.learnedMs`) override `estMs` per phrase. Delete that key to start learning from scratch after changing the voice or the spoken text.
 - The Drive read time is `readMinMs` / `readMaxMs` (800 / 3500). Defense's Min/Max delay fields are separate (HTML defaults 1000 / 3000).
 - The state tables (`NEXT` for Drive, `MOVE_LAB_NEXT` for Move Lab) and the finisher and start-call lists sit in the planner script. They are structure, not tuning.
+- `OFFENSE_DEFAULTS.readTheD` holds the Read the D timing (cue rate and gap, decision window, read time, LIVE delay, reset pause) and the hands / mid-dribble switches. Its calls (`D_…`) are in the shared `phrases` table. The rules and action weights are in `TRAINING_DEFAULTS.readTheD`.
 - `OFFENSE_DEFAULTS.moveLab` holds every Move Lab number, including the get-set time after each start call (`getSetMs`) and the gap from LEFT / RIGHT to the first move (`firstMoveGapMinMs` / `firstMoveGapMaxMs`). Its start calls and SHOT are in the shared `phrases` table.
 
 ### `TRAINING_DEFAULTS`
@@ -718,6 +857,16 @@ const TRAINING_DEFAULTS = {
   levels: {
     drive:    [{ driveMinMs: 2200, driveMaxMs: 2800, readMinMs: 2000, readMaxMs: 3500,
                  "afterDriveOrCutOffWeights.CUT_OFF": 10, "afterDriveOrCutOffWeights.LAY_UP": 10 }, …],
+    readTheD: [{ "readTheD.rate": 1.0, "readTheD.cueGapMs": 300, "readTheD.decisionMs": 3000,
+                 "readTheD.hands": 0, "readTheD.midDribble": 0 }, …],
+  },
+
+  // Read the D: the rule table and how often each action comes up
+  readTheD: {
+    rules: [{ id: "closing", when: [{ match: { momentum: ["closing"] }, situation: "closing defender" }],
+              action: "DRIVE_LEAD_SIDE", answer: "…", why: "attack the closeout past his front foot",
+              evidence: "coaching heuristic" }, …],
+    actionWeights: { DRIVE_LEFT: 25, DRIVE_RIGHT: 25, PULL_UP: 25, CREATE_SPACE: 25 }, // provisional
   },
 };
 ```
@@ -730,6 +879,8 @@ Rules of thumb:
 - **Long drives (several CUT OFFs) never happen**: they don't fit. Check the fit table below and raise `driveMaxMs` or `maxRate`.
 - **Calls lag behind the countdown on a phone**: the voice starts late. Set `speechLeadMs` (e.g. 100–200), or add a `finisherBufferMs` (Drive).
 - **A word is mispronounced**: change its `spoken` text.
+- **Read the D: the cues come too fast to take in**: lower the level, or with Auto difficulty off lower `readTheD.rate` or raise `cueGapMs`. **No time to act after NOW**: raise `decisionMs`.
+- **Read the D: one action comes up too often**: change `TRAINING_DEFAULTS.readTheD.actionWeights`. **You disagree with a rule**: edit `TRAINING_DEFAULTS.readTheD.rules` (validation makes sure every state still has an answer).
 - **Move Lab: not enough time to get to the spot**: raise that start call's `getSetMs` range.
 - **Move Lab: not enough time to finish a move before the next call**: raise `moveGapMinMs` / `moveGapMaxMs` (Gap between moves). **Too many or too few moves per rep**: change Max moves per rep or `afterMoveWeights`.
 
@@ -743,7 +894,21 @@ http://localhost:8080/index.html?selftest=1
 
 Use `/index.html?selftest=1`, not `/?selftest=1`. The bundled `server.js` only maps a bare `/` to `index.html`, so `/?selftest=1` returns "Not found".
 
-Instead of the app, the page runs a simulation of every offense planner (every drill profile's self-test) plus checks of the session helpers and the training log, and prints **PASS** / **FAIL** for each check to the console and to an on-page banner (green when everything passes, red otherwise). There are 48 checks in total: 18 Drive, 4 Move Lab, 6 Session, 2 Defaults, 3 Levels, 8 Training log and 7 History.
+Instead of the app, the page runs a simulation of every offense planner (every drill profile's self-test) plus checks of the session helpers and the training log, and prints **PASS** / **FAIL** for each check to the console and to an on-page banner (green when everything passes, red otherwise). There are 58 checks in total: 18 Drive, 4 Move Lab, 9 Read the D, 1 Runner, 6 Session, 2 Defaults, 3 Levels, 8 Training log and 7 History.
+
+**Read the D.** It checks:
+
+1. the vocabulary: the eleven cue phrases and LIVE exist, are shown as in the table, spoken as shown in lower case and have estimates, and every state value has its call;
+2. `correctAction` matches the rule table, written out independently in the test, for all 18 states and all 36 with hands;
+3. the hands call never changes the answer (or the deciding rule);
+4. every rule has an answer, a why, situations and an evidence tag, and only the tight, set lead-foot rule is study-based;
+5. validation: the defaults and all five levels pass; a cue rate of 1.7 (above the max rate) or 0.4, a negative or fractional cue gap, a 400 ms or empty decision window, flags other than 0/1, bad read time or LIVE delay ranges, a negative reset pause, a rule table that leaves a state uncovered, a rule matching hands, an unknown action or evidence tag, all-zero or negative weights are rejected, and a bad base rate is reported as a speech error;
+6. the sequence, at every level (2,000 reps each): READY (Levels 1–3) or LIVE (4–5) at 0 at the base rate; momentum, distance and lead foot in that order and matching the state; a hands call at Levels 3–5 only, in every rep, matching the state, at each of its four possible places; NOW last; the `cues` record matches what was called;
+7. the timing: the first cue within the read time or LIVE delay (clamped after the lead-in); every cue call at the level's rate with exactly the cue gap between calls, none overlapping; the sequence fits at the level's rate (`fitRateIn`); one window from NOW lasting the level's decision time, `endMs` at its end and the reset pause as rest;
+8. sampling: over 40,000 reps (Levels 1 and 3) each correct action's share is within 2 points of its weight;
+9. the same state never comes twice in a row, and every state (18, or 36 with hands) comes up.
+
+**Runner.** One check runs 1,000 rep plans of every drill (Read the D at all five levels) through `repPlanProblems`: the runner contract described in [Drill profiles and rep plans](#drill-profiles-and-rep-plans).
 
 **Move Lab.** It checks the move list (8 moves, 6 handle and 2 shot, each a phrase with an estimate; the default picks are real moves); validation (each single move, all moves, 1 and 6 moves per rep, zero gaps and one-sided weights pass; no moves, unknown moves, non-move phrases, duplicates, 0, 7 or fractional moves per rep, bad gap ranges, all-zero or negative weights, a negative reset pause, and a bad get-set or first-move gap are rejected; a bad speech rate is reported as a speech error); the plans (10,000 reps spread over 1–6 max moves with random picks: a start call, then LEFT/RIGHT, then 1..max picked moves, then SHOT; every move count from 1 to max happens; every start call, direction and move gets called; the get-set time, the first-move gap and each gap between moves stay in range; every call at the base rate, none overlapping; one countdown window from LEFT/RIGHT to the end of SHOT, and the reset pause as rest); and the weights (MOVE vs SHOT within 2 points of the default weights, SHOT always at the max, MOVE weight 0 means always one move, SHOT weight 0 always the max). Session adds a check that Move Lab uses its own reps per set; Training log adds a check of Move Lab sets (picked moves, or an old move + side, and clean reps 0..reps), their snapshot and clean-rep totals.
 
@@ -773,7 +938,7 @@ Instead of the app, the page runs a simulation of every offense planner (every d
 
 **Levels.** It checks:
 
-1. Drive has exactly 5 levels that set the same settings, every path exists in `OFFENSE_DEFAULTS`, every level passes the drill's validation (including the shortest-drive fit), plans 500 reps without error, and no level has a longer window than the one below it;
+1. Drive and Read the D each have exactly 5 levels that set the same settings, every path exists in `OFFENSE_DEFAULTS`, every level passes the drill's validation (including the shortest-drive fit), plans 500 reps without error, and no level has a longer window than the one below it;
 2. `levelDecision` / `nextLevel`: up at 8/10 with 0.1 errors per rep and exactly at both thresholds (4/5, 1 error in 10 reps); hold at 79% success, at error rate 0.11, and at 50% with 0.29; down at 49% and at error rate 0.30; clamped at 5 and 1; hold with only 4 attempts, for a skipped set and when errors weren't logged; a partial set with 5 attempts counts;
 3. `applyLevel` sets only the level's settings without changing its input (e.g. Drive Level 4: window 1500, CUT OFF 28, LAY UP 25; Drive Level 1: read 2000, CUT OFF 10, finishers still 20); `normalizeLevels` replaces missing, fractional or out-of-range levels with the start level; `progressLabel` adds " · LVL 3" only when a level is given; `levelMessage` reads "Level 3 → 4: nice, timing gets tighter" and "Holding at Level 3".
 
@@ -962,12 +1127,16 @@ A pure module (an IIFE assigned to `const OffensePlanner`). It contains:
 | `newSession()` / `beginRep(p)` / `isSetComplete(p, t)` / `beginSet(p)` | The set and rep counter. Progress is `{ set, rep }` (current set from 1, reps started in it) |
 | `progressLabel(p, t, level)` | "SET 2 / 4 · REP 5 / 8", plus " · LVL 3" when `level` is given |
 | `LEVEL_COUNT`, `levelPaths(drill, t)`, `applyLevel(s, drill, level, t)` | 5; the settings paths a drill's levels set; a copy of the settings with a level applied |
-| `normalizeLevels(stored, t)` | Stored levels → one per levelled drill (`{ drive }`), each 1–5 (else `startLevel`) |
+| `normalizeLevels(stored, t)` | Stored levels → one per levelled drill (`{ drive, readTheD }`), each 1–5 (else `startLevel`) |
 | `levelDecision(level, set, cfg)` / `nextLevel(level, set, cfg)` | The adjustment rule: `{ level, change }` (`up`, `down`, `hold`, `atTop`, `atBottom`, `tooFew`, `skipped`) / just the level |
 | `levelMessage(from, decision, cfg)` | The rest-screen line |
 | `formatElapsed(ms)` | Session clock text, mm:ss |
 | `sessionWarningDue(elapsedMs, t)` / `sessionWarningText(t)` | When the fatigue banner is due, and its text |
-| `runSelfTest(log, reps)` | The simulation (every profile's self-test, then the session checks); returns `{ passed, results, fitTable, fitTables: { drive, moveLab } }` |
+| `RTD_ORDER`, `RTD_PHRASE`, `RTD_ACTIONS`, `RTD_ACTION_NAMES` | Read the D: the fixed call order, the call for each state value, the four actions and their names |
+| `correctAction(state, rules)` / `rtdStates(withHands)` / `sampleState(cfg, withHands, prev, rng)` | The correct action for a state; all 18 (or 36) states; one weighted state draw that never repeats `prev` |
+| `planReadTheDRep(s, dur, rng, onPick, ctx)` / `validateReadTheD(s, dur)` / `readTheDFitTable(s, dur)` | The Read the D rep plan (with `cues`), its settings check, and the per-level sequence table |
+| `repPlanProblems(plan, phrases)` | The runner contract check: a list of problems, empty for a valid plan |
+| `runSelfTest(log, reps)` | The simulation (every profile's self-test, the runner contract, then the session checks); returns `{ passed, results, fitTable, fitTables: { drive, moveLab, readTheD } }` |
 
 `runSelfTest(log, reps, extraSuites)` also runs each function in `extraSuites` as `suite(check)`; the self-test page passes `[TrainingLog.selfTest]`.
 
