@@ -177,6 +177,14 @@
     if (levelMessage(3, { level: 4, change: "up" }, t) !== "Level 3 → 4: nice, timing gets tighter" ||
         levelMessage(3, { level: 3, change: "hold" }, t) !== "Holding at Level 3") mf.push("messages");
     check("levels: applyLevel changes only level settings, stored levels are clamped, LVL label and messages", mf);
+
+    // Only Drive has levels: a stored Read the D level (from before the rewrite) is dropped.
+    const df = [];
+    if (LEVEL_DRILLS.join() !== "drive") df.push("levelled drills " + LEVEL_DRILLS.join());
+    const old = normalizeLevels({ drive: 2, readTheD: 4 }, t);
+    if (old.drive !== 2 || "readTheD" in old || Object.keys(old).join() !== "drive") df.push("normalized " + JSON.stringify(old));
+    if (t.levels.readTheD !== undefined) df.push("Read the D still has levels");
+    check("levels: only Drive is levelled; normalizeLevels drops a stored readTheD level", df);
   }
   P.registerSuite(levelSelfTest);
 

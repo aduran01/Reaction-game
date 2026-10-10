@@ -89,20 +89,46 @@ const TrainingLog = (function () {
       }
     }
     if (set.drill === "readTheD") {
-      // One entry per decision: what was called, the right answer and what the player did.
-      const ds = set.extra.decisions;
-      const P = OffensePlanner;
-      if (!Array.isArray(ds)) return bad("extra", "A Read the D set needs its decisions.");
-      for (const d of ds) {
-        if (!isPlainObject(d) || !Number.isInteger(d.rep) || d.rep < 1 || d.rep > set.reps || (d.read !== 1 && d.read !== 2) ||
-            !Array.isArray(d.ids) || d.ids.length === 0 || !d.ids.every(id => typeof id === "string") ||
-            !isPlainObject(d.state) || P.RTD_ACTIONS.indexOf(d.correct) === -1 ||
-            typeof d.ruleId !== "string" || typeof d.situation !== "string") {
-          return bad("extra", "A Read the D decision is missing what was called or the right answer.");
-        }
-        if (d.actual !== null && P.RTD_REVIEW_ACTIONS.indexOf(d.actual) === -1) {
-          return bad("decisions", "Pick what you did for rep " + d.rep + ".");
-        }
+      // extra.reads (one per rep, since the rewrite) or extra.decisions (the first Read the D).
+      if (set.extra.reads !== undefined) return validateReads(set.extra.reads, set.reps);
+      return validateOldDecisions(set.extra.decisions, set.reps);
+    }
+    return null;
+  }
+
+  // Read the D reps: { rep, chain, terminal, driveSide, ok, missedCall }; ok true,
+  // false or null (not reviewed), missedCall null or a call of that rep's chain.
+  function validateReads(reads, reps) {
+    const bad = message => ({ field: "extra", message });
+    if (!Array.isArray(reads)) return bad("A Read the D set needs its reps.");
+    for (const r of reads) {
+      if (!isPlainObject(r) || !Number.isInteger(r.rep) || r.rep < 1 || r.rep > reps ||
+          !Array.isArray(r.chain) || r.chain.length === 0 || !r.chain.every(id => typeof id === "string") ||
+          typeof r.terminal !== "string" || [null, "left", "right"].indexOf(r.driveSide) === -1) {
+        return bad("A Read the D rep is missing its calls.");
+      }
+      if ([true, false, null].indexOf(r.ok) === -1) return bad("A Read the D rep must be read right, misread or not reviewed.");
+      if (r.missedCall !== null && (r.ok !== false || r.chain.indexOf(r.missedCall) === -1)) {
+        return bad("The misread call of rep " + r.rep + " must be one of its calls.");
+      }
+    }
+    return null;
+  }
+
+  // Sets of the first Read the D (before the rewrite): one entry per decision.
+  const OLD_RTD_ACTIONS = ["DRIVE_LEFT", "DRIVE_RIGHT", "PULL_UP", "CREATE_SPACE"];
+  function validateOldDecisions(ds, reps) {
+    const bad = (field, message) => ({ field, message });
+    if (!Array.isArray(ds)) return bad("extra", "A Read the D set needs its reps.");
+    for (const d of ds) {
+      if (!isPlainObject(d) || !Number.isInteger(d.rep) || d.rep < 1 || d.rep > reps || (d.read !== 1 && d.read !== 2) ||
+          !Array.isArray(d.ids) || d.ids.length === 0 || !d.ids.every(id => typeof id === "string") ||
+          !isPlainObject(d.state) || OLD_RTD_ACTIONS.indexOf(d.correct) === -1 ||
+          typeof d.ruleId !== "string" || typeof d.situation !== "string") {
+        return bad("extra", "A Read the D decision is missing what was called or the right answer.");
+      }
+      if (d.actual !== null && OLD_RTD_ACTIONS.concat("FROZE").indexOf(d.actual) === -1) {
+        return bad("decisions", "Pick what you did for rep " + d.rep + ".");
       }
     }
     return null;
@@ -167,13 +193,29 @@ const TrainingLog = (function () {
       ratedSets: 0, cleanSets: 0, cleanShare: null,
       // Move Lab: clean reps over the reps of sets where they were entered.
       cleanReps: 0, cleanRepsOf: 0, cleanRepShare: null,
-      // Read the D: reviewed decisions (OffensePlanner.scoreDecisions over every set's).
-      decisions: 0, decisionsCorrect: 0, decisionPct: null, decisionScore: null,
+      // Read the D: reviewed reads, right / reviewed. New sets count reps (extra.reads),
+      // sets of the first Read the D count decisions (extra.decisions); both are
+      // "share of reads I got right". readsScore: OffensePlanner.scoreReads of the new reps.
+      reads: 0, readsRight: 0, readsPct: null, readsScore: null,
     };
     let errorReps = 0;
-    const allDecisions = [];
+    const newReads = [];
     sets.forEach(set => {
-      if (set.extra && Array.isArray(set.extra.decisions)) allDecisions.push(...set.extra.decisions);
+      if (set.extra && Array.isArray(set.extra.reads)) {
+        set.extra.reads.forEach(r => {
+          if (r.ok === null) return;
+          sum.reads++;
+          if (r.ok) sum.readsRight++;
+        });
+        newReads.push(...set.extra.reads);
+      }
+      if (set.extra && Array.isArray(set.extra.decisions)) {
+        set.extra.decisions.forEach(d => {
+          if (d.actual === null || d.actual === undefined) return;
+          sum.reads++;
+          if (d.actual === d.correct) sum.readsRight++;
+        });
+      }
       sum.reps += set.reps;
       if (set.extra && Number.isInteger(set.extra.cleanReps)) {
         sum.cleanReps += set.extra.cleanReps;
@@ -202,13 +244,8 @@ const TrainingLog = (function () {
     }
     if (sum.ratedSets > 0) sum.cleanShare = sum.cleanSets / sum.ratedSets;
     if (sum.cleanRepsOf > 0) sum.cleanRepShare = sum.cleanReps / sum.cleanRepsOf;
-    if (allDecisions.length) {
-      const score = OffensePlanner.scoreDecisions(allDecisions);
-      sum.decisions = score.total;
-      sum.decisionsCorrect = score.correct;
-      sum.decisionPct = score.accuracy;
-      sum.decisionScore = score;
-    }
+    if (sum.reads > 0) sum.readsPct = sum.readsRight / sum.reads;
+    if (newReads.length) sum.readsScore = OffensePlanner.scoreReads(newReads);
     return sum;
   }
 
@@ -359,7 +396,7 @@ const TrainingLog = (function () {
     });
     if (drive.moveLab !== undefined || drive.readTheD !== undefined || drive.phrases !== undefined) snap.push("drive snapshot has unrelated settings");
     const rtd = snapshotSettings(Object.assign({}, settings, { drill: "readTheD" }));
-    if (!rtd.readTheD || rtd.readTheD.decisionMs !== settings.readTheD.decisionMs || rtd.repsPerSet !== 8 ||
+    if (!rtd.readTheD || rtd.readTheD.endWindowMs !== settings.readTheD.endWindowMs || !rtd.readTheD.waits || rtd.repsPerSet !== 8 ||
         rtd.driveMinMs !== undefined || rtd.moveLab !== undefined) snap.push("read the d snapshot");
     const moveLab = snapshotSettings(Object.assign({}, settings, { drill: "moveLab" }));
     settings.moveLab.getSetMs.CATCH.minMs = 1;
@@ -401,35 +438,57 @@ const TrainingLog = (function () {
     if (summarizeSets([base]).cleanRepShare !== null) mlf.push("clean share without Move Lab sets");
     check("log: Move Lab sets need picked moves (or an old move + side) and clean reps 0..reps (or null); snapshot and clean-rep totals", mlf);
 
-    // Read the D sets: decisions validated, totalled, compared and drawn as the third trend line.
+    // Read the D sets: the reps since the rewrite (extra.reads) and the decisions of the
+    // first Read the D (extra.decisions) both validate.
     const rf = [];
+    const read = (rep, ok, missedCall) => ({ rep, chain: ["D_GO", "D_TIGHT", "D_LEFT_FOOT", "D_LANE_OPEN", "D_LAY_LEFT"],
+      terminal: "D_LAY_LEFT", driveSide: "left", ok, missedCall: missedCall === undefined ? null : missedCall });
     const dec = (rep, correct, actual) => ({ rep, read: 1, ids: ["D_SET", "D_SAG", "D_LEFT_FOOT"],
       state: { momentum: "set", distance: "sag", leadFoot: "left" }, correct, ruleId: "gaveShot", situation: "sagging defender", actual });
-    const rtdSet = (decisions, changes) => withSet(Object.assign({ drill: "readTheD", reps: 4, made: 3, attempted: 4, extra: { decisions } }, changes));
-    const good = rtdSet([dec(1, "PULL_UP", "PULL_UP"), dec(2, "PULL_UP", "DRIVE_LEFT"), dec(3, "PULL_UP", "FROZE"),
+    const newSet = (reads, changes) => withSet(Object.assign({ drill: "readTheD", reps: 4, made: 3, attempted: 4, extra: { reads } }, changes));
+    const oldSet = (decisions, changes) => withSet(Object.assign({ drill: "readTheD", reps: 4, made: 3, attempted: 4, extra: { decisions } }, changes));
+    const skip = { made: null, attempted: null, lostHandles: null, missedCalls: null, quality: null };
+    const goodNew = newSet([read(1, true), read(2, false, "D_LANE_OPEN"), read(3, false), read(4, true)]);
+    const goodOld = oldSet([dec(1, "PULL_UP", "PULL_UP"), dec(2, "PULL_UP", "DRIVE_LEFT"), dec(3, "PULL_UP", "FROZE"),
       dec(4, "PULL_UP", "PULL_UP"), Object.assign(dec(4, "DRIVE_LEFT", "DRIVE_LEFT"), { read: 2 })]);
-    [["reviewed", good], ["skipped (not reviewed)", rtdSet([dec(1, "PULL_UP", null)], { made: null, attempted: null, lostHandles: null, missedCalls: null, quality: null })],
-     ["no decisions", rtdSet([])]].forEach(c => { const e = validateSet(c[1]); if (e) rf.push(c[0] + ": " + e.message); });
-    [["no decisions list", rtdSet(undefined)], ["rep 5 of 4", rtdSet([dec(5, "PULL_UP", "PULL_UP")])],
-     ["read 3", rtdSet([Object.assign(dec(1, "PULL_UP", "PULL_UP"), { read: 3 })])], ["unknown action", rtdSet([dec(1, "PULL_UP", "PASS")])],
-     ["unknown correct", rtdSet([dec(1, "SHOOT", "PULL_UP")])], ["no ids", rtdSet([Object.assign(dec(1, "PULL_UP", "PULL_UP"), { ids: [] })])],
-     ["no situation", rtdSet([Object.assign(dec(1, "PULL_UP", "PULL_UP"), { situation: undefined })])]].forEach(c => {
+    [["new: reviewed", goodNew], ["new: not reviewed", newSet([read(1, null), read(2, null)], skip)], ["new: no reps", newSet([])],
+     ["new: silent shot", newSet([Object.assign(read(1, true), { chain: ["D_GO", "D_SAG"], terminal: "SHOT", driveSide: null })])],
+     ["old: reviewed", goodOld], ["old: skipped", oldSet([dec(1, "PULL_UP", null)], skip)], ["old: empty", oldSet([])]].forEach(c => {
+      const e = validateSet(c[1]);
+      if (e) rf.push(c[0] + ": " + e.message);
+    });
+    [["new: rep 5 of 4", newSet([read(5, true)])], ["new: empty chain", newSet([Object.assign(read(1, true), { chain: [] })])],
+     ["new: no terminal", newSet([Object.assign(read(1, true), { terminal: undefined })])],
+     ["new: bad drive side", newSet([Object.assign(read(1, true), { driveSide: "middle" })])],
+     ["new: ok as text", newSet([read(1, "yes")])], ["new: missed call not in the chain", newSet([read(1, false, "D_HANDS_UP")])],
+     ["new: missed call on a right read", newSet([read(1, true, "D_TIGHT")])], ["new: reads not a list", newSet("D_GO")],
+     ["neither shape", withSet({ drill: "readTheD", reps: 4, extra: {} })],
+     ["old: unknown action", oldSet([dec(1, "PULL_UP", "PASS")])], ["old: rep 5 of 4", oldSet([dec(5, "PULL_UP", "PULL_UP")])],
+     ["old: no situation", oldSet([Object.assign(dec(1, "PULL_UP", "PULL_UP"), { situation: undefined })])]].forEach(c => {
       if (!validateSet(c[1])) rf.push("accepted " + c[0]);
     });
-    const rs = summarizeSets([good, withSet({})]);
-    if (rs.decisions !== 5 || rs.decisionsCorrect !== 3 || !near(rs.decisionPct, 0.6) || rs.decisionScore.topConfusion.count !== 1) rf.push("totals");
-    if (summarizeSets([base]).decisionPct !== null) rf.push("decisionPct without Read the D sets");
-    const rlog = { version: 1, sessions: [
-      { id: "r1", startedAt: "2026-05-01T10:00:00.000Z", sets: [rtdSet([dec(1, "PULL_UP", "PULL_UP"), dec(2, "PULL_UP", "FROZE")])] },
-      { id: "r2", startedAt: "2026-05-02T10:00:00.000Z", sets: [good] },
+    check("log: Read the D sets validate in both shapes: reps since the rewrite (extra.reads) and old decisions (extra.decisions)", rf);
+
+    // A log holding both shapes: one combined reads-right figure, comparison and trend.
+    const bf = [];
+    const both = summarizeSets([goodNew, goodOld, withSet({})]);
+    // New: 2 of 4 right; old: 3 of 5 right.
+    if (both.reads !== 9 || both.readsRight !== 5 || !near(both.readsPct, 5 / 9)) bf.push("totals " + both.readsRight + "/" + both.reads);
+    if (!both.readsScore || both.readsScore.mostMissed !== "D_LANE_OPEN") bf.push("most missed");
+    if (summarizeSets([base]).readsPct !== null || summarizeSets([newSet([read(1, null)])]).readsPct !== null) bf.push("readsPct without reviewed reads");
+    const blog = { version: 1, sessions: [
+      { id: "r1", startedAt: "2026-05-01T10:00:00.000Z", sets: [oldSet([dec(1, "PULL_UP", "PULL_UP"), dec(2, "PULL_UP", "FROZE")])] },
+      { id: "r2", startedAt: "2026-05-02T10:00:00.000Z", sets: [goodNew] },
     ] };
-    const rcmp = compareWithPrevious(rlog, rlog.sessions[1], "readTheD", 5);
-    if (comparisonText(rcmp) !== "Decisions 60% right (avg 50). Make % 75 (avg 75). Lost handles 2.5 per 10 reps (avg 2.5)") rf.push("compare: " + comparisonText(rcmp));
-    const rseries = trendSeries(rlog, "readTheD", 20);
-    const rgeo = trendGeometry(rseries, { width: 320, height: 180, left: 40, right: 40, top: 10, bottom: 30 });
-    if (rseries.map(p => p.decisionPct).join() !== "0.5,0.6" || rgeo.decision.length !== 2 || rgeo.decision[0].y !== 10 + 140 * 0.5) rf.push("trend");
-    if (trendGeometry([{ makePct: 0.5, lostPer10: 1, decisionPct: null }], { width: 320, height: 180, left: 40, right: 40, top: 10, bottom: 30 }).decision.length !== 0) rf.push("trend without decisions");
-    check("log: Read the D sets keep their decisions; accuracy totals, comparison text and the decision trend line", rf);
+    const parsed = parseLog(JSON.stringify(blog));
+    if (parsed.status !== "ok" || !parsed.log.sessions.every(sess => sess.sets.every(st => validateSet(st) === null))) bf.push("log does not load");
+    const bcmp = compareWithPrevious(blog, blog.sessions[1], "readTheD", 5);
+    if (comparisonText(bcmp) !== "Reads 50% right (avg 50). Make % 75 (avg 75). Lost handles 2.5 per 10 reps (avg 2.5)") bf.push("compare: " + comparisonText(bcmp));
+    const bseries = trendSeries(blog, "readTheD", 20);
+    const bgeo = trendGeometry(bseries, { width: 320, height: 180, left: 40, right: 40, top: 10, bottom: 30 });
+    if (bseries.map(p => p.readsPct).join() !== "0.5,0.5" || bgeo.reads.length !== 2 || bgeo.reads[0].y !== 10 + 140 * 0.5) bf.push("trend");
+    if (trendGeometry([{ makePct: 0.5, lostPer10: 1, readsPct: null }], { width: 320, height: 180, left: 40, right: 40, top: 10, bottom: 30 }).reads.length !== 0) bf.push("trend without reads");
+    check("log: a log with old and new Read the D sets loads, and gives one reads-right total, comparison and trend line", bf);
 
     const up = [];
     const log0 = emptyLog();

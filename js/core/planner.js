@@ -301,11 +301,8 @@ const OffensePlanner = (function () {
       if (!Array.isArray(plan.cues) || !Array.isArray(plan.windows) || plan.cues.length !== plan.windows.length) p.push("cues vs windows");
       else plan.cues.forEach((c, i) => {
         if (c.atMs !== plan.windows[i].startMs || c.durMs !== plan.windows[i].durMs) p.push("cue " + i + " is not its window");
-        // Two cue shapes: a Read the D decision ({ state, ids, correct }) or a
-        // Read the D machine window ({ chain, terminal, driveSide }).
-        const machine = Array.isArray(c.chain);
-        if (machine ? c.chain.length === 0 || typeof c.terminal !== "string"
-          : api.RTD_ACTIONS.indexOf(c.correct) === -1 || !Array.isArray(c.ids) || !c.state) p.push("cue " + i + " fields");
+        // Read the D: { chain: every call in order, terminal: the last call or "SHOT", driveSide }.
+        if (!Array.isArray(c.chain) || c.chain.length === 0 || typeof c.terminal !== "string") p.push("cue " + i + " fields");
       });
     }
     return p;
@@ -321,8 +318,6 @@ const OffensePlanner = (function () {
       const levels = LEVEL_DRILLS.indexOf(id) === -1 ? [null] : [1, 2, 3, 4, 5];
       levels.forEach(level => {
         const ls = level === null ? s : api.applyLevel(s, id, level, TRAINING_DEFAULTS);
-        // Read the D: odd levels in practice mode.
-        if (id === "readTheD") ls.readTheD.practice = level % 2;
         for (let n = 0; n < Math.min(reps, 1000); n++) {
           const plan = PROFILES[id].planRep(ls, dur, Math.random, null, ctx);
           if (plan.cues) ctx.lastState = plan.cues[0].state;

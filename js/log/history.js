@@ -38,22 +38,22 @@
     return {
       drill,
       count: prev.length,
-      today: { makePct: today.makePct, lostPer10: today.lostPer10, decisionPct: today.decisionPct },
+      today: { makePct: today.makePct, lostPer10: today.lostPer10, readsPct: today.readsPct },
       avg: {
         makePct: mean(prev.map(p => p.makePct)), lostPer10: mean(prev.map(p => p.lostPer10)),
-        decisionPct: mean(prev.map(p => p.decisionPct)),
+        readsPct: mean(prev.map(p => p.readsPct)),
       },
     };
   }
 
   // "Make % 62 (avg 55). Lost handles 1.2 per 10 reps (avg 2.0)", led by
-  // "Decisions 85% right (avg 78)" when decisions were reviewed (Read the D).
+  // "Reads 85% right (avg 78)" when Read the D reads were reviewed.
   function comparisonText(cmp) {
     const pct = x => String(Math.round(x * 100));
     const parts = [];
-    if (cmp.today.decisionPct !== null && cmp.today.decisionPct !== undefined) {
-      parts.push("Decisions " + pct(cmp.today.decisionPct) + "% right" +
-        (cmp.avg.decisionPct !== null && cmp.avg.decisionPct !== undefined ? " (avg " + pct(cmp.avg.decisionPct) + ")" : ""));
+    if (cmp.today.readsPct !== null && cmp.today.readsPct !== undefined) {
+      parts.push("Reads " + pct(cmp.today.readsPct) + "% right" +
+        (cmp.avg.readsPct !== null && cmp.avg.readsPct !== undefined ? " (avg " + pct(cmp.avg.readsPct) + ")" : ""));
     }
     if (cmp.today.makePct !== null) {
       parts.push("Make % " + pct(cmp.today.makePct) + (cmp.avg.makePct !== null ? " (avg " + pct(cmp.avg.makePct) + ")" : ""));
@@ -68,16 +68,16 @@
   }
 
   // The last n sessions of a drill, oldest first:
-  // [{ id, startedAt, makePct, lostPer10, decisionPct }] (decisionPct null unless decisions were reviewed).
+  // [{ id, startedAt, makePct, lostPer10, readsPct }] (readsPct null unless Read the D reads were reviewed).
   function trendSeries(log, drill, n) {
     return sessionsWithDrill(log, drill).slice(-n).map(s => {
       const sum = summarizeSets(setsOfDrill(s, drill));
-      return { id: s.id, startedAt: s.startedAt, makePct: sum.makePct, lostPer10: sum.lostPer10, decisionPct: sum.decisionPct };
+      return { id: s.id, startedAt: s.startedAt, makePct: sum.makePct, lostPer10: sum.lostPer10, readsPct: sum.readsPct };
     });
   }
 
   // Chart geometry for a trend in box { width, height, left, right, top, bottom }
-  // (the last four are padding). Make % and decision accuracy run 0..1 on the
+  // (the last four are padding). Make % and reads right run 0..1 on the
   // left axis, lost handles per 10 reps 0..lostMax on the right; points with no
   // value are left out.
   function trendGeometry(series, box) {
@@ -89,15 +89,15 @@
     const lostMax = Math.max(2, Math.ceil(maxLost));
     const make = [];
     const lost = [];
-    const decision = [];
+    const reads = [];
     series.forEach((p, i) => {
       if (p.makePct !== null) make.push({ x: x(i), y: box.top + plotH * (1 - p.makePct), value: p.makePct });
       if (p.lostPer10 !== null) lost.push({ x: x(i), y: box.top + plotH * (1 - p.lostPer10 / lostMax), value: p.lostPer10 });
-      if (p.decisionPct !== null && p.decisionPct !== undefined) {
-        decision.push({ x: x(i), y: box.top + plotH * (1 - p.decisionPct), value: p.decisionPct });
+      if (p.readsPct !== null && p.readsPct !== undefined) {
+        reads.push({ x: x(i), y: box.top + plotH * (1 - p.readsPct), value: p.readsPct });
       }
     });
-    return { make, lost, decision, lostMax, plot: { x0: box.left, x1: box.left + plotW, y0: box.top, y1: box.top + plotH } };
+    return { make, lost, reads, lostMax, plot: { x0: box.left, x1: box.left + plotW, y0: box.top, y1: box.top + plotH } };
   }
 
   // A new log without the session with this id.
