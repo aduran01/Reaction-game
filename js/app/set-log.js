@@ -14,8 +14,8 @@ const restLevel = document.getElementById("restLevel");
 const logCleanRow = document.getElementById("logCleanRow");
 const logClean = document.getElementById("logClean");
 const logReview = document.getElementById("logReview");
-const restDecision = document.getElementById("restDecision");
-const restConfusion = document.getElementById("restConfusion");
+const restReads = document.getElementById("restReads");
+const restMissed = document.getElementById("restMissed");
 
 // ---- Set log ----
 
@@ -39,7 +39,7 @@ function openSetLog(partial) {
   const moveLab = s.drill === "moveLab";
   const readTheD = s.drill === "readTheD";
   // Only finished reps are reviewed (the rep in progress at Stop doesn't count).
-  const decisions = readTheD ? decisionsOf(offenseMode.repCues.slice(0, reps)) : [];
+  const reads = readTheD ? readsOf(offenseMode.repCues.slice(0, reps)) : [];
   pendingSet = {
     drill: s.drill,
     level: s.level,
@@ -48,9 +48,9 @@ function openSetLog(partial) {
     endedAt: new Date().toISOString(),
     settingsSnapshot: TrainingLog.snapshotSettings(s),
     extra: moveLab ? { moveIds: s.moveLab.moveIds.slice(), cleanReps: null }
-      : readTheD ? { decisions: decisions.map(d => Object.assign({}, d, { actual: null })) } : {},
+      : readTheD ? { reads: reads.map(r => Object.assign({}, r, { ok: null, missedCall: null })) } : {},
   };
-  reviewItems = decisions.map(decision => ({ decision, wrong: false, choice: null }));
+  reviewItems = reads.map(read => ({ read, wrong: false, missedCall: null }));
   logReview.classList.toggle("hidden", !readTheD);
   renderReview();
   logDrill.textContent = DRILLS[s.drill].label;
@@ -87,11 +87,7 @@ function readLoggedSet() {
     note: note === "" ? null : note,
   });
   if (set.drill === "moveLab") set.extra = Object.assign({}, set.extra, { cleanReps: parseNumber(logClean.value) });
-  if (set.drill === "readTheD") {
-    const decisions = reviewedDecisions();
-    if (!decisions) return null;
-    set.extra = Object.assign({}, set.extra, { decisions });
-  }
+  if (set.drill === "readTheD") set.extra = Object.assign({}, set.extra, { reads: reviewedReads() });
   return set;
 }
 
@@ -117,7 +113,6 @@ function saveTrainingLog(log) {
 // Validate, add the set to the session and save the whole log right away, so
 // nothing is lost if the tab closes. Returns false (and shows why) if invalid.
 function commitSet(set) {
-  if (!set) return false;  // the reason is already shown (e.g. a review pick missing)
   const error = TrainingLog.validateSet(set);
   if (error) {
     logError.textContent = error.message;
@@ -127,8 +122,8 @@ function commitSet(set) {
   session.endedAt = set.endedAt;
   persistSession();
   pendingSet = null;
-  lastDecisionLines = set.drill === "readTheD"
-    ? P.decisionFeedback(P.scoreDecisions(set.extra.decisions), RTD_RULES) : null;
+  lastReadLines = set.drill === "readTheD"
+    ? P.readsFeedback(P.scoreReads(set.extra.reads), OFFENSE_DEFAULTS.phrases, READS) : null;
   adjustLevel(set);
   return true;
 }
@@ -140,7 +135,7 @@ function percent(x) {
 function sessionSummaryText() {
   const sum = TrainingLog.summarizeSession(session);
   const parts = [sum.sets + (sum.sets === 1 ? " set" : " sets")];
-  if (sum.decisionPct !== null) parts.push(sum.decisionsCorrect + "/" + sum.decisions + " decisions right");
+  if (sum.readsPct !== null) parts.push(sum.readsRight + "/" + sum.reads + " reads right");
   if (sum.makePct !== null) parts.push(sum.made + "/" + sum.attempted + " made (" + percent(sum.makePct) + ")");
   if (sum.errorsPerRep !== null) parts.push(sum.errorsPerRep.toFixed(2) + " errors per rep");
   if (sum.cleanShare !== null) parts.push(sum.cleanSets + " of " + sum.ratedSets + " rated sets clean");
@@ -153,12 +148,12 @@ function showRest() {
   const endsAt = performance.now() + restMs;
   restSummary.textContent = sessionSummaryText();
   restSaved.textContent = lastSaveOk ? "Set saved." : "Couldn't save to this device. Storage may be blocked or full.";
-  // Read the D: one line for accuracy, one for the most common miss and its rule.
-  const lines = lastDecisionLines || [null, null];
-  restDecision.textContent = lines[0] || "";
-  restDecision.classList.toggle("hidden", !lines[0]);
-  restConfusion.textContent = lines[1] || "";
-  restConfusion.classList.toggle("hidden", !lines[1]);
+  // Read the D: one line for reads right, one for the most-missed call and its read.
+  const lines = lastReadLines || [null, null];
+  restReads.textContent = lines[0] || "";
+  restReads.classList.toggle("hidden", !lines[0]);
+  restMissed.textContent = lines[1] || "";
+  restMissed.classList.toggle("hidden", !lines[1]);
   restLevel.textContent = lastLevelMessage || "";
   restLevel.classList.toggle("hidden", !lastLevelMessage);
   nextSetBtn.classList.add("hidden");

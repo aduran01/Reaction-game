@@ -392,10 +392,10 @@
       <h1 id="logTitle">Set 1 · 8 reps</h1>
     </div>
     <div class="panel log-panel">
-      <!-- Read the D: one row per decision, ✓ by default; tap a rep you got wrong. -->
+      <!-- Read the D: one row per finished rep, ✓ by default; tap a rep you misread. -->
       <div class="review hidden" id="logReview">
         <div class="review-head">
-          <p class="panel-title">Decisions <span class="title-hint">tap the ones you got wrong</span></p>
+          <p class="panel-title">Reads <span class="title-hint">tap a rep you misread</span></p>
           <button type="button" class="small-btn" id="reviewAllBtn">All correct</button>
         </div>
         <div class="review-list" id="reviewList"></div>
@@ -471,8 +471,8 @@
     <div class="rest-count" id="restCount">01:00</div>
     <p class="subtitle" id="restSummary"></p>
     <p class="subtitle" id="restSaved"></p>
-    <p class="level-line hidden" id="restDecision"></p>
-    <p class="subtitle hidden" id="restConfusion"></p>
+    <p class="level-line hidden" id="restReads"></p>
+    <p class="subtitle hidden" id="restMissed"></p>
     <p class="level-line hidden" id="restLevel"></p>
     <button id="nextSetBtn" class="hidden">Next set</button>
     <button id="endSessionBtn">End session</button>

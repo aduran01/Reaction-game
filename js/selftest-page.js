@@ -25,19 +25,10 @@
       String(r.minWindowMs).padStart(5) + " ms  fits: " + r.fitsAtDriveMax);
   });
 
-  console.table(result.fitTables.readTheD);
-  lines.push("\nRead the D per level: longest cue sequence (first cue to the end of NOW) at the cue rate, max rate " + s.maxRate);
-  result.fitTables.readTheD.forEach(r => {
-    lines.push("Level " + r.level + "  rate " + r.rate.toFixed(2) + "  gap " + String(r.cueGapMs).padStart(3) + " ms  " +
-      r.sequence.padEnd(50) + String(r.sequenceMs).padStart(5) + " ms  window " + r.decisionMs + " ms  fits: " + r.fits);
-  });
-
-  // Read the D rewrite (state machine, not wired in yet): how long its reps run.
-  const P = OffensePlanner;
-  const ms = P.cloneSettings(s);
-  const lengths = P.readTheDMachineLengthTable(ms, P.durationsFor(ms, null), 10000);
+  // Read the D: how long reps run (the drill's self-test returns this table).
+  const lengths = result.fitTables.readTheD;
   console.table(lengths);
-  lines.push("\nRead the D machine (in progress): rep length from GO to the end of the window, 10000 reps");
+  lines.push("\nRead the D: rep length from GO to the end of the window, by first read (" + lengths[lengths.length - 1].reps + " reps)");
   lengths.forEach(r => {
     lines.push(r.entry.padEnd(12) + String(r.reps).padStart(6) + " reps  avg " + String(r.avgMs).padStart(5) + " ms  longest " +
       String(r.maxMs).padStart(5) + " ms  calls avg " + r.avgCalls + ", max " + r.maxCalls);

@@ -632,8 +632,8 @@ input, textarea {
 .chart .dot-lost { fill: #ff7a4f; }
 .chart .title-make { fill: var(--accent); font-weight: 700; }
 .chart .title-lost { fill: #ff7a4f; font-weight: 700; }
-.chart .line-decision { fill: none; stroke: #4fd87c; stroke-width: 2.5; stroke-dasharray: 1 4; stroke-linecap: round; }
-.chart .dot-decision { fill: #4fd87c; }
+.chart .line-reads { fill: none; stroke: #4fd87c; stroke-width: 2.5; stroke-dasharray: 1 4; stroke-linecap: round; }
+.chart .dot-reads { fill: #4fd87c; }
 
 .legend {
   display: flex;

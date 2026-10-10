@@ -34,8 +34,8 @@ function drillCard(drill, sum, sess) {
       : sum.cleanReps + "/" + sum.cleanRepsOf + " · " + pctText(sum.cleanRepShare)]);
   }
   if (drill === "readTheD") {
-    rows.splice(2, 0, ["Decisions right", sum.decisionPct === null ? "–"
-      : sum.decisionsCorrect + "/" + sum.decisions + " · " + pctText(sum.decisionPct)]);
+    rows.splice(2, 0, ["Reads right", sum.readsPct === null ? "–"
+      : sum.readsRight + "/" + sum.reads + " · " + pctText(sum.readsPct)]);
   }
   rows.forEach(row => {
     const cell = el("div");
@@ -43,13 +43,12 @@ function drillCard(drill, sum, sess) {
     grid.appendChild(cell);
   });
   card.appendChild(grid);
-  // Read the D: right decisions per correct action, and the most common miss.
-  const score = sum.decisionScore;
+  // Read the D: the most-missed call of the reviewed reps.
+  const score = sum.readsScore;
   if (drill === "readTheD" && score && score.total > 0) {
-    card.appendChild(el("p", "compare-line", P.RTD_ACTIONS.filter(a => score.byAction[a].total > 0)
-      .map(a => REVIEW_LABELS[a] + " " + score.byAction[a].correct + "/" + score.byAction[a].total).join(" · ")));
-    card.appendChild(el("p", "compare-line", score.topConfusion
-      ? "Most common miss: " + P.confusionText(score.topConfusion) : "No misses."));
+    card.appendChild(el("p", "compare-line", score.mostMissed
+      ? "Most missed: " + OFFENSE_DEFAULTS.phrases[score.mostMissed].display + " (" + score.mostMissedCount + "×)"
+      : score.right === score.total ? "No misreads." : "No misread call picked."));
   }
   const cmp = TrainingLog.compareWithPrevious(trainingLog.log, sess, drill, P.TRAINING_DEFAULTS.compareSessions);
   card.appendChild(el("p", "compare-line", TrainingLog.comparisonText(cmp)));

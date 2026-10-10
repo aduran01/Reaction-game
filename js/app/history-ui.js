@@ -31,14 +31,14 @@ function svg(tag, attrs, text) {
 }
 
 // Make % (solid, left axis), lost handles per 10 reps (dashed, right axis) and,
-// for Read the D, decisions right (dotted green, left axis).
+// for Read the D, reads right (dotted green, left axis).
 function trendChart(series) {
   const box = { width: 320, height: 200, left: 38, right: 34, top: 24, bottom: 40 };
   const g = TrainingLog.trendGeometry(series, box);
   const p = g.plot;
   const root = svg("svg", {
     viewBox: "0 0 " + box.width + " " + box.height, role: "img",
-    "aria-label": "Make percent" + (g.decision.length ? ", decisions right" : "") +
+    "aria-label": "Make percent" + (g.reads.length ? ", reads right" : "") +
       " and lost handles per 10 reps over the last " + series.length + " sessions",
   });
   [0, 0.5, 1].forEach(f => {
@@ -59,8 +59,8 @@ function trendChart(series) {
   const pts = list => list.map(q => q.x.toFixed(1) + "," + q.y.toFixed(1)).join(" ");
   if (g.make.length > 1) root.appendChild(svg("polyline", { class: "line-make", points: pts(g.make) }));
   if (g.lost.length > 1) root.appendChild(svg("polyline", { class: "line-lost", points: pts(g.lost) }));
-  if (g.decision.length > 1) root.appendChild(svg("polyline", { class: "line-decision", points: pts(g.decision) }));
-  g.decision.forEach(q => root.appendChild(svg("circle", { class: "dot-decision", cx: q.x, cy: q.y, r: 3 })));
+  if (g.reads.length > 1) root.appendChild(svg("polyline", { class: "line-reads", points: pts(g.reads) }));
+  g.reads.forEach(q => root.appendChild(svg("circle", { class: "dot-reads", cx: q.x, cy: q.y, r: 3 })));
   g.make.forEach(q => root.appendChild(svg("circle", { class: "dot-make", cx: q.x, cy: q.y, r: 3 })));
   g.lost.forEach(q => root.appendChild(svg("circle", { class: "dot-lost", cx: q.x, cy: q.y, r: 3 })));
   return root;
@@ -83,7 +83,7 @@ function renderTrends() {
     chart.appendChild(trendChart(series));
     const legend = el("p", "legend");
     const items = [["#4f8cff", "Make % (left)"], ["#ff7a4f", "Lost handles per 10 reps (right, dashed)"]];
-    if (series.some(pt => pt.decisionPct !== null)) items.push(["#4fd87c", "Decisions right % (left, dotted)"]);
+    if (series.some(pt => pt.readsPct !== null)) items.push(["#4fd87c", "Reads right % (left, dotted)"]);
     items.forEach(item => {
       const span = el("span");
       const sw = el("span", "swatch");
@@ -107,8 +107,9 @@ function setLine(set, i) {
   parts.push(set.reps + (set.reps === 1 ? " rep" : " reps"));
   if (set.drill === "moveLab" && set.extra.cleanReps !== null) parts.push(set.extra.cleanReps + "/" + set.reps + " clean");
   if (set.drill === "readTheD") {
-    const score = P.scoreDecisions(set.extra.decisions);
-    parts.push(score.total ? score.correct + "/" + score.total + " decisions right" : "decisions not reviewed");
+    // Reps since the rewrite, or decisions of the first Read the D: both count reads right.
+    const sum = TrainingLog.summarizeSets([set]);
+    parts.push(sum.reads ? sum.readsRight + "/" + sum.reads + " reads right" : "reads not reviewed");
   }
   if (set.made === null) parts.push("not logged");
   else parts.push(set.made + "/" + set.attempted + " made");
