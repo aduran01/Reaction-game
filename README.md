@@ -220,7 +220,28 @@ The cue calls are spoken at the level's cue speech rate with the level's gap bet
 
 The on / off settings are toggle buttons (48 px tall) backed by hidden 0 / 1 inputs, so they are saved, validated and level-locked like any other field.
 
-The game screen shows **OFFENSE · READ THE D**, the set, rep and level, and the session clock. A set is logged with the normal set log form.
+The game screen shows **OFFENSE · READ THE D**, the set, rep and level, and the session clock.
+
+**Decision review.** The app knows every state it called and the right answer for it, so you only have to say which reps you got wrong, after the set. The set log form for Read the D starts with a **Decisions** list, above the shot counts: one row per decision of the set's finished reps, e.g.
+
+> **Rep 3** CLOSING · TIGHT · LEFT FOOT
+> DRIVE LEFT — attack the closeout past his front foot
+> **✓ I did that**
+
+Every row starts at ✓. Tap it (52 px button) to flip it to **✗ I did something else** and pick what you actually did: **Drive L**, **Drive R**, **Pull up**, **Create space** or **Froze** (52 px buttons, three per row). Picking the right action there counts as right. Tap ✗ again to set the row back to ✓, or **All correct** to reset every row. A flipped row without a pick stops the save ("Pick what you did for rep 3, or tap ✗ to set it back to ✓."). The rest of the form (shots made / attempted, lost handles, missed calls, rating, note) is as for every drill; **Skip logging** saves the decisions as not reviewed.
+
+**Scoring** (pure, in `OffensePlanner`): `scoreDecisions(decisions)` gives the decision accuracy (right / reviewed), the right count per correct action, and the **most common miss**: the same situation with the same kind of wrong action (e.g. "sagging defender → you drove anyway", "closing defender → you drove the wrong way", "… → you froze"); ties go to the one that happened first.
+
+**Rest screen.** After a reviewed set, one line for accuracy and one for the most common miss with its rule, phrased about the defender and the shot:
+
+> **7/8 correct.**
+> Missed: sagging defender → pull up, he gave you the shot.
+
+With no misses only the first line shows.
+
+**Summary and History.** The session card adds **Decisions right** (e.g. 22/26 · 85%), the per-action line (e.g. "Drive L 5/6 · Drive R 6/6 · Pull up 7/9 · Create space 4/5") and "Most common miss: …"; the comparison line starts with "Decisions 85% right (avg 78)". The trend chart adds a third line, **decisions right %** (dotted green, left axis), and each History set line shows "x/y decisions right".
+
+**Auto difficulty** for Read the D uses decision accuracy and shot success (see [adaptive difficulty](#offense-adaptive-difficulty)).
 
 ### Offense: Move Lab drill
 
@@ -311,7 +332,7 @@ Buttons:
 |--------|--------------|
 | **Save & rest** | Saves the set and shows the rest countdown (**Rest between sets**, default 60 s), the level line when Auto difficulty is on (e.g. "Level 3 → 4: nice, timing gets tighter"), and a summary of the session so far, e.g. "This session: 3 sets · 14/24 made (58%) · 0.21 errors per rep · 2 of 3 rated sets clean". When it reaches 00:00 a big **Next set** button appears. **End session** is available throughout |
 | **Save & end session** | Saves the set, ends the session and shows the [session summary](#offense-session-summary) |
-| **Skip logging** | Saves the set with every outcome field (made, attempted, lost handles, missed calls, rating, note) empty (`null`), then rests like Save & rest |
+| **Skip logging** | Saves the set with every outcome field (made, attempted, lost handles, missed calls, rating, note) empty (`null`), and Read the D decisions as not reviewed, then rests like Save & rest |
 | **Discard** | Only after Stop mid-set: drops the partial set without saving it and ends the session |
 
 If a value is invalid (e.g. you typed made 9 with attempted 8, or left a field empty), the reason shows above the buttons and nothing is saved until you fix it.
@@ -326,7 +347,7 @@ When a session that has at least one saved set ends (**End session**, **Save & e
 
 - the **session length** (from Start to the end, mm:ss);
 - a card **per drill** played, with: sets, reps, made / attempted and make %, lost handles per 10 reps, missed calls per 10 reps, and the share of rated sets marked Clean. Values that weren't logged show "–" (skipped sets don't count toward the rates);
-- one plain-language line comparing today with the **mean of your previous 5 sessions of the same drill** (each earlier session's own rate, averaged), e.g. "Make % 62 (avg 55). Lost handles 1.2 per 10 reps (avg 2.0)". With no earlier sessions of that drill it adds "No earlier sessions to compare with yet". With fewer than 5 earlier sessions it averages those it has.
+- one plain-language line comparing today with the **mean of your previous 5 sessions of the same drill** (each earlier session's own rate, averaged), e.g. "Make % 62 (avg 55). Lost handles 1.2 per 10 reps (avg 2.0)" (Read the D starts with "Decisions 85% right (avg 78)"). With no earlier sessions of that drill it adds "No earlier sessions to compare with yet". With fewer than 5 earlier sessions it averages those it has.
 
 **Done** returns to the start screen. A session with no saved sets goes straight back to the start screen.
 
@@ -334,7 +355,7 @@ When a session that has at least one saved set ends (**End session**, **Save & e
 
 Tap **History** on the start screen.
 
-**Trends.** For each drill, a small chart of the last 20 sessions of that drill (oldest on the left). The solid blue line is **make %** (left axis, 0–100%), the dashed orange line is **lost handles per 10 reps** (right axis, 0 up to the highest value rounded up, at least 2). The first and last session dates are under the x-axis. With fewer than 3 sessions of a drill it shows "Not enough data".
+**Trends.** For each drill, a small chart of the last 20 sessions of that drill (oldest on the left). The solid blue line is **make %** (left axis, 0–100%), the dashed orange line is **lost handles per 10 reps** (right axis, 0 up to the highest value rounded up, at least 2), and for Read the D a dotted green line is **decisions right %** (left axis). The first and last session dates are under the x-axis. With fewer than 3 sessions of a drill it shows "Not enough data".
 
 **Sessions.** Every saved session, newest first: date and time, drills, sets, make % and errors (lost handles + missed calls) per 10 reps. Tap one to see its sets (drill, reps, made / attempted, lost, missed, rating, note). **Delete session** asks for confirmation first ("Delete" / "Cancel"), then removes it from the log for good.
 
@@ -404,6 +425,13 @@ Every level passes the drill's normal validation, including the shortest-drive a
 - Otherwise **hold**. The level always stays within 1–5.
 
 **These thresholds, the level values and the starting level are starting heuristics to tune, not research-proven values.** The challenge-point idea says to keep practice hard but doable; it doesn't say that 80% or 0.10 errors per rep is the right line for this drill. They are all marked `// provisional` in `TRAINING_DEFAULTS` (`startLevel`, `levelMinAttempts`, `levelUpSuccess`, `levelUpMaxErrorRate`, `levelDownSuccess`, `levelDownErrorRate`, `levels`). Watch your History trends and adjust them.
+
+**Read the D's rule** (`readTheDLevelDecision`; `levelDecisionFor(drill, …)` picks the right rule per drill) uses decision accuracy as well as shots:
+
+- A set only counts if its outcomes **and** its decisions were logged (not skipped), with at least 5 shots attempted and at least 5 decisions.
+- **Step down** one level if decision accuracy < **0.65** or error rate ≥ **0.30**. This is checked first, so a set with too many errors never steps up.
+- **Step up** one level if decision accuracy ≥ **0.85** and success (made / attempted) ≥ **0.60**.
+- Otherwise hold. All four thresholds are `// provisional` (`readTheDLevelUpAccuracy`, `readTheDLevelUpSuccess`, `readTheDLevelDownAccuracy`, `readTheDLevelDownErrorRate`).
 
 ### Stopping
 
@@ -795,6 +823,21 @@ A session only appears in the log once its first set is saved. Partial sets are 
 - **Drive**: read time (`readMinMs` / `readMaxMs`), drive window, reset pause, finisher buffer, both caps and the three weight tables;
 - **Move Lab**: the whole `moveLab` settings object (picked moves, max moves per rep, gap between moves, weights, reset pause). Sets logged before Shooters only was removed hold the borrowed get-set and nope gap under `shooters` instead, and old Shooters sets hold the whole Shooters settings object; both stay valid.
 
+**Read the D's `extra`** holds the decisions, one per decision of each finished rep (two for a rep with a second read):
+
+```js
+extra: { decisions: [{
+  rep, read,          // rep number in the set (1..reps), 1 or 2 (second read)
+  ids,                // the cue calls in the order spoken, e.g. ["D_CLOSING", "D_TIGHT", "D_LEFT_FOOT"]
+  state,              // { momentum, distance, leadFoot, hands? }
+  correct, ruleId,    // the right action and the rule that decided it
+  situation,          // e.g. "closing defender" (for feedback)
+  actual              // what you did: DRIVE_LEFT | DRIVE_RIGHT | PULL_UP | CREATE_SPACE | FROZE, or null if not reviewed
+}] }
+```
+
+`summarizeSets` adds `decisions`, `decisionsCorrect`, `decisionPct` and `decisionScore` (the full `scoreDecisions` result) over every set's reviewed decisions. The log `version` stays 1: the new fields are additions inside `extra`, which older sets don't have.
+
 **Summaries** (pure helpers in `TrainingLog`):
 
 | Helper | Returns |
@@ -925,7 +968,7 @@ http://localhost:8080/index.html?selftest=1
 
 Use `/index.html?selftest=1`, not `/?selftest=1`. The bundled `server.js` only maps a bare `/` to `index.html`, so `/?selftest=1` returns "Not found".
 
-Instead of the app, the page runs a simulation of every offense planner (every drill profile's self-test) plus checks of the session helpers and the training log, and prints **PASS** / **FAIL** for each check to the console and to an on-page banner (green when everything passes, red otherwise). There are 59 checks in total: 18 Drive, 4 Move Lab, 10 Read the D, 1 Runner, 6 Session, 2 Defaults, 3 Levels, 8 Training log and 7 History.
+Instead of the app, the page runs a simulation of every offense planner (every drill profile's self-test) plus checks of the session helpers and the training log, and prints **PASS** / **FAIL** for each check to the console and to an on-page banner (green when everything passes, red otherwise). There are 62 checks in total: 18 Drive, 4 Move Lab, 10 Read the D, 1 Runner, 6 Session, 2 Defaults, 3 Levels, 2 Read the D scoring, 9 Training log and 7 History.
 
 **Read the D.** It checks:
 
@@ -939,6 +982,11 @@ Instead of the app, the page runs a simulation of every offense planner (every d
 8. sampling: over 40,000 reps (Levels 1 and 3) each correct action's share is within 2 points of its weight;
 9. the same state never comes twice in a row, and every state (18, or 36 with hands) comes up;
 10. practice mode (Levels 1, 3 and 5, 500 reps each): the action phrases and each rule's why phrase exist; after the window, the practice pause, then the correct action, then (at least the min gap later) the deciding rule's why marked as a caption; `endMs` is when the why ends; every plan passes the runner contract.
+
+**Read the D scoring.** Two checks:
+
+1. `scoreDecisions` on 8 decisions with one sagging defender driven anyway: 7/8, the per-action counts, the lines "7/8 correct." and exactly "Missed: sagging defender → pull up, he gave you the shot.", and "sagging defender → you drove anyway"; two closing-defender misses beat one sag miss ("closing defender → you drove the wrong way (2×)"); all right gives no second line; unreviewed decisions give no score;
+2. the level rule: up at 17/20 right with 6/10 made; hold at 84% right, at 59% made, and at exactly 65% right; down at 64% right and at error rate 0.30 (even with every decision right); clamped at 5 and 1; hold with too few shots, unreviewed decisions or a skipped set; Drive still uses its own rule.
 
 **Runner.** One check runs 1,000 rep plans of every drill (Read the D at all five levels, odd levels in practice mode) through `repPlanProblems`: the runner contract described in [Drill profiles and rep plans](#drill-profiles-and-rep-plans).
 
@@ -982,7 +1030,8 @@ Instead of the app, the page runs a simulation of every offense planner (every d
 4. `snapshotSettings` holds the drill's own windows, read or get-set times, weights, caps and speech settings (and nothing from the other drill), as a deep copy that later setting changes don't affect;
 5. `upsertSession` appends a new session, replaces one with the same id, and doesn't change the log it was given;
 6. `parseLog` reads a version 1 log; treats missing or empty text as a new log; and for a newer version (2, 99), a missing or string version, a non-array `sessions`, invalid JSON, `null`, an array, a number or a string returns a new empty log plus the original text to keep, without throwing;
-7. with a fake store: opening a version 2 log doesn't change it; the first save copies it byte-for-byte to `reactionCaller.log.backup.<time>` and then writes the new log; a second save makes no new backup; when the backup can't be written, the broken log is left untouched and the save reports failure; a valid log keeps its sessions across reopen and save.
+7. Read the D sets: reviewed, skipped and empty decision lists pass; a missing list, a rep beyond the set, a third read, unknown actions, no ids or no situation are rejected; totals (3 of 5 right), the comparison text "Decisions 60% right (avg 50). Make % 75 (avg 75). Lost handles 2.5 per 10 reps (avg 2.5)", and the decision trend series and line;
+8. with a fake store: opening a version 2 log doesn't change it; the first save copies it byte-for-byte to `reactionCaller.log.backup.<time>` and then writes the new log; a second save makes no new backup; when the backup can't be written, the broken log is left untouched and the save reports failure; a valid log keeps its sessions across reopen and save.
 
 **History.** It checks the summary, trend, merge and backup helpers in `TrainingLog`:
 
@@ -1163,6 +1212,8 @@ A pure module (an IIFE assigned to `const OffensePlanner`). It contains:
 | `normalizeLevels(stored, t)` | Stored levels → one per levelled drill (`{ drive, readTheD }`), each 1–5 (else `startLevel`) |
 | `levelDecision(level, set, cfg)` / `nextLevel(level, set, cfg)` | The adjustment rule: `{ level, change }` (`up`, `down`, `hold`, `atTop`, `atBottom`, `tooFew`, `skipped`) / just the level |
 | `levelMessage(from, decision, cfg)` | The rest-screen line |
+| `RTD_REVIEW_ACTIONS`, `scoreDecisions(decisions)`, `confusionText(c)`, `decisionFeedback(score, rules)` | Read the D scoring: the review choices (the four actions and FROZE), accuracy / per action / most common miss, its text, and the two rest-screen lines |
+| `readTheDLevelDecision(level, set, cfg)` / `levelDecisionFor(drill, level, set, cfg)` | Read the D's adjustment rule; the rule for any levelled drill |
 | `formatElapsed(ms)` | Session clock text, mm:ss |
 | `sessionWarningDue(elapsedMs, t)` / `sessionWarningText(t)` | When the fatigue banner is due, and its text |
 | `RTD_ORDER`, `RTD_PHRASE`, `RTD_ACTIONS`, `RTD_ACTION_NAMES` | Read the D: the fixed call order, the call for each state value, the four actions and their names |
@@ -1187,7 +1238,7 @@ The same script also defines **`TrainingLog`**, a second pure module (an IIFE as
 | `summarizeSets(sets)` | The same totals for any list of sets, plus `lostPer10` and `missedPer10` |
 | `setsOfDrill`, `sessionDrills`, `summarizeByDrill`, `sessionLengthMs` | Per-drill views of a session, and its length in ms |
 | `compareWithPrevious(log, session, drill, n)` / `comparisonText(cmp)` | Today vs the mean of the previous `n` sessions of the drill, and its one-line text |
-| `trendSeries(log, drill, n)` / `trendGeometry(series, box)` | The last `n` sessions' make % and lost handles per 10 reps, and their chart coordinates |
+| `trendSeries(log, drill, n)` / `trendGeometry(series, box)` | The last `n` sessions' make %, lost handles per 10 reps and decision accuracy, and their chart coordinates (`make`, `lost`, `decision`) |
 | `deleteSession(log, id)` | A new log without that session |
 | `parseImport(text)` / `mergeLogs(current, incoming, replaceConflicts)` | Read a backup; merge by session id (`{ log, added, identical, conflicts }`) |
 | `csvField(v)` / `setsToCsv(log)` | CSV export of every set |
@@ -1214,6 +1265,7 @@ Wrapped in an IIFE, so nothing leaks into the global scope. If `?selftest=1` is 
 - **`startGame` / `stopGame`**: validate (the Min/Max fields only for Defense and Drive, then the drill's `validate`, then `validateSession`; `showError` puts the message in the right place via `ERROR_TARGETS`), prime speech, switch screens, show the session clock and set/rep line only in Offense, start a new session record (Offense), start or stop the active mode, and cancel speech. `stopGame` ends the session and writes its end time to the log if it has saved sets. `stopPressed` (the Stop button) halts the set and opens the partial-set log instead when an Offense set has at least one finished rep.
 - **Adaptive difficulty**: `levels` (from `reactionCaller.levels` via `normalizeLevels`) and `autoLevel` hold the state. `updateLevelView()` shows the levels and toggle, and with Auto on calls `lockInput()` on every setting or weight input whose path a level sets (it keeps the manual value in `data-manual-value`, makes the input read-only and adds the "set by Level N" note); `unlockInput()` restores it. `renderFlags()` / `wireFlags()` draw and handle the on / off toggles (a locked toggle is disabled). `manualValue(input)` is what `saveSettings()` and `readOffenseSettings()` use, so level values are never saved as your own. `startGame` keeps the manual settings in `runBaseSettings` and applies the level on top (`settings.level`, or `null` with Auto off). After a set is committed, `adjustLevel(set)` runs `levelDecision`, stores the new level and prepares the rest-screen line; `applyCurrentLevel()` (in the **Next set** tap) re-applies the level to `runBaseSettings` for the next set, keeping the spoken lengths validated at Start (if those settings don't validate, the previous ones are kept).
 - **Summary, history and backup**: `showSummary(session)` builds one `drillCard` per drill from `summarizeByDrill` and `compareWithPrevious`. `openHistory()` renders `renderTrends()` (one `trendChart(series)` inline SVG per drill, from `trendGeometry`), `renderSessionList()` (rows that expand into `sessionDetail` with the delete confirmation) and `renderLastExport()`. `exportJson()` / `exportCsv()` use `downloadText()` (a `Blob` and an `<a download>` click), falling back to `showBackupText()`. `importText()` parses with `parseImport`, previews with `mergeLogs` and asks via the confirmation box when sessions conflict; `applyImport(replace)` merges and saves. `saveTrainingLog(log)` saves any changed log; `updateBackupReminder()` runs on load and on every return to the start screen (`showStart()`).
+- **Read the D review**: `decisionsOf(repCues)` turns the runner's `repCues` (finished reps only) into decision records; `reviewItems` holds each one's ✓ / ✗ state and pick; `renderReview()` draws the rows, `reviewedDecisions()` reads them back (or shows why it can't), and **All correct** resets them. `commitSet` stores the rest-screen lines (`decisionFeedback`) and `adjustLevel` uses `levelDecisionFor`.
 - **Set log and rest**: `trainingLog` is the state from `TrainingLog.openLog(logStore)` (`logStore` wraps `storageGet` / `storageSet`). `openSetLog(partial)` fills the form for the set that just ended, with its settings snapshot. `commitSet()` validates with `TrainingLog.validateSet`, adds the set to the session and saves the whole log (`persistSession` → `upsertSession` + `saveTrainingLog` → `saveLog`). `showRest()` runs the rest countdown and shows `summarizeSession`; `startNextSet()` primes speech and starts the next set.
 
 ### Script 3: self-test page
@@ -1250,7 +1302,8 @@ Runs only with `?selftest=1`. It hides the app, calls `OffensePlanner.runSelfTes
 - **Move Lab: the get-set time is not checked against how long the sprint really takes you.** Tune the `getSetMs` ranges to your court and speed.
 - **Results are self-reported.** You count shots, lost handles and missed calls yourself and enter them after the set; there is no automatic scoring or reaction-time measurement.
 - **The log lives in one browser, at one address.** Clearing site data (or Safari clearing it after weeks without a visit) deletes it, and `file://`, `http://localhost:8080` and `http://<LAN IP>:8080` each keep a separate log. Export regularly from **History**; importing a backup at a new address merges it in.
-- **Trends are per drill and per session.** Make % and lost handles are drawn on two axes in one small chart; missed calls and clean share are only in the session summary and the session list.
+- **Trends are per drill and per session.** Make % and lost handles (and decisions right % for Read the D) are drawn on two axes in one small chart;
+- **Read the D decisions are self-reported.** You mark the reps you got wrong after the set, from memory; with long sets it gets harder to remember each rep. missed calls and clean share are only in the session summary and the session list.
 - **Import can't undo.** Replacing conflicting sessions or deleting a session is permanent, unless you have an exported backup.
 - **Next set waits for the rest to finish.** There is no way to cut the rest short except setting **Rest between sets** lower (0 = none).
 - **Levels move one step per logged set**, based on that set alone (no averaging over several sets), and only in Offense with Auto difficulty on. Sets logged with it off have `level: null` and don't move the level.

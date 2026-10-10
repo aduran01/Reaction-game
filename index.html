@@ -638,6 +638,8 @@
   .chart .dot-lost { fill: #ff7a4f; }
   .chart .title-make { fill: var(--accent); font-weight: 700; }
   .chart .title-lost { fill: #ff7a4f; font-weight: 700; }
+  .chart .line-decision { fill: none; stroke: #4fd87c; stroke-width: 2.5; stroke-dasharray: 1 4; stroke-linecap: round; }
+  .chart .dot-decision { fill: #4fd87c; }
 
   .legend {
     display: flex;
@@ -775,6 +777,41 @@
     0% { background: #ffd24f; color: var(--bg); }
     100% { background: transparent; color: #ffd24f; }
   }
+
+  /* Read the D decision review on the set log: 48px+ targets for sweaty hands. */
+  .review { display: flex; flex-direction: column; gap: 10px; }
+  .review-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .review-list { display: flex; flex-direction: column; gap: 8px; }
+  .review-row {
+    border: 1px solid #2a2e38;
+    border-radius: 12px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .review-row.wrong { border-color: var(--danger); }
+  .review-seq { margin: 0; font-weight: 700; font-size: 1rem; line-height: 1.3; }
+  .review-seq .rep { color: var(--muted); font-weight: 600; margin-right: 6px; }
+  .review-answer { margin: 0; color: var(--muted); font-size: 0.9rem; line-height: 1.3; }
+  .review-toggle {
+    min-height: 52px;
+    padding: 8px 12px;
+    background: #2a2e38;
+    color: #4fd87c;
+    font-size: 1rem;
+  }
+  .review-row.wrong .review-toggle { color: var(--danger); }
+  .review-choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .review-choices button {
+    min-height: 52px;
+    padding: 6px 4px;
+    background: var(--bg);
+    border: 1px solid #2a2e38;
+    color: var(--muted);
+    font-size: 0.95rem;
+  }
+  .review-choices button[aria-pressed="true"] { background: #2a2e38; border-color: var(--accent); color: var(--text); }
 
   /* An on / off setting (toggle button bound to a hidden number input). */
   .flag-field .toggle-row label { color: var(--text); font-size: 1rem; }
@@ -1114,6 +1151,14 @@
       <h1 id="logTitle">Set 1 · 8 reps</h1>
     </div>
     <div class="panel log-panel">
+      <!-- Read the D: one row per decision, ✓ by default; tap a rep you got wrong. -->
+      <div class="review hidden" id="logReview">
+        <div class="review-head">
+          <p class="panel-title">Decisions <span class="title-hint">tap the ones you got wrong</span></p>
+          <button type="button" class="small-btn" id="reviewAllBtn">All correct</button>
+        </div>
+        <div class="review-list" id="reviewList"></div>
+      </div>
       <div class="log-row hidden" id="logCleanRow">
         <label for="logClean">Clean reps<span class="hint">controlled, on balance, eyes up</span></label>
         <div class="stepper">
@@ -1185,6 +1230,8 @@
     <div class="rest-count" id="restCount">01:00</div>
     <p class="subtitle" id="restSummary"></p>
     <p class="subtitle" id="restSaved"></p>
+    <p class="level-line hidden" id="restDecision"></p>
+    <p class="subtitle hidden" id="restConfusion"></p>
     <p class="level-line hidden" id="restLevel"></p>
     <button id="nextSetBtn" class="hidden">Next set</button>
     <button id="endSessionBtn">End session</button>
@@ -1766,6 +1813,13 @@ const OffensePlanner = (function () {
     // Step down when success < levelDownSuccess OR error rate >= levelDownErrorRate.
     levelDownSuccess: 0.50, // provisional
     levelDownErrorRate: 0.30, // provisional
+    // Read the D uses decision accuracy (right decisions / decisions reviewed) too:
+    // step up when accuracy >= readTheDLevelUpAccuracy AND success >= readTheDLevelUpSuccess;
+    // step down when accuracy < readTheDLevelDownAccuracy OR error rate >= readTheDLevelDownErrorRate.
+    readTheDLevelUpAccuracy: 0.85, // provisional
+    readTheDLevelUpSuccess: 0.60, // provisional
+    readTheDLevelDownAccuracy: 0.65, // provisional
+    readTheDLevelDownErrorRate: 0.30, // provisional
     // Five levels per drill, Level 1 easiest. Each maps a settings path (as in
     // OFFENSE_DEFAULTS) to its value; with Auto difficulty on these replace the
     // matching manual fields. Every level must pass the drill's validation.
@@ -2338,6 +2392,101 @@ const OffensePlanner = (function () {
     return null;
   }
 
+  // ---- Read the D scoring (decisions reviewed after the set) ----
+  // A logged decision: { rep, read, ids, state, correct, ruleId, situation, actual },
+  // actual one of RTD_REVIEW_ACTIONS, or null when not reviewed (skipped set).
+
+  const RTD_REVIEW_ACTIONS = RTD_ACTIONS.concat("FROZE");
+
+  function isReviewed(d) {
+    return d && d.actual !== null && d.actual !== undefined;
+  }
+
+  // What the player did, said about the outcome: "you drove anyway", "you froze", …
+  function didText(correct, actual) {
+    if (actual === "FROZE") return "you froze";
+    if (actual === "PULL_UP") return "you pulled up";
+    if (actual === "CREATE_SPACE") return "you created space";
+    return correct === "DRIVE_LEFT" || correct === "DRIVE_RIGHT" ? "you drove the wrong way" : "you drove anyway";
+  }
+
+  // Score reviewed decisions: { total, correct, accuracy (null if none), byAction:
+  // { DRIVE_LEFT: { total, correct }, … }, topConfusion }. topConfusion is the
+  // most common miss (same situation, same kind of wrong action; ties go to the
+  // first one): { situation, ruleId, correct, actual, did, count }, or null.
+  function scoreDecisions(decisions) {
+    const out = { total: 0, correct: 0, accuracy: null, byAction: {}, topConfusion: null };
+    RTD_ACTIONS.forEach(a => { out.byAction[a] = { total: 0, correct: 0 }; });
+    const misses = {};
+    const order = [];
+    (decisions || []).filter(isReviewed).forEach(d => {
+      out.total++;
+      const slot = out.byAction[d.correct];
+      if (slot) slot.total++;
+      if (d.actual === d.correct) {
+        out.correct++;
+        if (slot) slot.correct++;
+        return;
+      }
+      const did = didText(d.correct, d.actual);
+      const key = d.situation + "|" + did;
+      if (!misses[key]) {
+        misses[key] = { situation: d.situation, ruleId: d.ruleId, correct: d.correct, actual: d.actual, did, count: 0 };
+        order.push(key);
+      }
+      misses[key].count++;
+    });
+    if (out.total > 0) out.accuracy = out.correct / out.total;
+    order.forEach(key => {
+      if (!out.topConfusion || misses[key].count > out.topConfusion.count) out.topConfusion = misses[key];
+    });
+    return out;
+  }
+
+  // "sagging defender → you drove anyway (2×)"
+  function confusionText(c) {
+    return c.situation + " → " + c.did + (c.count > 1 ? " (" + c.count + "×)" : "");
+  }
+
+  // The two rest-screen lines: [accuracy, most common miss with its rule or null],
+  // e.g. ["7/8 correct.", "Missed: sagging defender → pull up, he gave you the shot."].
+  // null when nothing was reviewed.
+  function decisionFeedback(score, rules) {
+    if (!score || score.total === 0) return null;
+    const lines = [score.correct + "/" + score.total + " correct.", null];
+    const c = score.topConfusion;
+    const rule = c && rules.find(r => r.id === c.ruleId);
+    if (rule) lines[1] = "Missed: " + c.situation + " → " + rule.answer + ", " + rule.why + ".";
+    return lines;
+  }
+
+  // The adjustment rule for a Read the D set: decision accuracy and shot success.
+  // Same result shape as levelDecision. A set counts only when its outcomes and
+  // its decisions were logged, with at least levelMinAttempts shots and decisions.
+  function readTheDLevelDecision(level, set, cfg) {
+    const decisions = set && set.extra && Array.isArray(set.extra.decisions) ? set.extra.decisions : [];
+    const logged = set && set.made !== null && set.attempted !== null && set.lostHandles !== null &&
+      set.missedCalls !== null && set.reps > 0 && decisions.length > 0 && decisions.every(isReviewed);
+    if (!logged) return { level, change: "skipped" };
+    if (set.attempted < cfg.levelMinAttempts || decisions.length < cfg.levelMinAttempts) return { level, change: "tooFew" };
+    const eps = 1e-9;
+    const accuracy = scoreDecisions(decisions).accuracy;
+    const success = set.made / set.attempted;
+    const errorRate = (set.lostHandles + set.missedCalls) / set.reps;
+    // Step down is checked first, so a set with too many errors never steps up.
+    let change = "hold";
+    if (accuracy < cfg.readTheDLevelDownAccuracy - eps || errorRate >= cfg.readTheDLevelDownErrorRate - eps) change = "down";
+    else if (accuracy >= cfg.readTheDLevelUpAccuracy - eps && success >= cfg.readTheDLevelUpSuccess - eps) change = "up";
+    if (change === "up" && level >= LEVEL_COUNT) return { level: LEVEL_COUNT, change: "atTop" };
+    if (change === "down" && level <= 1) return { level: 1, change: "atBottom" };
+    return { level: level + (change === "up" ? 1 : change === "down" ? -1 : 0), change };
+  }
+
+  // The adjustment rule for any levelled drill.
+  function levelDecisionFor(drill, level, set, cfg) {
+    return drill === "readTheD" ? readTheDLevelDecision(level, set, cfg) : levelDecision(level, set, cfg);
+  }
+
   // Per level: the cue rate and gap, the longest cue sequence and how long it is spoken.
   function readTheDFitTable(s, dur) {
     return TRAINING_DEFAULTS.levels.readTheD.map((values, i) => {
@@ -2746,6 +2895,63 @@ const OffensePlanner = (function () {
     check("read the d: practice mode says the correct action after the window and its why as a caption, then rests", xf);
 
     return readTheDFitTable(defaults, dur);
+  }
+
+  // Read the D scoring: accuracy, per-action breakdown, most common miss,
+  // the rest-screen lines and the level rule.
+  function decisionSelfTest(check) {
+    const t = TRAINING_DEFAULTS;
+    const rules = t.readTheD.rules;
+    const d = (correct, actual, situation, ruleId) => ({ rep: 1, read: 1, ids: ["D_SET"], state: {}, correct, actual,
+      situation: situation || "x", ruleId: ruleId || "x" });
+    const sag = (actual) => d("PULL_UP", actual, "sagging defender", "gaveShot");
+    const sf = [];
+    // 8 decisions, 7 right; one sagging defender driven anyway.
+    const set8 = [sag("PULL_UP"), sag("DRIVE_LEFT"), d("DRIVE_LEFT", "DRIVE_LEFT"), d("DRIVE_RIGHT", "DRIVE_RIGHT"),
+      d("CREATE_SPACE", "CREATE_SPACE"), d("DRIVE_RIGHT", "DRIVE_RIGHT"), d("PULL_UP", "PULL_UP"), d("CREATE_SPACE", "CREATE_SPACE")];
+    const s8 = scoreDecisions(set8);
+    if (s8.total !== 8 || s8.correct !== 7 || Math.abs(s8.accuracy - 7 / 8) > 1e-9) sf.push("7/8 accuracy");
+    if (s8.byAction.PULL_UP.total !== 3 || s8.byAction.PULL_UP.correct !== 2 || s8.byAction.DRIVE_RIGHT.correct !== 2 ||
+        s8.byAction.CREATE_SPACE.total !== 2) sf.push("per action");
+    const fb = decisionFeedback(s8, rules);
+    if (!fb || fb[0] !== "7/8 correct." || fb[1] !== "Missed: sagging defender → pull up, he gave you the shot.") sf.push("feedback " + fb);
+    if (confusionText(s8.topConfusion) !== "sagging defender → you drove anyway") sf.push("confusion " + confusionText(s8.topConfusion));
+    // Most common: two closing-defender misses (one each way counts as the same "wrong way" kind) beat one sag miss.
+    const close = actual => d("DRIVE_LEFT", actual, "closing defender", "closing");
+    const top = scoreDecisions([sag("DRIVE_RIGHT"), close("DRIVE_RIGHT"), close("DRIVE_RIGHT"), close("FROZE")]).topConfusion;
+    if (!top || top.situation !== "closing defender" || top.count !== 2 || confusionText(top) !== "closing defender → you drove the wrong way (2×)") {
+      sf.push("most common " + (top && confusionText(top)));
+    }
+    const allRight = decisionFeedback(scoreDecisions([sag("PULL_UP")]), rules);
+    if (!allRight || allRight[0] !== "1/1 correct." || allRight[1] !== null) sf.push("all correct");
+    const skipped = scoreDecisions([sag(null), sag(undefined)]);
+    if (skipped.total !== 0 || skipped.accuracy !== null || decisionFeedback(skipped, rules) !== null) sf.push("not reviewed");
+    if (didText("PULL_UP", "FROZE") !== "you froze" || didText("DRIVE_LEFT", "CREATE_SPACE") !== "you created space") sf.push("did text");
+    check("read the d scoring: accuracy, per-action breakdown, most common miss and the rest-screen lines", sf);
+
+    const lf = [];
+    const set = (made, attempted, lost, missed, reps, right, wrong, unreviewed) => ({
+      made, attempted, lostHandles: lost, missedCalls: missed, reps,
+      extra: { decisions: Array(right).fill(sag("PULL_UP")).concat(Array(wrong).fill(sag("FROZE")), Array(unreviewed || 0).fill(sag(null))) },
+    });
+    [
+      ["up: 17/20 right, 6/10 made", 3, set(6, 10, 0, 0, 10, 17, 3), 4, "up"],
+      ["hold: 84% right", 3, set(10, 10, 0, 0, 100, 84, 16), 3, "hold"],
+      ["hold: 59% made", 3, set(59, 100, 0, 0, 100, 90, 10), 3, "hold"],
+      ["down: 64% right", 3, set(10, 10, 0, 0, 100, 64, 36), 2, "down"],
+      ["hold: exactly 65% right", 3, set(5, 10, 0, 0, 20, 13, 7), 3, "hold"],
+      ["down: error rate 0.30", 3, set(10, 10, 2, 1, 10, 10, 0), 2, "down"],
+      ["clamped at 5", 5, set(10, 10, 0, 0, 10, 10, 0), 5, "atTop"],
+      ["clamped at 1", 1, set(0, 10, 0, 0, 10, 0, 10), 1, "atBottom"],
+      ["too few shots", 3, set(4, 4, 0, 0, 8, 8, 0), 3, "tooFew"],
+      ["decisions not reviewed", 3, set(8, 8, 0, 0, 8, 7, 0, 1), 3, "skipped"],
+      ["skipped set", 3, set(null, null, null, null, 8, 8, 0), 3, "skipped"],
+    ].forEach(c => {
+      const r = levelDecisionFor("readTheD", c[1], c[2], t);
+      if (r.level !== c[3] || r.change !== c[4]) lf.push(c[0] + ": got " + r.level + " " + r.change);
+    });
+    if (levelDecisionFor("drive", 3, set(8, 10, 1, 0, 10, 0, 0), t).change !== "up") lf.push("drive still uses its own rule");
+    check("read the d levels: up at >= 85% right and >= 60% made, down below 65% right or at >= 0.30 errors per rep", lf);
   }
 
   // Difficulty levels and the adjustment rule.
@@ -3160,6 +3366,7 @@ const OffensePlanner = (function () {
     trainingSelfTest(check);
     defaultsSelfTest(check);
     levelSelfTest(check, reps);
+    decisionSelfTest(check);
     (extraSuites || []).forEach(suite => suite(check));
 
     const passed = results.every(r => r.ok);
@@ -3220,6 +3427,12 @@ const OffensePlanner = (function () {
     validateReadTheD,
     readTheDFitTable,
     repPlanProblems,
+    RTD_REVIEW_ACTIONS,
+    scoreDecisions,
+    confusionText,
+    decisionFeedback,
+    readTheDLevelDecision,
+    levelDecisionFor,
     runSelfTest,
   };
 })();
@@ -3311,6 +3524,23 @@ const TrainingLog = (function () {
         return bad("cleanReps", "Clean reps must be a whole number from 0 to the reps in the set.");
       }
     }
+    if (set.drill === "readTheD") {
+      // One entry per decision: what was called, the right answer and what the player did.
+      const ds = set.extra.decisions;
+      const P = OffensePlanner;
+      if (!Array.isArray(ds)) return bad("extra", "A Read the D set needs its decisions.");
+      for (const d of ds) {
+        if (!isPlainObject(d) || !Number.isInteger(d.rep) || d.rep < 1 || d.rep > set.reps || (d.read !== 1 && d.read !== 2) ||
+            !Array.isArray(d.ids) || d.ids.length === 0 || !d.ids.every(id => typeof id === "string") ||
+            !isPlainObject(d.state) || P.RTD_ACTIONS.indexOf(d.correct) === -1 ||
+            typeof d.ruleId !== "string" || typeof d.situation !== "string") {
+          return bad("extra", "A Read the D decision is missing what was called or the right answer.");
+        }
+        if (d.actual !== null && P.RTD_REVIEW_ACTIONS.indexOf(d.actual) === -1) {
+          return bad("decisions", "Pick what you did for rep " + d.rep + ".");
+        }
+      }
+    }
     return null;
   }
 
@@ -3373,9 +3603,13 @@ const TrainingLog = (function () {
       ratedSets: 0, cleanSets: 0, cleanShare: null,
       // Move Lab: clean reps over the reps of sets where they were entered.
       cleanReps: 0, cleanRepsOf: 0, cleanRepShare: null,
+      // Read the D: reviewed decisions (OffensePlanner.scoreDecisions over every set's).
+      decisions: 0, decisionsCorrect: 0, decisionPct: null, decisionScore: null,
     };
     let errorReps = 0;
+    const allDecisions = [];
     sets.forEach(set => {
+      if (set.extra && Array.isArray(set.extra.decisions)) allDecisions.push(...set.extra.decisions);
       sum.reps += set.reps;
       if (set.extra && Number.isInteger(set.extra.cleanReps)) {
         sum.cleanReps += set.extra.cleanReps;
@@ -3404,6 +3638,13 @@ const TrainingLog = (function () {
     }
     if (sum.ratedSets > 0) sum.cleanShare = sum.cleanSets / sum.ratedSets;
     if (sum.cleanRepsOf > 0) sum.cleanRepShare = sum.cleanReps / sum.cleanRepsOf;
+    if (allDecisions.length) {
+      const score = OffensePlanner.scoreDecisions(allDecisions);
+      sum.decisions = score.total;
+      sum.decisionsCorrect = score.correct;
+      sum.decisionPct = score.accuracy;
+      sum.decisionScore = score;
+    }
     return sum;
   }
 
@@ -3458,15 +3699,23 @@ const TrainingLog = (function () {
     return {
       drill,
       count: prev.length,
-      today: { makePct: today.makePct, lostPer10: today.lostPer10 },
-      avg: { makePct: mean(prev.map(p => p.makePct)), lostPer10: mean(prev.map(p => p.lostPer10)) },
+      today: { makePct: today.makePct, lostPer10: today.lostPer10, decisionPct: today.decisionPct },
+      avg: {
+        makePct: mean(prev.map(p => p.makePct)), lostPer10: mean(prev.map(p => p.lostPer10)),
+        decisionPct: mean(prev.map(p => p.decisionPct)),
+      },
     };
   }
 
-  // "Make % 62 (avg 55). Lost handles 1.2 per 10 reps (avg 2.0)"
+  // "Make % 62 (avg 55). Lost handles 1.2 per 10 reps (avg 2.0)", led by
+  // "Decisions 85% right (avg 78)" when decisions were reviewed (Read the D).
   function comparisonText(cmp) {
     const pct = x => String(Math.round(x * 100));
     const parts = [];
+    if (cmp.today.decisionPct !== null && cmp.today.decisionPct !== undefined) {
+      parts.push("Decisions " + pct(cmp.today.decisionPct) + "% right" +
+        (cmp.avg.decisionPct !== null && cmp.avg.decisionPct !== undefined ? " (avg " + pct(cmp.avg.decisionPct) + ")" : ""));
+    }
     if (cmp.today.makePct !== null) {
       parts.push("Make % " + pct(cmp.today.makePct) + (cmp.avg.makePct !== null ? " (avg " + pct(cmp.avg.makePct) + ")" : ""));
     }
@@ -3479,17 +3728,19 @@ const TrainingLog = (function () {
     return parts.join(". ");
   }
 
-  // The last n sessions of a drill, oldest first: [{ id, startedAt, makePct, lostPer10 }].
+  // The last n sessions of a drill, oldest first:
+  // [{ id, startedAt, makePct, lostPer10, decisionPct }] (decisionPct null unless decisions were reviewed).
   function trendSeries(log, drill, n) {
     return sessionsWithDrill(log, drill).slice(-n).map(s => {
       const sum = summarizeSets(setsOfDrill(s, drill));
-      return { id: s.id, startedAt: s.startedAt, makePct: sum.makePct, lostPer10: sum.lostPer10 };
+      return { id: s.id, startedAt: s.startedAt, makePct: sum.makePct, lostPer10: sum.lostPer10, decisionPct: sum.decisionPct };
     });
   }
 
   // Chart geometry for a trend in box { width, height, left, right, top, bottom }
-  // (the last four are padding). Make % runs 0..1 on the left axis, lost handles
-  // per 10 reps 0..lostMax on the right; points with no value are left out.
+  // (the last four are padding). Make % and decision accuracy run 0..1 on the
+  // left axis, lost handles per 10 reps 0..lostMax on the right; points with no
+  // value are left out.
   function trendGeometry(series, box) {
     const plotW = box.width - box.left - box.right;
     const plotH = box.height - box.top - box.bottom;
@@ -3499,11 +3750,15 @@ const TrainingLog = (function () {
     const lostMax = Math.max(2, Math.ceil(maxLost));
     const make = [];
     const lost = [];
+    const decision = [];
     series.forEach((p, i) => {
       if (p.makePct !== null) make.push({ x: x(i), y: box.top + plotH * (1 - p.makePct), value: p.makePct });
       if (p.lostPer10 !== null) lost.push({ x: x(i), y: box.top + plotH * (1 - p.lostPer10 / lostMax), value: p.lostPer10 });
+      if (p.decisionPct !== null && p.decisionPct !== undefined) {
+        decision.push({ x: x(i), y: box.top + plotH * (1 - p.decisionPct), value: p.decisionPct });
+      }
     });
-    return { make, lost, lostMax, plot: { x0: box.left, x1: box.left + plotW, y0: box.top, y1: box.top + plotH } };
+    return { make, lost, decision, lostMax, plot: { x0: box.left, x1: box.left + plotW, y0: box.top, y1: box.top + plotH } };
   }
 
   // A new log without the session with this id.
@@ -3761,6 +4016,36 @@ const TrainingLog = (function () {
     if (mlSum.cleanReps !== 13 || mlSum.cleanRepsOf !== 15 || !near(mlSum.cleanRepShare, 13 / 15)) mlf.push("clean rep totals");
     if (summarizeSets([base]).cleanRepShare !== null) mlf.push("clean share without Move Lab sets");
     check("log: Move Lab sets need picked moves (or an old move + side) and clean reps 0..reps (or null); snapshot and clean-rep totals", mlf);
+
+    // Read the D sets: decisions validated, totalled, compared and drawn as the third trend line.
+    const rf = [];
+    const dec = (rep, correct, actual) => ({ rep, read: 1, ids: ["D_SET", "D_SAG", "D_LEFT_FOOT"],
+      state: { momentum: "set", distance: "sag", leadFoot: "left" }, correct, ruleId: "gaveShot", situation: "sagging defender", actual });
+    const rtdSet = (decisions, changes) => withSet(Object.assign({ drill: "readTheD", reps: 4, made: 3, attempted: 4, extra: { decisions } }, changes));
+    const good = rtdSet([dec(1, "PULL_UP", "PULL_UP"), dec(2, "PULL_UP", "DRIVE_LEFT"), dec(3, "PULL_UP", "FROZE"),
+      dec(4, "PULL_UP", "PULL_UP"), Object.assign(dec(4, "DRIVE_LEFT", "DRIVE_LEFT"), { read: 2 })]);
+    [["reviewed", good], ["skipped (not reviewed)", rtdSet([dec(1, "PULL_UP", null)], { made: null, attempted: null, lostHandles: null, missedCalls: null, quality: null })],
+     ["no decisions", rtdSet([])]].forEach(c => { const e = validateSet(c[1]); if (e) rf.push(c[0] + ": " + e.message); });
+    [["no decisions list", rtdSet(undefined)], ["rep 5 of 4", rtdSet([dec(5, "PULL_UP", "PULL_UP")])],
+     ["read 3", rtdSet([Object.assign(dec(1, "PULL_UP", "PULL_UP"), { read: 3 })])], ["unknown action", rtdSet([dec(1, "PULL_UP", "PASS")])],
+     ["unknown correct", rtdSet([dec(1, "SHOOT", "PULL_UP")])], ["no ids", rtdSet([Object.assign(dec(1, "PULL_UP", "PULL_UP"), { ids: [] })])],
+     ["no situation", rtdSet([Object.assign(dec(1, "PULL_UP", "PULL_UP"), { situation: undefined })])]].forEach(c => {
+      if (!validateSet(c[1])) rf.push("accepted " + c[0]);
+    });
+    const rs = summarizeSets([good, withSet({})]);
+    if (rs.decisions !== 5 || rs.decisionsCorrect !== 3 || !near(rs.decisionPct, 0.6) || rs.decisionScore.topConfusion.count !== 1) rf.push("totals");
+    if (summarizeSets([base]).decisionPct !== null) rf.push("decisionPct without Read the D sets");
+    const rlog = { version: 1, sessions: [
+      { id: "r1", startedAt: "2026-05-01T10:00:00.000Z", sets: [rtdSet([dec(1, "PULL_UP", "PULL_UP"), dec(2, "PULL_UP", "FROZE")])] },
+      { id: "r2", startedAt: "2026-05-02T10:00:00.000Z", sets: [good] },
+    ] };
+    const rcmp = compareWithPrevious(rlog, rlog.sessions[1], "readTheD", 5);
+    if (comparisonText(rcmp) !== "Decisions 60% right (avg 50). Make % 75 (avg 75). Lost handles 2.5 per 10 reps (avg 2.5)") rf.push("compare: " + comparisonText(rcmp));
+    const rseries = trendSeries(rlog, "readTheD", 20);
+    const rgeo = trendGeometry(rseries, { width: 320, height: 180, left: 40, right: 40, top: 10, bottom: 30 });
+    if (rseries.map(p => p.decisionPct).join() !== "0.5,0.6" || rgeo.decision.length !== 2 || rgeo.decision[0].y !== 10 + 140 * 0.5) rf.push("trend");
+    if (trendGeometry([{ makePct: 0.5, lostPer10: 1, decisionPct: null }], { width: 320, height: 180, left: 40, right: 40, top: 10, bottom: 30 }).decision.length !== 0) rf.push("trend without decisions");
+    check("log: Read the D sets keep their decisions; accuracy totals, comparison text and the decision trend line", rf);
 
     const up = [];
     const log0 = emptyLog();
@@ -4170,6 +4455,11 @@ const TrainingLog = (function () {
   const readTheDError = document.getElementById("readTheDError");
   const readTheDAdvanced = document.getElementById("readTheDAdvanced");
   const flagButtons = document.querySelectorAll("button[data-flag-for]");
+  const logReview = document.getElementById("logReview");
+  const reviewList = document.getElementById("reviewList");
+  const reviewAllBtn = document.getElementById("reviewAllBtn");
+  const restDecision = document.getElementById("restDecision");
+  const restConfusion = document.getElementById("restConfusion");
 
   const STORAGE_MODE = "reactionCaller.mode";
   const STORAGE_DRILL = "reactionCaller.offenseDrill";
@@ -5070,6 +5360,81 @@ const TrainingLog = (function () {
   let lastSaveOk = true;
   let restTimerId = null;
 
+  // ---- Read the D decision review (set log) ----
+  // One item per decision of the set's finished reps: { decision, wrong, choice }.
+  // A decision counts as right unless flipped to "something else" and a choice picked.
+
+  const RTD_RULES = P.TRAINING_DEFAULTS.readTheD.rules;
+  const REVIEW_LABELS = { DRIVE_LEFT: "Drive L", DRIVE_RIGHT: "Drive R", PULL_UP: "Pull up", CREATE_SPACE: "Create space", FROZE: "Froze" };
+  let reviewItems = [];
+  let lastDecisionLines = null;  // rest-screen accuracy and most-common-miss lines
+
+  function callText(ids) {
+    return ids.map(id => OFFENSE_DEFAULTS.phrases[id].display).join(" · ");
+  }
+
+  // The logged form of each decision in repCues (actual still null).
+  function decisionsOf(repCues) {
+    const out = [];
+    repCues.forEach((cues, i) => cues.forEach((cue, k) => {
+      const c = P.correctAction(cue.state, RTD_RULES);
+      out.push({ rep: i + 1, read: k + 1, ids: cue.ids.slice(), state: Object.assign({}, cue.state),
+        correct: cue.correct, ruleId: cue.ruleId, situation: c ? c.situation : "" });
+    }));
+    return out;
+  }
+
+  function renderReview() {
+    const reads = {};
+    reviewItems.forEach(item => { reads[item.decision.rep] = (reads[item.decision.rep] || 0) + 1; });
+    reviewList.replaceChildren(...reviewItems.map(item => {
+      const d = item.decision;
+      const row = el("div", "review-row" + (item.wrong ? " wrong" : ""));
+      const seq = el("p", "review-seq");
+      seq.append(el("span", "rep", "Rep " + d.rep + (reads[d.rep] > 1 ? " · read " + d.read : "")), callText(d.ids));
+      const rule = RTD_RULES.find(r => r.id === d.ruleId);
+      const answer = el("p", "review-answer", P.RTD_ACTION_NAMES[d.correct] + (rule ? " — " + rule.why : ""));
+      const toggle = el("button", "review-toggle", item.wrong ? "✗ I did something else" : "✓ I did that");
+      toggle.type = "button";
+      toggle.setAttribute("aria-pressed", String(!item.wrong));
+      toggle.addEventListener("click", () => {
+        item.wrong = !item.wrong;
+        item.choice = null;
+        logError.textContent = "";
+        renderReview();
+      });
+      row.append(seq, answer, toggle);
+      if (item.wrong) {
+        const choices = el("div", "review-choices");
+        choices.setAttribute("role", "group");
+        choices.setAttribute("aria-label", "What you did on rep " + d.rep);
+        P.RTD_REVIEW_ACTIONS.forEach(a => {
+          const b = el("button", null, REVIEW_LABELS[a]);
+          b.type = "button";
+          b.setAttribute("aria-pressed", String(item.choice === a));
+          b.addEventListener("click", () => {
+            item.choice = a;
+            logError.textContent = "";
+            renderReview();
+          });
+          choices.appendChild(b);
+        });
+        row.appendChild(choices);
+      }
+      return row;
+    }));
+  }
+
+  // The reviewed decisions, or null (with the reason shown) if a flipped one has no pick.
+  function reviewedDecisions() {
+    const missing = reviewItems.find(item => item.wrong && item.choice === null);
+    if (missing) {
+      logError.textContent = "Pick what you did for rep " + missing.decision.rep + ", or tap ✗ to set it back to ✓.";
+      return null;
+    }
+    return reviewItems.map(item => Object.assign({}, item.decision, { actual: item.wrong ? item.choice : item.decision.correct }));
+  }
+
   function selectQuality(quality) {
     selectedQuality = quality;
     qualityButtons.forEach(btn => btn.setAttribute("aria-pressed", String(btn.dataset.quality === quality)));
@@ -5081,6 +5446,9 @@ const TrainingLog = (function () {
     const p = offenseMode.progress;
     const reps = offenseMode.repsCompleted;
     const moveLab = s.drill === "moveLab";
+    const readTheD = s.drill === "readTheD";
+    // Only finished reps are reviewed (the rep in progress at Stop doesn't count).
+    const decisions = readTheD ? decisionsOf(offenseMode.repCues.slice(0, reps)) : [];
     pendingSet = {
       drill: s.drill,
       level: s.level,
@@ -5088,8 +5456,12 @@ const TrainingLog = (function () {
       startedAt: offenseMode.setStartedAt,
       endedAt: new Date().toISOString(),
       settingsSnapshot: TrainingLog.snapshotSettings(s),
-      extra: moveLab ? { moveIds: s.moveLab.moveIds.slice(), cleanReps: null } : {},
+      extra: moveLab ? { moveIds: s.moveLab.moveIds.slice(), cleanReps: null }
+        : readTheD ? { decisions: decisions.map(d => Object.assign({}, d, { actual: null })) } : {},
     };
+    reviewItems = decisions.map(decision => ({ decision, wrong: false, choice: null }));
+    logReview.classList.toggle("hidden", !readTheD);
+    renderReview();
     logDrill.textContent = DRILLS[s.drill].label;
     logTitle.textContent = partial
       ? "Partial set " + p.set + " · " + reps + " of " + s.training.repsPerSet + " reps"
@@ -5124,6 +5496,11 @@ const TrainingLog = (function () {
       note: note === "" ? null : note,
     });
     if (set.drill === "moveLab") set.extra = Object.assign({}, set.extra, { cleanReps: parseNumber(logClean.value) });
+    if (set.drill === "readTheD") {
+      const decisions = reviewedDecisions();
+      if (!decisions) return null;
+      set.extra = Object.assign({}, set.extra, { decisions });
+    }
     return set;
   }
 
@@ -5149,6 +5526,7 @@ const TrainingLog = (function () {
   // Validate, add the set to the session and save the whole log right away, so
   // nothing is lost if the tab closes. Returns false (and shows why) if invalid.
   function commitSet(set) {
+    if (!set) return false;  // the reason is already shown (e.g. a review pick missing)
     const error = TrainingLog.validateSet(set);
     if (error) {
       logError.textContent = error.message;
@@ -5158,6 +5536,8 @@ const TrainingLog = (function () {
     session.endedAt = set.endedAt;
     persistSession();
     pendingSet = null;
+    lastDecisionLines = set.drill === "readTheD"
+      ? P.decisionFeedback(P.scoreDecisions(set.extra.decisions), RTD_RULES) : null;
     adjustLevel(set);
     return true;
   }
@@ -5167,7 +5547,7 @@ const TrainingLog = (function () {
   function adjustLevel(set) {
     lastLevelMessage = null;
     if (set.level === null) return;
-    const decision = P.levelDecision(set.level, set, TD);
+    const decision = P.levelDecisionFor(set.drill, set.level, set, TD);
     levels[set.drill] = decision.level;
     saveLevels();
     lastLevelMessage = P.levelMessage(set.level, decision, TD);
@@ -5180,6 +5560,7 @@ const TrainingLog = (function () {
   function sessionSummaryText() {
     const sum = TrainingLog.summarizeSession(session);
     const parts = [sum.sets + (sum.sets === 1 ? " set" : " sets")];
+    if (sum.decisionPct !== null) parts.push(sum.decisionsCorrect + "/" + sum.decisions + " decisions right");
     if (sum.makePct !== null) parts.push(sum.made + "/" + sum.attempted + " made (" + percent(sum.makePct) + ")");
     if (sum.errorsPerRep !== null) parts.push(sum.errorsPerRep.toFixed(2) + " errors per rep");
     if (sum.cleanShare !== null) parts.push(sum.cleanSets + " of " + sum.ratedSets + " rated sets clean");
@@ -5192,6 +5573,12 @@ const TrainingLog = (function () {
     const endsAt = performance.now() + restMs;
     restSummary.textContent = sessionSummaryText();
     restSaved.textContent = lastSaveOk ? "Set saved." : "Couldn't save to this device. Storage may be blocked or full.";
+    // Read the D: one line for accuracy, one for the most common miss and its rule.
+    const lines = lastDecisionLines || [null, null];
+    restDecision.textContent = lines[0] || "";
+    restDecision.classList.toggle("hidden", !lines[0]);
+    restConfusion.textContent = lines[1] || "";
+    restConfusion.classList.toggle("hidden", !lines[1]);
     restLevel.textContent = lastLevelMessage || "";
     restLevel.classList.toggle("hidden", !lastLevelMessage);
     nextSetBtn.classList.add("hidden");
@@ -5264,12 +5651,24 @@ const TrainingLog = (function () {
       rows.splice(2, 0, ["Clean reps", sum.cleanRepShare === null ? "–"
         : sum.cleanReps + "/" + sum.cleanRepsOf + " · " + pctText(sum.cleanRepShare)]);
     }
+    if (drill === "readTheD") {
+      rows.splice(2, 0, ["Decisions right", sum.decisionPct === null ? "–"
+        : sum.decisionsCorrect + "/" + sum.decisions + " · " + pctText(sum.decisionPct)]);
+    }
     rows.forEach(row => {
       const cell = el("div");
       cell.append(el("dt", "", row[0]), el("dd", "", row[1]));
       grid.appendChild(cell);
     });
     card.appendChild(grid);
+    // Read the D: right decisions per correct action, and the most common miss.
+    const score = sum.decisionScore;
+    if (drill === "readTheD" && score && score.total > 0) {
+      card.appendChild(el("p", "compare-line", P.RTD_ACTIONS.filter(a => score.byAction[a].total > 0)
+        .map(a => REVIEW_LABELS[a] + " " + score.byAction[a].correct + "/" + score.byAction[a].total).join(" · ")));
+      card.appendChild(el("p", "compare-line", score.topConfusion
+        ? "Most common miss: " + P.confusionText(score.topConfusion) : "No misses."));
+    }
     const cmp = TrainingLog.compareWithPrevious(trainingLog.log, sess, drill, P.TRAINING_DEFAULTS.compareSessions);
     card.appendChild(el("p", "compare-line", TrainingLog.comparisonText(cmp)));
     return card;
@@ -5307,14 +5706,16 @@ const TrainingLog = (function () {
     return node;
   }
 
-  // Make % (solid, left axis) and lost handles per 10 reps (dashed, right axis).
+  // Make % (solid, left axis), lost handles per 10 reps (dashed, right axis) and,
+  // for Read the D, decisions right (dotted green, left axis).
   function trendChart(series) {
     const box = { width: 320, height: 200, left: 38, right: 34, top: 24, bottom: 40 };
     const g = TrainingLog.trendGeometry(series, box);
     const p = g.plot;
     const root = svg("svg", {
       viewBox: "0 0 " + box.width + " " + box.height, role: "img",
-      "aria-label": "Make percent and lost handles per 10 reps over the last " + series.length + " sessions",
+      "aria-label": "Make percent" + (g.decision.length ? ", decisions right" : "") +
+        " and lost handles per 10 reps over the last " + series.length + " sessions",
     });
     [0, 0.5, 1].forEach(f => {
       const y = p.y1 - (p.y1 - p.y0) * f;
@@ -5334,6 +5735,8 @@ const TrainingLog = (function () {
     const pts = list => list.map(q => q.x.toFixed(1) + "," + q.y.toFixed(1)).join(" ");
     if (g.make.length > 1) root.appendChild(svg("polyline", { class: "line-make", points: pts(g.make) }));
     if (g.lost.length > 1) root.appendChild(svg("polyline", { class: "line-lost", points: pts(g.lost) }));
+    if (g.decision.length > 1) root.appendChild(svg("polyline", { class: "line-decision", points: pts(g.decision) }));
+    g.decision.forEach(q => root.appendChild(svg("circle", { class: "dot-decision", cx: q.x, cy: q.y, r: 3 })));
     g.make.forEach(q => root.appendChild(svg("circle", { class: "dot-make", cx: q.x, cy: q.y, r: 3 })));
     g.lost.forEach(q => root.appendChild(svg("circle", { class: "dot-lost", cx: q.x, cy: q.y, r: 3 })));
     return root;
@@ -5355,7 +5758,9 @@ const TrainingLog = (function () {
       const chart = el("div", "chart");
       chart.appendChild(trendChart(series));
       const legend = el("p", "legend");
-      [["#4f8cff", "Make % (left)"], ["#ff7a4f", "Lost handles per 10 reps (right, dashed)"]].forEach(item => {
+      const items = [["#4f8cff", "Make % (left)"], ["#ff7a4f", "Lost handles per 10 reps (right, dashed)"]];
+      if (series.some(pt => pt.decisionPct !== null)) items.push(["#4fd87c", "Decisions right % (left, dotted)"]);
+      items.forEach(item => {
         const span = el("span");
         const sw = el("span", "swatch");
         sw.style.background = item[0];
@@ -5377,6 +5782,10 @@ const TrainingLog = (function () {
     if (set.level !== null) parts.push("L" + set.level);
     parts.push(set.reps + (set.reps === 1 ? " rep" : " reps"));
     if (set.drill === "moveLab" && set.extra.cleanReps !== null) parts.push(set.extra.cleanReps + "/" + set.reps + " clean");
+    if (set.drill === "readTheD") {
+      const score = P.scoreDecisions(set.extra.decisions);
+      parts.push(score.total ? score.correct + "/" + score.total + " decisions right" : "decisions not reviewed");
+    }
     if (set.made === null) parts.push("not logged");
     else parts.push(set.made + "/" + set.attempted + " made");
     if (set.lostHandles !== null) parts.push(set.lostHandles + " lost");
@@ -5674,6 +6083,11 @@ const TrainingLog = (function () {
       logMade.max = String(attempted);
       if (parseNumber(logMade.value) > attempted) logMade.value = attempted;
     }
+  });
+  reviewAllBtn.addEventListener("click", () => {
+    reviewItems.forEach(item => { item.wrong = false; item.choice = null; });
+    logError.textContent = "";
+    renderReview();
   });
   qualityButtons.forEach(btn => btn.addEventListener("click", () => {
     selectQuality(selectedQuality === btn.dataset.quality ? null : btn.dataset.quality);
