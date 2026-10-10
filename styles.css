@@ -1,0 +1,819 @@
+/* Reaction Caller styles. Dark theme only; colors are CSS variables on :root. */
+:root {
+  --bg: #0f1115;
+  --panel: #171a21;
+  --accent: #4f8cff;
+  --accent-down: #3a6fd6;
+  --danger: #ff4f5e;
+  --danger-down: #d93d4a;
+  --text: #f2f3f5;
+  --muted: #9aa1ab;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  overscroll-behavior: none;
+  user-select: none;
+}
+
+#app {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(20px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right))
+            max(20px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+}
+
+.screen {
+  width: 100%;
+  max-width: 440px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(16px, 4vh, 32px);
+}
+
+.hidden { display: none !important; }
+
+h1 {
+  font-size: clamp(1.6rem, 6vw, 2.2rem);
+  margin: 0;
+  text-align: center;
+}
+
+.subtitle {
+  color: var(--muted);
+  font-size: clamp(0.85rem, 3vw, 1rem);
+  text-align: center;
+  margin: -8px 0 0;
+}
+
+.panel {
+  background: var(--panel);
+  border-radius: 16px;
+  padding: clamp(16px, 4vw, 24px);
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field label {
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.field input[type="number"] {
+  background: #0f1115;
+  border: 1px solid #2a2e38;
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 1.1rem;
+  padding: 12px 14px;
+  width: 100%;
+}
+
+.field input[type="number"]:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.range-row {
+  display: flex;
+  gap: 12px;
+}
+
+.range-row .field { flex: 1; }
+
+.error {
+  color: var(--danger);
+  font-size: 0.85rem;
+  min-height: 1.1em;
+  text-align: center;
+}
+
+button {
+  border: none;
+  border-radius: 14px;
+  font-size: clamp(1rem, 4vw, 1.2rem);
+  font-weight: 600;
+  padding: clamp(14px, 4vw, 18px) 24px;
+  width: 100%;
+  cursor: pointer;
+  color: #fff;
+  transition: transform 0.08s ease;
+}
+
+button:active { transform: scale(0.97); }
+
+#startBtn { background: var(--accent); }
+#startBtn:active { background: var(--accent-down); }
+
+#stopBtn { background: var(--danger); }
+#stopBtn:active { background: var(--danger-down); }
+
+#gameScreen {
+  height: 100%;
+  justify-content: space-between;
+  min-height: 70vh;
+  min-height: 70dvh;
+}
+
+.word-stage {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#word {
+  font-size: clamp(3rem, 16vw, 6rem);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  opacity: 0;
+  transform: scale(0.85);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+
+#word.show {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.segmented {
+  display: flex;
+  gap: 4px;
+  width: 100%;
+  padding: 4px;
+  background: var(--panel);
+  border-radius: 14px;
+}
+
+.segmented button {
+  flex: 1;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1rem;
+  padding: 10px 12px;
+  border-radius: 10px;
+}
+
+.segmented button[aria-pressed="true"] {
+  background: #2a2e38;
+  color: var(--text);
+}
+
+/* The drill switch sits inside a panel, so it needs a darker track. */
+.panel .segmented { background: var(--bg); }
+.panel .segmented button { padding: 10px 6px; }
+
+.panel-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.mode-label {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+}
+
+.panel-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+details.advanced summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.advanced-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 14px;
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.weight-title {
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+
+.countdown {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.countdown.idle { visibility: hidden; }
+
+.countdown-track {
+  flex: 1;
+  height: 10px;
+  background: #2a2e38;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.countdown-fill {
+  height: 100%;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+
+.countdown-text {
+  min-width: 3.5em;
+  text-align: right;
+  color: var(--muted);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Multi-word offense phrases: smaller and allowed to wrap so they fit at 320px. */
+#word.long {
+  font-size: clamp(2rem, 10vw, 3.75rem);
+  line-height: 1.05;
+  text-align: center;
+  max-width: 100%;
+  overflow-wrap: break-word;
+}
+
+/* Phrases over 18 characters (e.g. "SPRINT FROM RIGHT CORNER"): one step smaller. */
+#word.xlong {
+  font-size: clamp(1.6rem, 8vw, 3rem);
+}
+
+/* Number stepper (− / +) for fields filled in by hand: 48px+ touch targets. */
+.stepper {
+  display: flex;
+  gap: 8px;
+}
+
+.stepper button {
+  flex: none;
+  width: 56px;
+  min-height: 48px;
+  padding: 0;
+  background: #2a2e38;
+  color: var(--text);
+  font-size: 1.6rem;
+  line-height: 1;
+  border-radius: 10px;
+}
+
+.stepper button:active { background: #3a3f4b; }
+
+.field .stepper input[type="number"] {
+  flex: 1;
+  min-width: 0;
+  min-height: 48px;
+  text-align: center;
+  font-size: 1.25rem;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.stepper input::-webkit-outer-spin-button,
+.stepper input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Game screen header: mode label, set/rep progress, session clock in the corner. */
+.game-header {
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.session-progress {
+  color: var(--muted);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  font-variant-numeric: tabular-nums;
+}
+
+.session-clock {
+  position: absolute;
+  top: 0;
+  right: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.session-banner {
+  width: 100%;
+  background: var(--panel);
+  border-left: 4px solid #ffd24f;
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 0.95rem;
+  line-height: 1.35;
+}
+
+#nextSetBtn {
+  background: var(--accent);
+  min-height: 80px;
+  font-size: clamp(1.3rem, 6vw, 1.6rem);
+}
+#nextSetBtn:active { background: var(--accent-down); }
+
+#endSessionBtn,
+#saveEndBtn {
+  background: #2a2e38;
+  min-height: 56px;
+}
+
+/* Set log form: label and stepper share a row when there is room, else stack. */
+.log-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.log-panel { gap: 14px; }
+
+.log-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.log-row label {
+  flex: 1 1 110px;
+  font-size: 1rem;
+  color: var(--text);
+}
+
+.log-row .hint {
+  display: block;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.log-row .stepper { flex: 0 0 auto; }
+
+.log-row .stepper input[type="number"] {
+  width: 72px;
+  min-height: 56px;
+  background: #0f1115;
+  border: 1px solid #2a2e38;
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 1.4rem;
+  font-weight: 700;
+  text-align: center;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.log-row .stepper button { min-height: 56px; }
+
+.segmented.choice button { min-height: 52px; }
+
+textarea {
+  width: 100%;
+  background: #0f1115;
+  border: 1px solid #2a2e38;
+  border-radius: 10px;
+  color: var(--text);
+  font: inherit;
+  font-size: 1rem;
+  padding: 12px 14px;
+  resize: vertical;
+}
+
+textarea:focus { outline: none; border-color: var(--accent); }
+
+input, textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+#saveRestBtn {
+  background: var(--accent);
+  min-height: 64px;
+  font-size: clamp(1.15rem, 5vw, 1.35rem);
+}
+#saveRestBtn:active { background: var(--accent-down); }
+
+.log-minor {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+}
+
+.log-minor button {
+  flex: 1;
+  min-height: 48px;
+  background: transparent;
+  border: 1px solid #2a2e38;
+  color: var(--muted);
+}
+
+#discardBtn { color: var(--danger); }
+
+/* Adaptive difficulty. */
+.toggle-row,
+.level-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.toggle-label {
+  font-size: 1rem;
+  font-weight: 600;
+}
+.toggle-label .hint {
+  display: block;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 400;
+  margin-top: 2px;
+}
+
+.toggle-btn {
+  flex: none;
+  width: 88px;
+  min-height: 48px;
+  padding: 0;
+  background: #2a2e38;
+  color: var(--muted);
+}
+.toggle-btn[aria-pressed="true"] {
+  background: var(--accent);
+  color: #fff;
+}
+
+.level-row span { font-size: 1rem; font-variant-numeric: tabular-nums; }
+
+.small-btn {
+  flex: none;
+  width: auto;
+  min-height: 48px;
+  padding: 0 16px;
+  font-size: 0.9rem;
+  background: transparent;
+  border: 1px solid #2a2e38;
+  color: var(--muted);
+}
+
+.level-locked {
+  opacity: 0.6;
+}
+
+.level-note {
+  display: block;
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.level-line {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* Summary, history and backup. */
+.stack {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.secondary-btn,
+#historyBackBtn {
+  background: #2a2e38;
+  min-height: 52px;
+}
+.secondary-btn:active,
+#historyBackBtn:active { background: #3a3f4b; }
+
+.danger-btn {
+  background: var(--danger);
+  min-height: 52px;
+}
+.danger-btn:active { background: var(--danger-down); }
+
+#summaryDoneBtn {
+  background: var(--accent);
+  min-height: 64px;
+}
+#summaryDoneBtn:active { background: var(--accent-down); }
+
+.button-row {
+  display: flex;
+  gap: 10px;
+}
+.button-row button {
+  flex: 1;
+  padding-left: 8px;
+  padding-right: 8px;
+  font-size: 0.95rem;
+}
+
+.reminder {
+  width: 100%;
+  margin: 0;
+  background: var(--panel);
+  border-left: 4px solid #ffd24f;
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 0.95rem;
+  line-height: 1.35;
+}
+
+.muted-text {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.status-text {
+  margin: 0;
+  min-height: 1.2em;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--danger);
+  border-radius: 12px;
+}
+.confirm p { margin: 0; line-height: 1.4; }
+
+.drill-card h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 12px;
+  margin: 0;
+}
+.stat-grid dt {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.stat-grid dd {
+  margin: 2px 0 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.compare-line {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+.chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.chart .axis { stroke: #2a2e38; stroke-width: 1; }
+.chart .tick { fill: var(--muted); font-size: 10px; }
+.chart .line-make { fill: none; stroke: var(--accent); stroke-width: 2.5; }
+.chart .line-lost { fill: none; stroke: #ff7a4f; stroke-width: 2.5; stroke-dasharray: 5 4; }
+.chart .dot-make { fill: var(--accent); }
+.chart .dot-lost { fill: #ff7a4f; }
+.chart .title-make { fill: var(--accent); font-weight: 700; }
+.chart .title-lost { fill: #ff7a4f; font-weight: 700; }
+.chart .line-decision { fill: none; stroke: #4fd87c; stroke-width: 2.5; stroke-dasharray: 1 4; stroke-linecap: round; }
+.chart .dot-decision { fill: #4fd87c; }
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.legend .swatch {
+  display: inline-block;
+  width: 18px;
+  height: 3px;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.history-item {
+  border: 1px solid #2a2e38;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.history-item > button {
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  font-size: 0.95rem;
+  font-weight: 400;
+  padding: 12px 14px;
+  min-height: 56px;
+  border-radius: 0;
+}
+.history-item > button:active { transform: none; background: #1f232c; }
+.history-item .item-date { display: block; font-weight: 700; }
+.history-item .item-meta { display: block; color: var(--muted); font-size: 0.85rem; margin-top: 2px; }
+
+.history-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 14px 14px;
+}
+
+.set-line {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+}
+.set-line .note {
+  display: block;
+  color: var(--muted);
+  font-style: italic;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.rest-count {
+  font-size: clamp(4rem, 22vw, 7rem);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Move Lab: move picker (2 columns of 52px toggle buttons). */
+.title-hint {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 400;
+  margin-left: 6px;
+}
+
+.move-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.move-grid button {
+  min-height: 52px;
+  padding: 8px;
+  background: var(--bg);
+  border: 1px solid #2a2e38;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.move-grid button[aria-pressed="true"] {
+  background: #2a2e38;
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+/* Game screen: the named move, small under the call, for the whole rep. */
+.word-stage {
+  flex-direction: column;
+  gap: 12px;
+}
+
+.caption {
+  font-size: clamp(1.4rem, 7vw, 2.4rem);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1.1;
+  text-align: center;
+  color: #45d6e0;
+}
+
+.word-move { color: #45d6e0; }
+.word-read { color: var(--text); }
+.word-sprint { color: #ff7a4f; }
+.word-catch { color: var(--text); }
+.word-shot { color: #ffd24f; }
+
+/* Read the D: one color per role, so the categories stay distinct. */
+.word-momentum { color: #ff7a4f; }
+.word-distance { color: #c47bff; }
+.word-foot { color: #45d6e0; }
+.word-hands { color: #ff6bd6; }
+/* NOW: a short flash (yellow block fading to yellow text). */
+.word-now {
+  color: #ffd24f;
+  border-radius: 16px;
+  padding: 0 0.25em;
+  animation: now-flash 0.45s ease-out;
+}
+@keyframes now-flash {
+  0% { background: #ffd24f; color: var(--bg); }
+  100% { background: transparent; color: #ffd24f; }
+}
+
+/* Read the D decision review on the set log: 48px+ targets for sweaty hands. */
+.review { display: flex; flex-direction: column; gap: 10px; }
+.review-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.review-list { display: flex; flex-direction: column; gap: 8px; }
+.review-row {
+  border: 1px solid #2a2e38;
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.review-row.wrong { border-color: var(--danger); }
+.review-seq { margin: 0; font-weight: 700; font-size: 1rem; line-height: 1.3; }
+.review-seq .rep { color: var(--muted); font-weight: 600; margin-right: 6px; }
+.review-answer { margin: 0; color: var(--muted); font-size: 0.9rem; line-height: 1.3; }
+.review-toggle {
+  min-height: 52px;
+  padding: 8px 12px;
+  background: #2a2e38;
+  color: #4fd87c;
+  font-size: 1rem;
+}
+.review-row.wrong .review-toggle { color: var(--danger); }
+.review-choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.review-choices button {
+  min-height: 52px;
+  padding: 6px 4px;
+  background: var(--bg);
+  border: 1px solid #2a2e38;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+.review-choices button[aria-pressed="true"] { background: #2a2e38; border-color: var(--accent); color: var(--text); }
+
+/* An on / off setting (toggle button bound to a hidden number input). */
+.flag-field .toggle-row label { color: var(--text); font-size: 1rem; }
+.toggle-btn:disabled { opacity: 0.6; cursor: default; }
+.word-center { color: #c47bff; }
+.word-cut { color: #ff4f5e; }
+.word-layup { color: #ffd24f; }
+
+.word-left { color: #4f8cff; }
+.word-right { color: #4fd87c; }
+.word-up { color: #ffd24f; }
+.word-back { color: #ff7a4f; }

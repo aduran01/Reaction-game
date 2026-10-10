@@ -12,14 +12,20 @@
 
 The app is meant to run on a phone (iPhone Safari is the main target) propped up nearby while you train. The words are big enough to read from a distance, and the voice means you don't have to look at all.
 
-The whole project is two files:
+The app is plain HTML, CSS and JavaScript, split into files by feature (about 330 KB in all):
 
-| File | Size | Purpose |
-|------|------|---------|
-| `index.html` | ~290 KB | The entire app: markup, styles and JavaScript in one page |
-| `server.js` | ~1 KB | A tiny Node.js static file server so phones on your network can open the app |
+| Path | Purpose |
+|------|---------|
+| `index.html` | The markup of every screen, and the `<script>` tags in load order |
+| `styles.css` | All styles (dark theme, CSS variables on `:root`) |
+| `js/core/`, `js/log/` | Pure logic shared by every drill: timing math, levels, sessions, the training log and history |
+| `js/drive/`, `js/move-lab/`, `js/read-the-d/` | One folder per drill: its pure logic, and (`*-ui.js`) its part of the app |
+| `js/app/` | The app: speech, Defense mode, the runner, the forms and screens, and `main.js`, which starts everything |
+| `js/selftest-page.js` | The `?selftest=1` page |
+| `selftest-node.js` | Runs the self-test under Node (`node selftest-node.js`) |
+| `server.js` | A tiny Node.js static file server so phones on your network can open the app |
 
-There is no build step, no `package.json`, no framework and no third-party library.
+There is no build step, no `package.json`, no framework and no third-party library. See [Project structure](#project-structure) for every file.
 
 ---
 
@@ -64,7 +70,7 @@ There is no build step, no `package.json`, no framework and no third-party libra
 7. [Project structure](#project-structure)
 8. [Architecture overview](#architecture-overview)
 9. [`server.js` in detail](#serverjs-in-detail)
-10. [`index.html` in detail](#indexhtml-in-detail)
+10. [The code in detail](#the-code-in-detail)
 11. [Browser APIs used](#browser-apis-used)
 12. [Known limitations and quirks](#known-limitations-and-quirks)
 13. [Troubleshooting](#troubleshooting)
@@ -103,7 +109,7 @@ Then open:
 
 ### Without the server
 
-`index.html` is fully self-contained, so you can also open it straight from disk (`file://`). The server mainly exists so that **another device** (your phone) can load the page from your computer. Settings are saved per address, so `file://` and `http://…:8080` keep separate saved settings.
+The app uses plain scripts (no ES modules), so you can also open `index.html` straight from disk (`file://`), as long as the `js/` folder and `styles.css` sit next to it. The server mainly exists so that **another device** (your phone) can load the page from your computer. Settings are saved per address, so `file://` and `http://…:8080` keep separate saved settings.
 
 To stop the server, press `Ctrl+C` in its terminal.
 
@@ -888,7 +894,7 @@ If the backup can't be written (storage full), the log is not saved at all, so t
 
 ### `OFFENSE_DEFAULTS`
 
-Every tunable offense number lives in one commented object, `OFFENSE_DEFAULTS`, at the top of the first `<script>` block in `index.html`:
+Every tunable offense number lives in one commented object, `OFFENSE_DEFAULTS`. It is created in `js/core/planner.js` (speech, learning and the shared phrases), and each drill file adds its own section: `js/drive/drive.js` the top-level Drive keys and phrases, `js/move-lab/move-lab.js` `moveLab`, `js/read-the-d/read-the-d.js` `readTheD`. Put together it looks like this:
 
 ```js
 const OFFENSE_DEFAULTS = {
@@ -930,13 +936,13 @@ const OFFENSE_DEFAULTS = {
 - Values here are the **defaults** the start screen shows. Values you type into the start screen are saved and **override** these on that device. After changing a default in the file, clear the saved settings (`localStorage.removeItem("reactionCaller.settings")`) to see the new default in the form.
 - The **phrase table** (`phrases`) is where you fix pronunciation (`spoken`), change on-screen text (`display`) or adjust the length estimates (`estMs`). Learned lengths (`reactionCaller.learnedMs`) override `estMs` per phrase. Delete that key to start learning from scratch after changing the voice or the spoken text.
 - The Drive read time is `readMinMs` / `readMaxMs` (800 / 3500). Defense's Min/Max delay fields are separate (HTML defaults 1000 / 3000).
-- The state tables (`NEXT` for Drive, `MOVE_LAB_NEXT` for Move Lab) and the finisher and start-call lists sit in the planner script. They are structure, not tuning.
+- The state tables (`NEXT` for Drive, `MOVE_LAB_NEXT` for Move Lab) and the finisher and start-call lists sit in the drill files. They are structure, not tuning.
 - `OFFENSE_DEFAULTS.readTheD` holds the Read the D timing (cue rate and gap, decision window, read time, LIVE delay, reset pause) and the hands / mid-dribble switches. Its calls (`D_…`) are in the shared `phrases` table. The rules and action weights are in `TRAINING_DEFAULTS.readTheD`.
 - `OFFENSE_DEFAULTS.moveLab` holds every Move Lab number, including the get-set time after each start call (`getSetMs`) and the gap from LEFT / RIGHT to the first move (`firstMoveGapMinMs` / `firstMoveGapMaxMs`). Its start calls and SHOT are in the shared `phrases` table.
 
 ### `TRAINING_DEFAULTS`
 
-Session structure lives in a second commented object in the same script (logging and progression settings will go here too):
+Session structure, logging and progression live in a second commented object, also created in `js/core/planner.js`; `js/core/session.js` adds the session fields, `js/core/levels.js` the level rule, `js/log/history.js` the history numbers, and each drill its levels and settings. Put together:
 
 ```js
 const TRAINING_DEFAULTS = {
@@ -998,7 +1004,7 @@ http://localhost:8080/index.html?selftest=1
 
 Use `/index.html?selftest=1`, not `/?selftest=1`. The bundled `server.js` only maps a bare `/` to `index.html`, so `/?selftest=1` returns "Not found".
 
-Instead of the app, the page runs a simulation of every offense planner (every drill profile's self-test) plus checks of the session helpers and the training log, and prints **PASS** / **FAIL** for each check to the console and to an on-page banner (green when everything passes, red otherwise). There are 63 checks in total: 18 Drive, 4 Move Lab, 11 Read the D, 1 Runner, 6 Session, 2 Defaults, 3 Levels, 2 Read the D scoring, 9 Training log and 7 History.
+Instead of the app, the page runs a simulation of every offense planner (every drill profile's self-test) plus checks of the session helpers and the training log, and prints **PASS** / **FAIL** for each check to the console and to an on-page banner (green when everything passes, red otherwise). There are 64 checks in total: 19 Drive, 5 Move Lab, 11 Read the D, 1 Runner, 1 Learned lengths, 6 Session, 3 Levels, 2 Read the D scoring, 9 Training log and 7 History. Each drill file runs its own checks; the other files register theirs with `registerSuite`.
 
 **Read the D.** It checks:
 
@@ -1044,10 +1050,11 @@ Checks 6 and 7 look at the first decision of each rep (up to the first NOW).
 4. `formatElapsed` gives mm:ss (e.g. 754000 ms → "12:34", 4503000 ms → "75:03", negative → "00:00");
 5. the fatigue warning is due at and after 45 min but not 1 ms before, never when set to 0, and its text starts with "45 min: decision quality".
 
-**Defaults.** It checks:
+**Defaults and learned lengths.** Three checks, each in the file it belongs to:
 
-1. the `READ` phrase is shown as READY and spoken "ready"; `migrateLearned` drops a stored `READ` length on the first load but keeps other phrases, records `read-to-ready`, sets the marker even when nothing was stored, and doesn't drop a re-learned value on later loads;
-2. every default Move Lab get-set minimum is at least the start call's estimated length at `baseRate` + `minGapMs`, every get-set range is at least 600 ms wide, and the Drive read time range is at least 2000 ms wide.
+1. (`js/core/planner.js`) the `READ` phrase is shown as READY and spoken "ready"; `migrateLearned` drops a stored `READ` length on the first load but keeps other phrases, records `read-to-ready`, sets the marker even when nothing was stored, and doesn't drop a re-learned value on later loads;
+2. (Move Lab) every default get-set minimum is at least the start call's estimated length at `baseRate` + `minGapMs`, and every get-set range is at least 600 ms wide;
+3. (Drive) the read time range is at least 2000 ms wide.
 
 **Levels.** It checks:
 
@@ -1089,18 +1096,56 @@ So with the defaults, **a drive can contain at most 2 CUT OFFs**, and the 3-cut-
 
 The self-test uses `OFFENSE_DEFAULTS`, `TRAINING_DEFAULTS` and the seed estimates only. It ignores saved settings and learned lengths, and in self-test mode the normal app never starts.
 
-You can run the same checks without a browser: the planner script has no DOM access, so it can be pulled out of `index.html` and run under Node with `OffensePlanner.runSelfTest(console.log, 10000, [TrainingLog.selfTest])` (the third argument adds the training log checks).
+You can run the same checks without a browser: `node selftest-node.js` (add `-q` to print only failures and the total). It reads the `<script>` tags in `index.html` and loads every pure file (everything except `js/app/`, the `*-ui.js` files and the self-test page) in that order, so it always runs exactly what the page runs. Its exit code is 0 when everything passes.
 
 ---
 
 ## Project structure
 
 ```
-Reaction game/
-├── index.html   ← the whole app (HTML + CSS + three <script> blocks)
-├── server.js    ← minimal static file server (Node.js, port 8080)
-└── README.md    ← this document
+Reaction-game/
+├── index.html              ← markup of every screen + <script> tags in load order
+├── styles.css              ← all styles
+├── js/
+│   ├── core/               ← pure logic shared by every drill
+│   │   ├── planner.js      ← OffensePlanner: the defaults objects, timing math, learned lengths,
+│   │   │                     drill registry, runner contract, self-test runner
+│   │   ├── levels.js       ← adaptive difficulty: levels, the adjustment rule, its message
+│   │   └── session.js      ← sets and reps, progress label, session clock, fatigue warning
+│   ├── drive/
+│   │   └── drive.js        ← Drive: defaults, phrases, levels, state machine, planner, validation, self-test
+│   ├── move-lab/
+│   │   ├── move-lab.js     ← Move Lab: defaults, move list, planner, validation, self-test
+│   │   └── move-lab-ui.js  ← (app) the move picker, get-set fields, move colors
+│   ├── read-the-d/
+│   │   ├── read-the-d.js   ← Read the D: calls, rules, sampling, planner, second read, validation, self-test
+│   │   ├── scoring.js      ← decision scoring, feedback lines, its level rule
+│   │   └── read-the-d-ui.js← (app) cue colors and the decision review
+│   ├── log/
+│   │   ├── training-log.js ← TrainingLog: set validation, snapshots, summaries, versioned load / save
+│   │   └── history.js      ← comparisons, trends, delete, import / merge, CSV, export names
+│   ├── app/                ← the app (DOM, speech, timers, storage)
+│   │   ├── shared.js       ← storage, speech, showWord, small helpers, drill names, shared elements
+│   │   ├── defense.js      ← Defense mode
+│   │   ├── runner.js       ← the Offense runner, countdown bar, session clock, learned lengths
+│   │   ├── settings.js     ← the settings form, steppers, toggles, saving and loading fields
+│   │   ├── levels-ui.js    ← Auto difficulty, level-locked fields, moving the level after a set
+│   │   ├── set-log.js      ← the set log form, saving a set, rest, Next set
+│   │   ├── summary.js      ← the session summary
+│   │   ├── history-ui.js   ← the history screen: trends chart, session list, export reminder
+│   │   ├── backup.js       ← export (JSON / CSV), backup text, import
+│   │   └── main.js         ← modes, start screen view, Start / Stop, wiring; init() starts the app
+│   └── selftest-page.js    ← the ?selftest=1 page
+├── selftest-node.js        ← runs the self-test under Node
+├── server.js               ← minimal static file server (Node.js, port 8080)
+└── README.md               ← this document
 ```
+
+**How the files fit together.** `index.html` loads the scripts in a fixed order: the pure files first (`js/core/planner.js` first, then levels, session, the drills, the log), then the app files, `main.js` last, and the self-test page.
+
+- **Pure files** are each an IIFE. `planner.js` creates `OffensePlanner` (the shared helpers, `OFFENSE_DEFAULTS`, `TRAINING_DEFAULTS` and the registry); every other pure file takes what it needs from it, adds its own defaults sections, and adds its exports back with `Object.assign(P, …)`. A drill registers itself with `registerDrill(profile)` (see [Drill profiles and rep plans](#drill-profiles-and-rep-plans)); other self-test suites with `registerSuite(fn)`. `training-log.js` creates `TrainingLog`, and `history.js` adds to it.
+- **App files** are plain scripts sharing the page's global scope: a top-level `function`, `const` or `let` in one is visible in the others, so names must be unique across them. Each element reference lives in the file that uses it (or in `shared.js` when several do). Nothing runs on load except declarations; `main.js` builds the forms, loads saved values and wires every control in `init()`, which it skips on the `?selftest=1` page.
+- **Adding a drill** means a new folder with a pure file that calls `registerDrill` (and `*-ui.js` if it needs its own UI), a button in the drill switch, its `DRILLS` entry in `js/app/shared.js`, and its `<script>` tags in `index.html`.
 
 ---
 
@@ -1114,30 +1159,25 @@ Reaction game/
                                                │  HTTP (LAN)
                      ┌─────────────────────────┴──────────────────────────┐
                      │               Phone / any browser                  │
-                     │  index.html                                        │
-                     │   ├─ Start screen: mode switch, settings, Start    │
-                     │   ├─ Game screen: mode label, set/rep, clock,      │
-                     │   │    word, countdown, Stop                       │
-                     │   ├─ Set log screen: steppers, rating, note, save  │
-                     │   ├─ Rest screen: countdown, summary, Next set     │
-                     │   ├─ Script 1: OffensePlanner (pure functions)     │
-                     │   │    OFFENSE_DEFAULTS, TRAINING_DEFAULTS, state  │
-                     │   │    tables, fit/plan, validation, learning      │
-                     │   │    math, session helpers, drill profiles,      │
-                     │   │    self-test                                   │
-                     │   │  + TrainingLog (pure): set validation,         │
-                     │   │    snapshots, summaries, versioned load/save   │
-                     │   ├─ Script 2: the app                             │
-                     │   │    speech, Defense mode, Offense rep and set   │
-                     │   │    runner, set log form, rest, settings form,  │
-                     │   │    localStorage                                │
-                     │   └─ Script 3: ?selftest=1 page (inactive normally)│
+                     │  index.html + styles.css                           │
+                     │   ├─ Screens: start, game, set log, rest,          │
+                     │   │    summary, history                            │
+                     │   ├─ Pure logic (js/core, js/log, the drills)      │
+                     │   │    OffensePlanner: defaults, timing math,      │
+                     │   │    levels, sessions, one file per drill        │
+                     │   │    (planner, validation, self-test, profile)   │
+                     │   │    TrainingLog: set validation, summaries,     │
+                     │   │    versioned load/save, history                │
+                     │   ├─ The app (js/app, the drills' *-ui.js)         │
+                     │   │    speech, Defense mode, Offense runner, forms,│
+                     │   │    screens, localStorage; main.js starts it    │
+                     │   └─ js/selftest-page.js: ?selftest=1 page         │
                      └────────────────────────────────────────────────────┘
 ```
 
 All logic runs **in the browser**. The server only delivers files and has no game state, API or database.
 
-The planner is kept pure on purpose: its functions take settings, spoken lengths and an injectable `rng` (default `Math.random`) and return plain data. They never touch the DOM, timers or speech. That is what lets the self-test simulate tens of thousands of drives and reps in under a second, using exactly the code the game uses. Each drill is a profile whose `planRep` returns a rep plan, and the runner in Script 2 only executes rep plans (see [Drill profiles and rep plans](#drill-profiles-and-rep-plans)). `TrainingLog` follows the same rule: it never touches `localStorage` itself, but reads and writes through a store object (`{ get, set }`) that the app passes in and the self-test fakes.
+The planner is kept pure on purpose: its functions take settings, spoken lengths and an injectable `rng` (default `Math.random`) and return plain data. They never touch the DOM, timers or speech. That is what lets the self-test simulate tens of thousands of drives and reps in under a second, using exactly the code the game uses. Each drill is a profile whose `planRep` returns a rep plan, and the runner (`js/app/runner.js`) only executes rep plans (see [Drill profiles and rep plans](#drill-profiles-and-rep-plans)). `TrainingLog` follows the same rule: it never touches `localStorage` itself, but reads and writes through a store object (`{ get, set }`) that the app passes in and the self-test fakes.
 
 ---
 
@@ -1162,7 +1202,7 @@ It listens on `0.0.0.0` (all interfaces), which is what lets a phone on the same
 
 ---
 
-## `index.html` in detail
+## The code in detail
 
 ### Head and viewport
 
@@ -1174,7 +1214,7 @@ Mobile-responsive viewport. The page extends under iPhone notches (`viewport-fit
 
 ### Styling
 
-Colors are CSS custom properties on `:root`:
+All styles are in `styles.css`. Colors are CSS custom properties on `:root`:
 
 | Variable | Value | Used for |
 |----------|-------|----------|
@@ -1216,9 +1256,9 @@ Notable pieces:
 
 All six screens are always in the DOM, and the `.hidden` class switches between them.
 
-### Script 1: `OffensePlanner`
+### Pure logic: `OffensePlanner`
 
-A pure module (an IIFE assigned to `const OffensePlanner`). It contains:
+`const OffensePlanner` is created by `js/core/planner.js`; `js/core/levels.js`, `js/core/session.js`, the drill files and `js/read-the-d/scoring.js` each add their exports to it (see [Project structure](#project-structure)). Together it contains:
 
 | Export | Purpose |
 |--------|---------|
@@ -1253,11 +1293,12 @@ A pure module (an IIFE assigned to `const OffensePlanner`). It contains:
 | `correctAction(state, rules)` / `rtdStates(withHands)` / `sampleState(cfg, withHands, prev, rng)` | The correct action for a state; all 18 (or 36) states; one weighted state draw that never repeats `prev` |
 | `planReadTheDRep(s, dur, rng, onPick, ctx)` / `validateReadTheD(s, dur)` / `readTheDFitTable(s, dur)` | The Read the D rep plan (with `cues`), its settings check, and the per-level sequence table |
 | `repPlanProblems(plan, phrases)` | The runner contract check: a list of problems, empty for a valid plan |
-| `runSelfTest(log, reps)` | The simulation (every profile's self-test, the runner contract, then the session checks); returns `{ passed, results, fitTable, fitTables: { drive, moveLab, readTheD } }` |
+| `registerDrill(profile)` / `registerSuite(fn)`, `PROFILES`, `LEVEL_DRILLS` | The drill registry (a profile with `levelled: true` joins `LEVEL_DRILLS`) and the extra self-test suites |
+| `runSelfTest(log, reps)` | The simulation (every drill's self-test, then every registered suite: runner contract, learned lengths, session, levels, Read the D scoring); returns `{ passed, results, fitTable, fitTables: { drive, moveLab, readTheD } }` |
 
 `runSelfTest(log, reps, extraSuites)` also runs each function in `extraSuites` as `suite(check)`; the self-test page passes `[TrainingLog.selfTest]`.
 
-The same script also defines **`TrainingLog`**, a second pure module (an IIFE assigned to `const TrainingLog`):
+**`TrainingLog`** is the second pure module, created by `js/log/training-log.js`; `js/log/history.js` adds the comparison, trend, delete, import, merge and CSV functions:
 
 | Export | Purpose |
 |--------|---------|
@@ -1282,9 +1323,9 @@ The same script also defines **`TrainingLog`**, a second pure module (an IIFE as
 
 Internally, `fitRateIn` / `minWindowIn` / `scheduleCalls` take the end buffer as a parameter, so any window can keep a buffer free at its end with the same math.
 
-### Script 2: the app
+### The app (`js/app/`, `js/*/…-ui.js`)
 
-Wrapped in an IIFE, so nothing leaks into the global scope. If `?selftest=1` is present it returns immediately.
+Plain scripts sharing the global scope (see [Project structure](#project-structure)); `js/app/main.js` starts the app in `init()` unless the page is `?selftest=1`. By file: shared helpers are in `shared.js`, Defense in `defense.js`, the runner and learned lengths in `runner.js`, the settings form, toggles and persistence in `settings.js`, adaptive difficulty in `levels-ui.js`, the Move Lab picker in `js/move-lab/move-lab-ui.js`, the Read the D review in `js/read-the-d/read-the-d-ui.js`, the set log and rest in `set-log.js`, the session summary in `summary.js`, the history screen in `history-ui.js`, backup in `backup.js`, and modes, Start / Stop and wiring in `main.js`.
 
 - **Shared helpers**: `storageGet` / `storageSet` (try/catch around `localStorage`), voice loading and `pickVoice()` (first English voice, else the first voice, else the browser default), `speak(text, { rate, cancel })`, `primeSpeech()`, `validateRange()`, `randomDelay()` and `showWord(text, className)`.
   - `speak` cancels before speaking unless `cancel: false` is passed. Defense uses the default (cancel, rate 1), and Offense passes `cancel: false` and the drive's rate.
@@ -1301,7 +1342,7 @@ Wrapped in an IIFE, so nothing leaks into the global scope. If `?selftest=1` is 
 - **Read the D review**: `decisionsOf(repCues)` turns the runner's `repCues` (finished reps only) into decision records; `reviewItems` holds each one's ✓ / ✗ state and pick; `renderReview()` draws the rows, `reviewedDecisions()` reads them back (or shows why it can't), and **All correct** resets them. `commitSet` stores the rest-screen lines (`decisionFeedback`) and `adjustLevel` uses `levelDecisionFor`.
 - **Set log and rest**: `trainingLog` is the state from `TrainingLog.openLog(logStore)` (`logStore` wraps `storageGet` / `storageSet`). `openSetLog(partial)` fills the form for the set that just ended, with its settings snapshot. `commitSet()` validates with `TrainingLog.validateSet`, adds the set to the session and saves the whole log (`persistSession` → `upsertSession` + `saveTrainingLog` → `saveLog`). `showRest()` runs the rest countdown and shows `summarizeSession`; `startNextSet()` primes speech and starts the next set.
 
-### Script 3: self-test page
+### Self-test page (`js/selftest-page.js`)
 
 Runs only with `?selftest=1`. It hides the app, calls `OffensePlanner.runSelfTest`, logs the results and both fit tables (`console.table`) and renders them in a `<pre>` banner.
 
@@ -1392,7 +1433,8 @@ Runs only with `?selftest=1`. It hides the app, calls `OffensePlanner.runSelfTes
 | Pressing Stop went straight to the start screen instead of the log | No rep of that set had finished yet, so there was nothing to log | Expected |
 | History is empty on the phone, but sessions were logged | The app was opened at a different address (e.g. the computer's LAN IP changed), or Safari cleared site data | Open the old address if it still works, or import your latest JSON backup from **History** |
 | Export does nothing / no file appears | The browser blocked or doesn't support downloads | Use **Backup as text** → **Copy**, and paste it into a note or a file |
-| "This backup is from a newer version of the app" | The backup was made by a newer app version | Update `index.html`, then import |
+| "This backup is from a newer version of the app" | The backup was made by a newer app version | Update the app files, then import |
+| The page is unstyled, or nothing happens on Start | `styles.css` or a file under `js/` is missing next to `index.html` (e.g. only `index.html` was copied) | Copy the whole folder: `index.html`, `styles.css` and `js/` |
 | A `reactionCaller.log.backup.…` key appeared | The stored log couldn't be read (broken, or written by a newer version), so it was kept aside before a new log was started | Nothing is lost. The raw text is in that key |
 
 ---
@@ -1405,5 +1447,5 @@ Runs only with `?selftest=1`. It hides the app, calls `OffensePlanner.runSelfTes
 - Tune the level thresholds from real logs, e.g. adjust over the last two or three sets instead of one, and chart the level in History.
 - An option to prevent the same Defense word twice in a row.
 - Voice picker and a mute toggle (visual-only mode).
-- Harden the server: serve only `index.html`, map `/?…` to `index.html`, use a `ROOT + path.sep` prefix check, and make the port configurable.
+- Harden the server: serve only the app's files, map `/?…` to `index.html`, use a `ROOT + path.sep` prefix check, and make the port configurable.
 - Make it a PWA (manifest + service worker) so it can be installed to the home screen and work offline.
