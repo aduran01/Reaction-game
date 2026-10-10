@@ -754,22 +754,15 @@ input, textarea {
 .word-catch { color: var(--text); }
 .word-shot { color: #ffd24f; }
 
-/* Read the D: one color per role, so the categories stay distinct. */
-.word-momentum { color: #ff7a4f; }
-.word-distance { color: #c47bff; }
-.word-foot { color: #45d6e0; }
-.word-hands { color: #ff6bd6; }
-/* NOW: a short flash (yellow block fading to yellow text). */
-.word-now {
-  color: #ffd24f;
-  border-radius: 16px;
-  padding: 0 0.25em;
-  animation: now-flash 0.45s ease-out;
-}
-@keyframes now-flash {
-  0% { background: #ffd24f; color: var(--bg); }
-  100% { background: transparent; color: #ffd24f; }
-}
+/* Read the D: one color per role, so the categories stay distinct. GO and the
+   LAY calls use .word-read (white), CUT OFF uses .word-cut (red). */
+.word-distance { color: #c47bff; }  /* TIGHT, NO OPENING, SAGGING */
+.word-retreat { color: #ff7a4f; }   /* RETREATING */
+.word-foot { color: #45d6e0; }      /* LEFT FOOT, RIGHT FOOT */
+.word-hands { color: #ff6bd6; }     /* HANDS UP, HANDS DOWN */
+.word-lane { color: #4fd87c; }      /* LANE OPEN */
+.word-crossed { color: #4f8cff; }   /* CROSSED */
+.word-help { color: #ffd24f; }      /* HELP D ON LEFT / RIGHT */
 
 /* Read the D decision review on the set log: 48px+ targets for sweaty hands. */
 .review { display: flex; flex-direction: column; gap: 10px; }
@@ -786,7 +779,6 @@ input, textarea {
 .review-row.wrong { border-color: var(--danger); }
 .review-seq { margin: 0; font-weight: 700; font-size: 1rem; line-height: 1.3; }
 .review-seq .rep { color: var(--muted); font-weight: 600; margin-right: 6px; }
-.review-answer { margin: 0; color: var(--muted); font-size: 0.9rem; line-height: 1.3; }
 .review-toggle {
   min-height: 52px;
   padding: 8px 12px;
@@ -795,10 +787,13 @@ input, textarea {
   font-size: 1rem;
 }
 .review-row.wrong .review-toggle { color: var(--danger); }
-.review-choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.review-chips-title { margin: 0; color: var(--muted); font-size: 0.85rem; }
+.review-choices { display: flex; flex-wrap: wrap; gap: 6px; }
 .review-choices button {
+  flex: 1 1 auto;
+  width: auto;
   min-height: 52px;
-  padding: 6px 4px;
+  padding: 6px 12px;
   background: var(--bg);
   border: 1px solid #2a2e38;
   color: var(--muted);
@@ -806,9 +801,10 @@ input, textarea {
 }
 .review-choices button[aria-pressed="true"] { background: #2a2e38; border-color: var(--accent); color: var(--text); }
 
-/* An on / off setting (toggle button bound to a hidden number input). */
-.flag-field .toggle-row label { color: var(--text); font-size: 1rem; }
-.toggle-btn:disabled { opacity: 0.6; cursor: default; }
+/* Read the D settings: a one-line hint under a timing field. */
+.field-hint { margin: 4px 0 0; color: var(--muted); font-size: 0.8rem; line-height: 1.3; }
+.timing-pair { display: flex; flex-direction: column; }
+.field label .hint { display: block; font-size: 0.8rem; }
 .word-center { color: #c47bff; }
 .word-cut { color: #ff4f5e; }
 .word-layup { color: #ffd24f; }

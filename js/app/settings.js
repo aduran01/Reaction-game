@@ -1,9 +1,8 @@
 // Offense settings form: fields by settings path, weight tables, − / + steppers,
-// on / off toggles, and saving / loading every field.
+// and saving / loading every field.
 // App code (DOM, speech, timers, storage). The app files share the global
 // scope, load in the order of index.html, and only main.js starts anything.
 
-const flagButtons = document.querySelectorAll("button[data-flag-for]");
 const STORAGE_SETTINGS = "reactionCaller.settings";
 
 const WEIGHT_TABLE_TITLES = {
@@ -127,34 +126,6 @@ function readOffenseSettings() {
   s.moveLab.moveIds = moveLabChoice.moveIds.slice();
   s.training = P.sessionForDrill(readTrainingSettings(), selectedDrill);
   return s;
-}
-
-// ---- On / off settings: a toggle button drives a hidden 0 / 1 input ----
-
-function flagInput(btn) {
-  return document.getElementById(btn.dataset.flagFor);
-}
-
-// Show each toggle's value; a level-locked one is shown but can't be tapped.
-function renderFlags() {
-  flagButtons.forEach(btn => {
-    const input = flagInput(btn);
-    const on = input.value === "1";
-    btn.setAttribute("aria-pressed", String(on));
-    btn.textContent = on ? "On" : "Off";
-    btn.disabled = input.readOnly;
-    btn.classList.toggle("level-locked", input.readOnly);
-  });
-}
-
-function wireFlags() {
-  flagButtons.forEach(btn => btn.addEventListener("click", () => {
-    const input = flagInput(btn);
-    if (input.readOnly) return;
-    input.value = input.value === "1" ? "0" : "1";
-    input.dispatchEvent(new Event("input"));
-    renderFlags();
-  }));
 }
 
 // ---- Persistence: mode, drill, Defense's Min/Max fields and offense settings only ----

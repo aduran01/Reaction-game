@@ -81,7 +81,6 @@ function updateLevelView() {
     if (autoLevel) lockInput(input, owner[path], path);
     else unlockInput(input);
   });
-  renderFlags();
 }
 
 // Auto difficulty: apply the adjustment rule to the set just logged; the new

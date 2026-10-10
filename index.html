@@ -49,10 +49,6 @@
           <span id="levelText-drive">Drive: Level 3</span>
           <button type="button" class="small-btn" data-reset-level="drive">Reset level</button>
         </div>
-        <div class="level-row">
-          <span id="levelText-readTheD">Read the D: Level 3</span>
-          <button type="button" class="small-btn" data-reset-level="readTheD">Reset level</button>
-        </div>
         <p class="status-text" id="levelStatus" role="status"></p>
       </div>
 
@@ -107,91 +103,141 @@
         </details>
       </div>
 
-      <!-- Read the D drill only. On / off settings are hidden number inputs (0 / 1)
-           driven by toggle buttons, so levels and saved settings treat them like any field. -->
+      <!-- Read the D drill only. Every field is a path into OFFENSE_DEFAULTS.readTheD.
+           rtdRate, rtdReadMinMs / rtdReadMaxMs and rtdResetPauseMs kept their ids so saved values load. -->
       <div class="panel-section hidden" id="readTheDSettings">
-        <div class="field flag-field">
-          <div class="toggle-row">
-            <label for="rtdPractice" class="toggle-label">Practice mode<span class="hint">After each decision the voice says the right move and why</span></label>
-            <button type="button" class="toggle-btn" data-flag-for="rtdPractice" aria-pressed="false">Off</button>
-          </div>
-          <input type="number" id="rtdPractice" class="hidden" min="0" max="1" step="1" data-setting="readTheD.practice">
+        <div class="field">
+          <label for="rtdRate">Speech rate<span class="hint">every call after GO (GO uses the base rate)</span></label>
+          <input type="number" id="rtdRate" min="0.5" max="2" step="0.05" inputmode="decimal" data-setting="readTheD.rate">
         </div>
-        <div class="range-row">
+
+        <p class="panel-title">Timing <span class="title-hint">each wait runs from the end of one call to the start of the next</span></p>
+        <div class="timing-pair">
+          <div class="range-row">
+            <div class="field">
+              <label for="rtdReadMinMs">Read wait min (ms)</label>
+              <input type="number" id="rtdReadMinMs" min="0" step="50" data-setting="readTheD.waits.read.minMs">
+            </div>
+            <div class="field">
+              <label for="rtdReadMaxMs">Read wait max (ms)</label>
+              <input type="number" id="rtdReadMaxMs" min="0" step="50" data-setting="readTheD.waits.read.maxMs">
+            </div>
+          </div>
+          <p class="field-hint">After GO, before the first read: TIGHT, NO OPENING, SAGGING or RETREATING.</p>
+        </div>
+        <div class="timing-pair">
+          <div class="range-row">
+            <div class="field">
+              <label for="rtdJabMin">Jab wait min (ms)</label>
+              <input type="number" id="rtdJabMin" min="0" step="50" data-setting="readTheD.waits.jab.minMs">
+            </div>
+            <div class="field">
+              <label for="rtdJabMax">Jab wait max (ms)</label>
+              <input type="number" id="rtdJabMax" min="0" step="50" data-setting="readTheD.waits.jab.maxMs">
+            </div>
+          </div>
+          <p class="field-hint">After TIGHT, before LEFT FOOT or RIGHT FOOT.</p>
+        </div>
+        <div class="timing-pair">
+          <div class="range-row">
+            <div class="field">
+              <label for="rtdDribbleMin">Dribble wait min (ms)</label>
+              <input type="number" id="rtdDribbleMin" min="0" step="50" data-setting="readTheD.waits.dribble.minMs">
+            </div>
+            <div class="field">
+              <label for="rtdDribbleMax">Dribble wait max (ms)</label>
+              <input type="number" id="rtdDribbleMax" min="0" step="50" data-setting="readTheD.waits.dribble.maxMs">
+            </div>
+          </div>
+          <p class="field-hint">After NO OPENING or HANDS UP, before the next read.</p>
+        </div>
+        <div class="timing-pair">
+          <div class="range-row">
+            <div class="field">
+              <label for="rtdQuickMin">Quick follow min (ms)</label>
+              <input type="number" id="rtdQuickMin" min="0" step="50" data-setting="readTheD.waits.quick.minMs">
+            </div>
+            <div class="field">
+              <label for="rtdQuickMax">Quick follow max (ms)</label>
+              <input type="number" id="rtdQuickMax" min="0" step="50" data-setting="readTheD.waits.quick.maxMs">
+            </div>
+          </div>
+          <p class="field-hint">After a foot call, CUT OFF, CROSSED, SAGGING or RETREATING: the defender's quick reaction (or the shot).</p>
+        </div>
+        <div class="timing-pair">
+          <div class="range-row">
+            <div class="field">
+              <label for="rtdFinishMin">Finish wait min (ms)</label>
+              <input type="number" id="rtdFinishMin" min="0" step="50" data-setting="readTheD.waits.finish.minMs">
+            </div>
+            <div class="field">
+              <label for="rtdFinishMax">Finish wait max (ms)</label>
+              <input type="number" id="rtdFinishMax" min="0" step="50" data-setting="readTheD.waits.finish.maxMs">
+            </div>
+          </div>
+          <p class="field-hint">After LANE OPEN or HELP D, before HELP D or the LAY call.</p>
+        </div>
+        <div class="field-grid">
           <div class="field">
-            <label for="rtdRate">Cue speech rate</label>
-            <input type="number" id="rtdRate" min="0.5" max="2" step="0.05" inputmode="decimal" data-setting="readTheD.rate">
+            <label for="rtdEndWindowMs">End window (ms)</label>
+            <input type="number" id="rtdEndWindowMs" min="0" step="100" data-setting="readTheD.endWindowMs">
+            <p class="field-hint">The countdown after the last call: make your move and shoot.</p>
           </div>
           <div class="field">
-            <label for="rtdDecisionMs">Decision window (ms)</label>
-            <input type="number" id="rtdDecisionMs" min="500" step="100" data-setting="readTheD.decisionMs">
+            <label for="rtdResetPauseMs">Reset pause (ms)</label>
+            <input type="number" id="rtdResetPauseMs" min="0" step="100" data-setting="readTheD.resetPauseMs">
+            <p class="field-hint">The rest after the window, before the next GO.</p>
           </div>
         </div>
         <div class="error" id="readTheDError"></div>
 
-        <details class="advanced" id="readTheDAdvanced">
-          <summary>Advanced</summary>
+        <details class="advanced" id="readTheDChances">
+          <summary>Chances</summary>
           <div class="advanced-body">
-            <div class="field flag-field">
-              <div class="toggle-row">
-                <label for="rtdHands" class="toggle-label">Hands call<span class="hint">HANDS UP / DOWN, a distractor that never changes the answer</span></label>
-                <button type="button" class="toggle-btn" data-flag-for="rtdHands" aria-pressed="false">Off</button>
-              </div>
-              <input type="number" id="rtdHands" class="hidden" min="0" max="1" step="1" data-setting="readTheD.hands">
-            </div>
-            <div class="field flag-field">
-              <div class="toggle-row">
-                <label for="rtdMidDribble" class="toggle-label">Mid-dribble<span class="hint">LIVE at the start, the read comes while you dribble</span></label>
-                <button type="button" class="toggle-btn" data-flag-for="rtdMidDribble" aria-pressed="false">Off</button>
-              </div>
-              <input type="number" id="rtdMidDribble" class="hidden" min="0" max="1" step="1" data-setting="readTheD.midDribble">
-            </div>
-            <div class="field flag-field">
-              <div class="toggle-row">
-                <label for="rtdSecondRead" class="toggle-label">Second read<span class="hint">In about half the reps the defender reacts to your move: read again</span></label>
-                <button type="button" class="toggle-btn" data-flag-for="rtdSecondRead" aria-pressed="false">Off</button>
-              </div>
-              <input type="number" id="rtdSecondRead" class="hidden" min="0" max="1" step="1" data-setting="readTheD.secondRead">
-            </div>
+            <p class="weight-title">Chances (0 to 1)</p>
             <div class="field-grid">
               <div class="field">
-                <label for="rtdCueGapMs">Gap between cue calls (ms)</label>
-                <input type="number" id="rtdCueGapMs" min="0" step="10" data-setting="readTheD.cueGapMs">
+                <label for="rtdSagHandsUpChance">HANDS UP after SAGGING</label>
+                <input type="number" id="rtdSagHandsUpChance" min="0" max="1" step="0.05" inputmode="decimal" data-setting="readTheD.sagHandsUpChance">
               </div>
               <div class="field">
-                <label for="rtdResetPauseMs">Reset pause (ms)</label>
-                <input type="number" id="rtdResetPauseMs" min="0" step="100" data-setting="readTheD.resetPauseMs">
+                <label for="rtdRetreatHandsUpChance">HANDS UP after RETREATING</label>
+                <input type="number" id="rtdRetreatHandsUpChance" min="0" max="1" step="0.05" inputmode="decimal" data-setting="readTheD.retreatHandsUpChance">
               </div>
               <div class="field">
-                <label for="rtdReadMinMs">Min read time (ms)</label>
-                <input type="number" id="rtdReadMinMs" min="100" step="100" data-setting="readTheD.readMinMs">
+                <label for="rtdCutOffChance">CUT OFF after a foot call</label>
+                <input type="number" id="rtdCutOffChance" min="0" max="1" step="0.05" inputmode="decimal" data-setting="readTheD.cutOffChance">
               </div>
               <div class="field">
-                <label for="rtdReadMaxMs">Max read time (ms)</label>
-                <input type="number" id="rtdReadMaxMs" min="100" step="100" data-setting="readTheD.readMaxMs">
+                <label for="rtdCutOffAgainChance">CUT OFF again after CUT OFF</label>
+                <input type="number" id="rtdCutOffAgainChance" min="0" max="1" step="0.05" inputmode="decimal" data-setting="readTheD.cutOffAgainChance">
               </div>
               <div class="field">
-                <label for="rtdLiveDelayMinMs">LIVE delay min (ms)</label>
-                <input type="number" id="rtdLiveDelayMinMs" min="0" step="100" data-setting="readTheD.liveDelayMinMs">
-              </div>
-              <div class="field">
-                <label for="rtdLiveDelayMaxMs">LIVE delay max (ms)</label>
-                <input type="number" id="rtdLiveDelayMaxMs" min="0" step="100" data-setting="readTheD.liveDelayMaxMs">
-              </div>
-              <div class="field">
-                <label for="rtdSecondGapMinMs">Second read gap min (ms)</label>
-                <input type="number" id="rtdSecondGapMinMs" min="0" step="100" data-setting="readTheD.secondGapMinMs">
-              </div>
-              <div class="field">
-                <label for="rtdSecondGapMaxMs">Second read gap max (ms)</label>
-                <input type="number" id="rtdSecondGapMaxMs" min="0" step="100" data-setting="readTheD.secondGapMaxMs">
-              </div>
-              <div class="field">
-                <label for="rtdPracticePauseMs">Practice pause (ms)</label>
-                <input type="number" id="rtdPracticePauseMs" min="0" step="100" data-setting="readTheD.practicePauseMs">
+                <label for="rtdHelpChance">HELP D after LANE OPEN</label>
+                <input type="number" id="rtdHelpChance" min="0" max="1" step="0.05" inputmode="decimal" data-setting="readTheD.helpChance">
               </div>
             </div>
-            <p class="muted-text">The rules that decide the right move, and how often each move comes up, are in TRAINING_DEFAULTS.readTheD in index.html.</p>
+            <div id="readTheDWeightTables"></div>
+          </div>
+        </details>
+
+        <details class="advanced" id="readTheDCaps">
+          <summary>Caps</summary>
+          <div class="advanced-body">
+            <div class="field-grid">
+              <div class="field">
+                <label for="rtdMaxCutOffs">Max CUT OFFs per rep</label>
+                <input type="number" id="rtdMaxCutOffs" min="0" step="1" data-setting="readTheD.maxCutOffsPerRep">
+              </div>
+              <div class="field">
+                <label for="rtdMaxHandsUp">Max HANDS UP per rep</label>
+                <input type="number" id="rtdMaxHandsUp" min="0" step="1" data-setting="readTheD.maxHandsUpPerRep">
+              </div>
+              <div class="field">
+                <label for="rtdMaxHelp">Max HELP D per rep</label>
+                <input type="number" id="rtdMaxHelp" min="0" max="1" step="1" data-setting="readTheD.maxHelpPerRep">
+              </div>
+            </div>
           </div>
         </details>
       </div>

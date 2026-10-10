@@ -99,9 +99,7 @@ const offenseMode = {
   repsCompleted: 0,    // reps of the current set whose endMs has passed
   repMoves: [],        // moves called in each rep of the current set (from plan.moves)
   lastMoveId: null,    // the last move called this session (so planners never repeat it)
-  repCues: [],         // Read the D: each rep's decisions in the current set (plan.cues)
-  lastState: null,     // Read the D: the last defender state called (never repeated next rep)
-  captionFromCall: false,  // the caption shows a call (practice mode's why), not plan.caption
+  repCues: [],         // Read the D: each rep's cues in the current set (plan.cues)
 
   start(settings) {
     this.settings = settings;
@@ -109,7 +107,6 @@ const offenseMode = {
     this.runId++;
     this.progress = P.newSession();
     this.lastMoveId = null;
-    this.lastState = null;
     countdownEl.classList.remove("hidden");
     this.startClock();
     this.beginSetClock();
@@ -181,22 +178,11 @@ const offenseMode = {
     this.timers.push(id);
   },
 
-  // show "caption": the call goes in the small line under the word (practice
-  // mode's why); otherwise it is the big word, which clears such a caption.
-  say(id, rate, show) {
+  say(id, rate) {
     const phrase = this.settings.phrases[id];
-    if (show === "caption") {
-      showCaption([id]);
-      this.captionFromCall = true;
-    } else {
-      const len = phrase.display.length;
-      const long = len > 18 ? " long xlong" : len > 7 ? " long" : "";
-      showWord(phrase.display, PHRASE_CLASS[id] + long);
-      if (this.captionFromCall) {
-        hideCaption();
-        this.captionFromCall = false;
-      }
-    }
+    const len = phrase.display.length;
+    const long = len > 18 ? " long xlong" : len > 7 ? " long" : "";
+    showWord(phrase.display, PHRASE_CLASS[id] + long);
     const utter = speak(phrase.spoken, { rate, cancel: false });
     if (utter) this.measure(utter, id, rate);
   },
@@ -221,13 +207,12 @@ const offenseMode = {
     this.progress = P.beginRep(this.progress);
     sessionProgress.textContent = P.progressLabel(this.progress, s.training, s.level);
     const plan = this.profile.planRep(s, s.durations, Math.random, null,
-      { repInSet: this.progress.rep, lastMoveId: this.lastMoveId, lastState: this.lastState });
+      { repInSet: this.progress.rep, lastMoveId: this.lastMoveId });
     const moves = plan.moves || [];
     this.repMoves.push(moves);
     if (moves.length) this.lastMoveId = moves[moves.length - 1];
-    // Read the D: what was called and the right answer, for the decision review.
+    // Read the D: every call of the rep (plan.cues), for the review after the set.
     this.repCues.push(plan.cues || []);
-    if (plan.cues && plan.cues.length) this.lastState = plan.cues[0].state;
 
     // Rep clock: t = 0 is when the first call should be heard. Every call is
     // spoken speechLeadMs before its planned time to cover TTS start-up, so the
@@ -239,7 +224,6 @@ const offenseMode = {
     countdownEl.classList.add("idle");
     // The caption (e.g. the named move) stays from its atMs until the next rep.
     hideCaption();
-    this.captionFromCall = false;
     if (plan.caption) {
       const ids = plan.caption.ids;
       const delay = at(plan.caption.atMs);
@@ -248,8 +232,8 @@ const offenseMode = {
     }
     plan.calls.forEach(call => {
       const delay = at(call.atMs);
-      if (delay <= 0) this.say(call.id, call.rate, call.show);
-      else this.later(() => this.say(call.id, call.rate, call.show), delay);
+      if (delay <= 0) this.say(call.id, call.rate);
+      else this.later(() => this.say(call.id, call.rate), delay);
     });
 
     // The countdown bar is drawn only from plan.windows.

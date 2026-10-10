@@ -44,7 +44,8 @@ const moveLabRepsField = document.getElementById("moveLabRepsField");
 const repsPerSetField = document.getElementById("repsPerSetField");
 const readTheDSettings = document.getElementById("readTheDSettings");
 const readTheDError = document.getElementById("readTheDError");
-const readTheDAdvanced = document.getElementById("readTheDAdvanced");
+const readTheDChances = document.getElementById("readTheDChances");
+const readTheDCaps = document.getElementById("readTheDCaps");
 const reviewAllBtn = document.getElementById("reviewAllBtn");
 const STORAGE_MODE = "reactionCaller.mode";
 const STORAGE_DRILL = "reactionCaller.offenseDrill";
@@ -55,7 +56,7 @@ const ERROR_TARGETS = {
   advanced: { el: advancedError, details: advancedEl },
   speech: { el: speechError, details: speechEl },
   moveLab: { el: moveLabError },
-  readTheD: { el: readTheDError, details: readTheDAdvanced },
+  readTheD: { el: readTheDError, details: [readTheDChances, readTheDCaps] },
   session: { el: sessionError },
 };
 let selectedMode = "defense";
@@ -83,7 +84,7 @@ function clearErrors() {
 
 function showError(error) {
   const target = ERROR_TARGETS[error.field];
-  if (target.details) target.details.open = true;
+  [].concat(target.details || []).forEach(d => { d.open = true; });
   target.el.textContent = error.message;
 }
 
@@ -223,12 +224,12 @@ function init() {
   buildWeightTables(weightTablesEl, P.WEIGHT_TABLES, "", WEIGHT_TABLE_TITLES);
   buildGetSetFields();
   buildWeightTables(moveLabWeightTablesEl, ["afterMoveWeights"], "moveLab.", MOVE_LAB_WEIGHT_TABLE_TITLES);
+  buildWeightTables(readTheDWeightTablesEl, P.PROFILES.readTheD.weightTables, "readTheD.", READ_THE_D_WEIGHT_TABLE_TITLES);
   buildMovePicker();
   renderMoveLab();
   fillOffenseDefaults();
   loadSettings();
   persistedInputs().forEach(input => input.addEventListener("input", saveSettings));
-  wireFlags();
   updateLevelView();
   autoLevelBtn.addEventListener("click", () => {
     autoLevel = !autoLevel;
@@ -253,11 +254,7 @@ function init() {
       if (parseNumber(logMade.value) > attempted) logMade.value = attempted;
     }
   });
-  reviewAllBtn.addEventListener("click", () => {
-    reviewItems.forEach(item => { item.wrong = false; item.choice = null; });
-    logError.textContent = "";
-    renderReview();
-  });
+  reviewAllBtn.addEventListener("click", markAllReadsRight);
   qualityButtons.forEach(btn => btn.addEventListener("click", () => {
     selectQuality(selectedQuality === btn.dataset.quality ? null : btn.dataset.quality);
   }));

@@ -46,7 +46,7 @@ const DRILLS = {
   },
   readTheD: {
     label: "OFFENSE · READ THE D",
-    subtitle: "Read the D: decide the move from what the defender's doing — no move is named for you.",
+    subtitle: "Read the D: decide your move from what the defender does next. No move is named for you.",
   },
   moveLab: {
     label: "OFFENSE · MOVE LAB",
