@@ -3,12 +3,11 @@
 **Reaction Caller** is a small, dependency-free web app for basketball reaction drills. A voice calls commands at random times, the same command appears in large color-coded letters, and the player reacts. It has two modes:
 
 - **Defense mode**: after a random wait, the app calls one of **Left**, **Right**, **Up** or **Back**, again and again until you press **Stop**.
-- **Offense mode** is **Call & Execute: move fluency and readiness under unpredictable timing.** The app dictates every move; you execute it cleanly and on time. It is not decision-making or court-reading training: nothing is read from the defense, the call tells you what to do. It has three drills:
+- **Offense mode** is **Call & Execute: move fluency and readiness under unpredictable timing.** The app dictates every move; you execute it cleanly and on time. It is not decision-making or court-reading training: nothing is read from the defense, the call tells you what to do. It has two drills:
   - **Drive** simulates a ball-handler driving from the top of the key to the basket. The app calls **READY** (get in your stance, live dribble, wait for the call), then a drive direction (**LEFT** / **RIGHT**), then zero or more reactions to the defense (**CUT OFF**, **LAY UP**), and finally a **finisher** such as **LAY UP LEFT SIDE**. All of it happens inside a timed drive window shown as a countdown bar.
   - **Move Lab** trains your own moves: pick the moves you want to work on, and each rep calls **SPRINT FROM LEFT CORNER**, **SPRINT FROM RIGHT CORNER** or **CATCH**, then **LEFT** / **RIGHT**, then one or more of your moves (up to a max you set) and finally **SHOT**. You also log how many reps were clean. See [Move Lab](#offense-move-lab-drill).
-  - **Shooters only** trains sprinting to a spot, catching and dribbling to create space for a shot. The app calls a start call (**SPRINT FROM PAINT**, **SPRINT FROM LEFT CORNER**, **SPRINT FROM RIGHT CORNER** or **CATCH**), then **LEFT** / **RIGHT**, zero or more **CUT OFF**s and **SHOT**, all inside a timed create-space window. Sometimes a **NOPE** (the shot is contested) follows, and a second window starts.
 
-  In both drills, calls are planned so that every spoken phrase fits inside its window and no call ever cuts off another. An Offense session is organized as **sets of reps**. After each set the app says "set done" and shows a quick big-button form where you log how the set went (shots made and attempted, lost handles, missed calls, how it felt). Every set is saved on the device as soon as you log it, then a rest countdown leads into the next set. Ending a session shows a summary compared with your recent sessions, and a **History** screen shows trends over weeks and lets you export and import the log as a backup. With **Auto difficulty** on, each drill has a level from 1 to 5 that sets its timing and moves up or down after each logged set, so the task stays hard but doable.
+  In every drill, calls are planned so that every spoken phrase fits inside its window and no call ever cuts off another. An Offense session is organized as **sets of reps**. After each set the app says "set done" and shows a quick big-button form where you log how the set went (shots made and attempted, lost handles, missed calls, how it felt). Every set is saved on the device as soon as you log it, then a rest countdown leads into the next set. Ending a session shows a summary compared with your recent sessions, and a **History** screen shows trends over weeks and lets you export and import the log as a backup. With **Auto difficulty** on, each drill has a level from 1 to 5 that sets its timing and moves up or down after each logged set, so the task stays hard but doable.
 
 The app is meant to run on a phone (iPhone Safari is the main target) propped up nearby while you train. The words are big enough to read from a distance, and the voice means you don't have to look at all.
 
@@ -31,7 +30,6 @@ There is no build step, no `package.json`, no framework and no third-party libra
    - [Defense mode](#defense-mode)
    - [Offense mode](#offense-mode)
    - [Offense: Drive drill](#offense-drive-drill)
-   - [Offense: Shooters only drill](#offense-shooters-only-drill)
    - [Offense: Move Lab drill](#offense-move-lab-drill)
    - [Offense: sessions, sets and reps](#offense-sessions-sets-and-reps)
    - [Offense: logging a set](#offense-logging-a-set)
@@ -49,24 +47,17 @@ There is no build step, no `package.json`, no framework and no third-party libra
    - [Running a rep](#running-a-rep)
    - [Learned spoken lengths](#learned-spoken-lengths)
    - [Validation](#validation)
-4. [Shooters only drill in depth](#shooters-only-drill-in-depth)
-   - [Shooters phrases](#shooters-phrases)
-   - [Shooters state machine](#shooters-state-machine)
-   - [Shooters weights](#shooters-weights)
-   - [Shooters timing rules](#shooters-timing-rules)
-   - [Planning a Shooters rep](#planning-a-shooters-rep)
-   - [Shooters validation](#shooters-validation)
-5. [Drill profiles and rep plans](#drill-profiles-and-rep-plans)
+4. [Drill profiles and rep plans](#drill-profiles-and-rep-plans)
    - [The training log](#the-training-log)
-6. [Tuning offense mode](#tuning-offense-mode)
-7. [Project structure](#project-structure)
-8. [Architecture overview](#architecture-overview)
-9. [`server.js` in detail](#serverjs-in-detail)
-10. [`index.html` in detail](#indexhtml-in-detail)
-11. [Browser APIs used](#browser-apis-used)
-12. [Known limitations and quirks](#known-limitations-and-quirks)
-13. [Troubleshooting](#troubleshooting)
-14. [Ideas for future work](#ideas-for-future-work)
+5. [Tuning offense mode](#tuning-offense-mode)
+6. [Project structure](#project-structure)
+7. [Architecture overview](#architecture-overview)
+8. [`server.js` in detail](#serverjs-in-detail)
+9. [`index.html` in detail](#indexhtml-in-detail)
+10. [Browser APIs used](#browser-apis-used)
+11. [Known limitations and quirks](#known-limitations-and-quirks)
+12. [Troubleshooting](#troubleshooting)
+13. [Ideas for future work](#ideas-for-future-work)
 
 ---
 
@@ -142,12 +133,11 @@ Each word has a 25% chance on every call, and the same word can repeat. Speech i
 
 Offense is **Call & Execute: move fluency and readiness under unpredictable timing.** Every call tells you exactly what to do; the training effect is executing the move fast and clean when you can't predict when (or which way) the call comes. It does not train reading the defense or making decisions.
 
-Select **Offense** to see the offense panel. At its top is a **Drive | Shooters only | Move Lab** switch (Drive is the default, and your choice is remembered). Below it is **Auto difficulty** (on by default) with each drill's current level and a **Reset level** button (see [adaptive difficulty](#offense-adaptive-difficulty)), then the settings for the selected drill, then the **Session** group (reps per set, planned sets, session time warning; see [sessions, sets and reps](#offense-sessions-sets-and-reps)), and at the bottom a collapsible **Speech (both drills)** group: base and max speech rate, minimum gap and speech lead. Both drills use the same session and speech settings.
+Select **Offense** to see the offense panel. At its top is a **Drive | Move Lab** switch (Drive is the default, and your choice is remembered). Below it is **Auto difficulty** (on by default) with each drill's current level and a **Reset level** button (see [adaptive difficulty](#offense-adaptive-difficulty)), then the settings for the selected drill, then the **Session** group (reps per set, planned sets, session time warning; see [sessions, sets and reps](#offense-sessions-sets-and-reps)), and at the bottom a collapsible **Speech (every drill)** group: base and max speech rate, minimum gap and speech lead. Every drill uses the same session and speech settings (Move Lab has its own reps per set).
 
 | Drill | When to use it |
 |-------|----------------|
 | **Drive** | Attacking off the dribble: stay ready, drive on the call, counter, finish on the side called. |
-| **Shooters only** | Catch-and-shoot and shot creation: sprint to a spot (or catch), then create space with LEFT / RIGHT until you're open for the shot. |
 | **Move Lab** | Your own moves into a shot: sprint from a corner (or catch), go LEFT / RIGHT, then hit the moves you picked as they are called, until SHOT. |
 
 Each Start runs one drill for the whole session, set after set (see [sessions, sets and reps](#offense-sessions-sets-and-reps)). There is no mixed drill yet (see [Drill profiles and rep plans](#drill-profiles-and-rep-plans)).
@@ -189,57 +179,15 @@ Calls are colored by meaning:
 | CUT OFF | Red | `#ff4f5e` |
 | LAY UP | Yellow | `#ffd24f` |
 
-Phrases longer than 7 characters (e.g. "LAY UP CENTER SIDE") use a smaller font and may wrap to two lines, so they stay readable on a 320 px-wide screen. Phrases longer than 18 characters (only the corner sprint calls of the Shooters drill) get one step smaller still. Short calls keep the huge font.
+Phrases longer than 7 characters (e.g. "LAY UP CENTER SIDE") use a smaller font and may wrap to two lines, so they stay readable on a 320 px-wide screen. Phrases longer than 18 characters (only the corner sprint calls of Move Lab) get one step smaller still. Short calls keep the huge font.
 
 The countdown bar is visible only during the drive, from the LEFT/RIGHT call until the window `D` runs out. It drains from `D` to 0 with a one-decimal seconds readout ("1.6 s"). During the reset pause it sits empty at "0.0 s", and it is hidden while READY is up.
 
-### Offense: Shooters only drill
-
-The Shooters settings are:
-
-- **Min / Max window (ms)**: how long each create-space window lasts (default 1000–1800 ms).
-- **Reset pause (ms)**: wait after a rep's last window before the next start call (default 1000 ms; separate from the Drive reset pause).
-- **Advanced** (collapsed by default): the get-set time range after each start call, nope gap and after-nope gap ranges, shot buffer, max cut offs per window, max nopes per rep, and the five weight tables. Every setting is described in [Shooters timing rules](#shooters-timing-rules) and [Shooters weights](#shooters-weights).
-
-The Drive read time fields and every other Drive-only control are hidden in this drill.
-
-Press **Start**. The game screen shows **OFFENSE · SHOOTERS**, the set and rep counter and the session clock. Within a set, reps loop like this:
-
-```
-start call ──(get-set)──▶ LEFT/RIGHT ▶ [CUT OFF …] ▶ SHOT ──┬─(65%)──────────────────────────────────────────▶ reset pause ─┐
-                          └──── window D, countdown ────┘  └─(35%)▶ NOPE ▶ LEFT/RIGHT ▶ [CUT OFF …] ▶ SHOT ──▶ reset pause ─┤
-  ▲                                                                         └──── second window D ────┘                     │
-  └──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
-```
-
-What each call tells the player:
-
-| Call | Meaning |
-|------|---------|
-| **SPRINT FROM PAINT / LEFT CORNER / RIGHT CORNER** | Get to that spot. |
-| **CATCH** | Catch the ball. |
-| **LEFT / RIGHT** | Dribble that way to create space. The window countdown starts now. |
-| **CUT OFF** | The defender took that away. Counter. |
-| **SHOT** | You're open. Shoot. |
-| **NOPE** | The shot is contested. Abort and create space again (a new window follows). |
-
-| Calls | Color | Hex |
-|-------|-------|-----|
-| SPRINT FROM … | Orange | `#ff7a4f` |
-| CATCH | White | `#f2f3f5` |
-| LEFT | Blue | `#4f8cff` |
-| RIGHT | Green | `#4fd87c` |
-| CUT OFF | Red | `#ff4f5e` |
-| SHOT | Yellow | `#ffd24f` |
-| NOPE | Pink | `#ff6bd6` |
-
-The countdown bar drains **once per window**, from the LEFT/RIGHT call until that window's `D` runs out. Between windows (around a NOPE) and during the reset pause it sits empty at "0.0 s". It is hidden during the start call and the get-set time.
-
 ### Offense: Move Lab drill
 
-Move Lab is Call & Execute with your own moves. You pick the moves you want to work on, and every rep runs like a Shooters rep whose create-space part is made of those moves.
+Move Lab is Call & Execute with your own moves. You pick the moves you want to work on, and every rep is a start call, a direction, then those moves until SHOT.
 
-**Settings.** A **Moves** grid of the eight moves in `TRAINING_DEFAULTS.moves`: tap a move to pick it, tap again to drop it (picked moves are highlighted; at least one is needed). **Max moves per rep** (− / +, 1–6, default 3). Under **Advanced**: **Gap between moves** min / max (800 / 1500 ms, provisional), **Reset pause** (1000 ms), and **Weights after a move** (Another move 50 / SHOT 50, provisional). In the Session group, **Reps per set (Move Lab)** (default 10, saved separately from the other drills). Auto difficulty is hidden: Move Lab has no levels (`level: null`). The picked moves are stored in `reactionCaller.moveLab` as `{ moveIds: [...] }` (a choice saved by the first version of Move Lab, `{ moveId, side }`, loads as that one move). Defaults: CROSSOVER and HESI.
+**Settings.** A **Moves** grid of the eight moves in `TRAINING_DEFAULTS.moves`: tap a move to pick it, tap again to drop it (picked moves are highlighted; at least one is needed). **Max moves per rep** (− / +, 1–6, default 3). Under **Advanced**: **Gap between moves** min / max (800 / 1500 ms, provisional), **Reset pause** (1000 ms), **Gap before first move** min / max (150 / 400 ms), the **get-set time** min / max after each start call (left corner 1000–2300, right corner 1040–2300, catch 440–1100 ms, provisional), and **Weights after a move** (Another move 50 / SHOT 50, provisional). In the Session group, **Reps per set (Move Lab)** (default 10, saved separately from the other drills). Auto difficulty is hidden: Move Lab has no levels (`level: null`). The picked moves are stored in `reactionCaller.moveLab` as `{ moveIds: [...] }` (a choice saved by the first version of Move Lab, `{ moveId, side }`, loads as that one move). Defaults: CROSSOVER and HESI.
 
 | Move | Type | Spoken | est. ms at rate 1.0 |
 |---|---|---|---|
@@ -257,10 +205,10 @@ Each move is also added to the shared phrase table, so learned lengths work for 
 **Flow** (`planMoveLabRep`, pure, self-tested). One rep:
 
 ```
-SPRINT FROM LEFT CORNER | SPRINT FROM RIGHT CORNER | CATCH     (equally likely; never SPRINT FROM PAINT)
-  -> get-set time (Shooters getSetMs for that start call)
+SPRINT FROM LEFT CORNER | SPRINT FROM RIGHT CORNER | CATCH     (equally likely)
+  -> get-set time (getSetMs for that start call)
 LEFT | RIGHT                                                    (50 / 50)
-  -> gap: Shooters nope gap (nopeGapMinMs..nopeGapMaxMs, 150-400 ms of silence)
+  -> gap before the first move (firstMoveGapMinMs..firstMoveGapMaxMs, 150-400 ms of silence)
 MOVE                                                            (one of your picked moves, at random)
   -> gap between moves (moveGapMinMs..moveGapMaxMs of silence)
 MOVE again (weight "Another move") or SHOT (weight SHOT)
@@ -268,7 +216,7 @@ MOVE again (weight "Another move") or SHOT (weight SHOT)
 SHOT  -> rep ends; reset pause, then the next start call
 ```
 
-So a rep has 1 to Max moves; with the default 50 / 50 weights and a max of 3, half the reps have one move, a quarter two and a quarter three. The same move can be called twice in a row. Every call is spoken at the base rate, each one only after the previous one has finished, so calls never overlap. The get-set and nope-gap ranges are the Shooters only settings (edit them under Shooters only › Advanced); Move Lab's own numbers are in `OFFENSE_DEFAULTS.moveLab`. The countdown bar drains from LEFT / RIGHT until SHOT has been spoken.
+So a rep has 1 to Max moves; with the default 50 / 50 weights and a max of 3, half the reps have one move, a quarter two and a quarter three. The same move can be called twice in a row. Every call is spoken at the base rate, each one only after the previous one has finished, so calls never overlap. All of Move Lab's numbers, including the get-set times and the gap before the first move, are in `OFFENSE_DEFAULTS.moveLab` and under Move Lab › Advanced. (They used to be borrowed from the removed Shooters only drill; values you saved there carry over, because the inputs kept their ids.) The countdown bar drains from LEFT / RIGHT until SHOT has been spoken.
 
 **Logging.** The set log adds **Clean reps** (0 to the reps in the set, default 0): every move in the rep controlled, on balance, eyes up. Shots made / attempted are always shown, since every rep ends in SHOT. `extra` stores `{ moveIds, cleanReps }` (the picked moves). The summary card adds a Clean reps line, and History lists the picked moves of each set.
 
@@ -280,7 +228,7 @@ Offense is organized like a training session in the gym:
 
 | Term | Meaning |
 |------|---------|
-| **Rep** | One rep plan from the drill: one READY … finisher drive, or one Shooters rep (start call through the last SHOT) |
+| **Rep** | One rep plan from the drill: one READY … finisher drive, or one Move Lab rep (start call through SHOT) |
 | **Set** | A fixed number of reps (**Reps per set**) |
 | **Session** | Everything from Start until you end it |
 
@@ -307,12 +255,12 @@ When the **last rep of a set ends** (at the end of its window, without waiting f
 
 You log a set only **after** it ends, never during it. The form is one screen of big controls (− / + steppers at least 56 px tall, three large rating buttons), so it works with sweaty hands. You can also type into the number fields.
 
-The top shows the drill and what you are logging, e.g. **OFFENSE · SHOOTERS** / **Set 2 · 8 reps**, or **Partial set 2 · 5 of 8 reps** after Stop.
+The top shows the drill and what you are logging, e.g. **OFFENSE · DRIVE** / **Set 2 · 8 reps**, or **Partial set 2 · 5 of 8 reps** after Stop.
 
 | Field | Default | Meaning |
 |-------|---------|---------|
 | **Shots made** | 0 | Shots or finishes you made. Can't go above attempted: the + button stops there, and lowering attempted pulls made down with it |
-| **Shots attempted** | the reps in the set | Each rep ends in exactly one real shot or finish (a SHOT followed by NOPE doesn't count), so this is normally the rep count |
+| **Shots attempted** | the reps in the set | Each rep ends in exactly one real shot or finish, so this is normally the rep count |
 | **Lost handles** | 0 | Lost dribble, travel, or picked up the dribble early |
 | **Missed or late calls** | 0 | Calls you didn't react to in time |
 | **How did the set feel?** | none | One tap: **Clean**, **Rushed** or **Off-balance**. Optional; tap the selected one again to clear it |
@@ -329,7 +277,7 @@ Buttons:
 
 If a value is invalid (e.g. you typed made 9 with attempted 8, or left a field empty), the reason shows above the buttons and nothing is saved until you fix it.
 
-**Next set** starts the next set right away, beginning with its first call (READY or a Shooters start call). The tap unlocks speech again on iPhone. **End session** ends the session and shows the [session summary](#offense-session-summary).
+**Next set** starts the next set right away, beginning with its first call (READY or a Move Lab start call). The tap unlocks speech again on iPhone. **End session** ends the session and shows the [session summary](#offense-session-summary).
 
 The rest screen says "Set saved." after each save, or "Couldn't save to this device. Storage may be blocked or full." if storage refused it. Training carries on either way. What is stored is described in [The training log](#the-training-log).
 
@@ -386,25 +334,25 @@ Learning is best when a task is hard but doable for your current skill (the "cha
 
 **Levels** (all values provisional, in `TRAINING_DEFAULTS.levels`):
 
-| Level | Drive window (ms) | Drive read time (ms) | Drive CUT OFF / LAY UP weights | Shooters window (ms) | Shooters CUT OFF : SHOT | NOPE : END |
-|---|---|---|---|---|---|---|
-| 1 | 2200–2800 | 2000–3500 | 10 / 10 | 1600–2200 | 15 : 85 | 15 : 85 |
-| 2 | 1900–2500 | 1500–3000 | 15 / 15 | 1400–2000 | 25 : 75 | 25 : 75 |
-| 3 | 1600–2200 | 1000–2500 | 20 / 20 | 1200–1800 | 30 : 70 | 35 : 65 |
-| 4 | 1500–2000 | 800–2000 | 28 / 25 | 1050–1600 | 40 : 60 | 40 : 60 |
-| 5 | 1400–1800 | 600–1500 | 35 / 30 | 950–1400 | 45 : 55 | 45 : 55 |
+| Level | Drive window (ms) | Drive read time (ms) | Drive CUT OFF / LAY UP weights |
+|---|---|---|---|
+| 1 | 2200–2800 | 2000–3500 | 10 / 10 |
+| 2 | 1900–2500 | 1500–3000 | 15 / 15 |
+| 3 | 1600–2200 | 1000–2500 | 20 / 20 |
+| 4 | 1500–2000 | 800–2000 | 28 / 25 |
+| 5 | 1400–1800 | 600–1500 | 35 / 30 |
 
-The Drive CUT OFF / LAY UP weights are the CUT OFF and LAY UP entries of `afterDriveOrCutOffWeights` (the three `LAY UP … SIDE` finishers stay at 20 each), so higher levels make drives busier as well as shorter. Shooters levels set `afterDirectionOrCutOffWeights` and `afterShotWeights`.
+The Drive CUT OFF / LAY UP weights are the CUT OFF and LAY UP entries of `afterDriveOrCutOffWeights` (the three `LAY UP … SIDE` finishers stay at 20 each), so higher levels make drives busier as well as shorter.
 
-Every level passes the drill's normal validation, including the shortest-drive and shortest-window fit checks (a self-test check loops over all ten). From the fit tables, at the defaults (`maxRate` 1.6, `minGapMs` 120):
+Every level passes the drill's normal validation, including the shortest-drive and shortest-window fit checks (a self-test check loops over all of them). From the fit tables, at the defaults (`maxRate` 1.6, `minGapMs` 120):
 
-| Level | Drive: most CUT OFFs that fit at the min / max window | Shooters: most CUT OFFs that fit at the min / max window |
-|---|---|---|
-| 1 | 3 / 3 | 2 / 2 |
-| 2 | 2 / 3 | 2 / 2 |
-| 3 | 1 / 3 | 1 / 2 |
-| 4 | 1 / 2 | 1 / 2 |
-| 5 | 1 / 2 | 0 / 2 |
+| Level | Drive: most CUT OFFs that fit at the min / max window |
+|---|---|
+| 1 | 3 / 3 |
+| 2 | 2 / 3 |
+| 3 | 1 / 3 |
+| 4 | 1 / 2 |
+| 5 | 1 / 2 |
 
 (Drive counts use the cheapest finisher; longer finishers need a little more room.)
 
@@ -428,7 +376,7 @@ Every level passes the drill's normal validation, including the shortest-drive a
 
 **Stop in Defense**, or in Offense before any rep of the current set has finished, and **End session** (on the rest screen) or **Discard**:
 
-- cancel every pending call (Offense keeps all its timers in one list and clears them all, whatever state the rep is in: start call, get-set, mid-window, NOPE gap or reset pause);
+- cancel every pending call (Offense keeps all its timers in one list and clears them all, whatever state the rep is in: start call, get-set, mid-window or reset pause);
 - stop the countdown animation, the session clock and any rest countdown;
 - silence speech immediately (`speechSynthesis.cancel()`);
 - write the session's end time to the training log, if it has saved sets;
@@ -443,18 +391,18 @@ The app uses `localStorage` and saves only:
 | Key | Contents | When written |
 |-----|----------|--------------|
 | `reactionCaller.mode` | `"defense"` or `"offense"` | When you tap the mode switch |
-| `reactionCaller.offenseDrill` | `"drive"`, `"shooters"` or `"moveLab"` (missing or unknown means Drive) | When you tap the drill switch |
+| `reactionCaller.offenseDrill` | `"drive"` or `"moveLab"` (missing or unknown, including the removed `"shooters"`, means Drive) | When you tap the drill switch |
 | `reactionCaller.moveLab` | The Move Lab moves you picked, `{ "moveIds": [...] }` (missing means the default CROSSOVER and HESI) | When you tap a move in the Moves grid |
-| `reactionCaller.settings` | The raw text of Defense's Min/Max delay fields and every offense field: Drive read time, window and Advanced values, the shared speech settings, every Shooters field (window, reset pause, get-set ranges, gaps, buffer, caps), the Move Lab fields (max moves per rep, gap between moves, reset pause), every weight and the Session fields (reps per set, planned sets, session time warning), keyed by input id | Whenever you edit any of those fields, by typing or with the − / + steppers |
-| `reactionCaller.learnedMs` | Learned spoken length of each offense phrase, Drive and Shooters alike (see [Learned spoken lengths](#learned-spoken-lengths)) | After each measured offense call |
+| `reactionCaller.settings` | The raw text of Defense's Min/Max delay fields and every offense field: Drive read time, window and Advanced values, the shared speech settings, the Move Lab fields (max moves per rep, get-set times, gaps, reset pause), every weight and the Session fields (reps per set, planned sets, session time warning), keyed by input id | Whenever you edit any of those fields, by typing or with the − / + steppers |
+| `reactionCaller.learnedMs` | Learned spoken length of each offense phrase, every drill alike (see [Learned spoken lengths](#learned-spoken-lengths)) | After each measured offense call |
 | `reactionCaller.log` | The training log: every Offense session and its logged sets (see [The training log](#the-training-log)) | After every saved set (Save & rest, Save & end session, Skip logging), and when a session with saved sets ends |
 | `reactionCaller.log.backup.<time>` | The raw text of a stored log that this version couldn't read (broken, or from a newer version), kept untouched | Once, just before the first new log is saved over it |
 | `reactionCaller.lastExportAt` | ISO time of the last JSON export (download, or copying the JSON text) | On export |
-| `reactionCaller.levels` | Each drill's current level, e.g. `{"drive":3,"shooters":4}` (missing or invalid means Level 3) | After every logged set with Auto difficulty on, and on Reset level |
+| `reactionCaller.levels` | Each drill's current level, e.g. `{"drive":3}` (missing or invalid means Level 3) | After every logged set with Auto difficulty on, and on Reset level |
 | `reactionCaller.autoLevel` | `"on"` or `"off"` (missing means on) | When you tap the Auto difficulty toggle |
 | `reactionCaller.migrations` | Ids of one-time migrations already applied, e.g. `["read-to-ready"]` | Once, on the first load after a migration is added |
 
-Settings are saved by input id, and the Drive and speech fields kept their ids. So settings saved before the Shooters drill or the Session group existed still load, and any field without a saved value shows its default.
+Settings are saved by input id, and the Drive and speech fields kept their ids. So settings saved before the Session group existed still load, and any field without a saved value shows its default. Values saved for the removed Shooters only fields are ignored, except its get-set times (corners and catch) and nope gap, which load into Move Lab's get-set and gap-before-first-move fields.
 
 Nothing else is stored. Every storage access is wrapped in `try/catch`. If storage is blocked (private mode, disabled site data), the app works normally with the built-in defaults and just doesn't remember anything; the rest screen then says the set couldn't be saved.
 
@@ -464,7 +412,7 @@ To reset everything to defaults, clear the site's data in your browser, or run `
 
 ## Offense mode in depth (Drive drill)
 
-This section describes the Drive drill. The phrase table, speech settings, runner and learned lengths are shared with the Shooters drill, which is covered in [Shooters only drill in depth](#shooters-only-drill-in-depth).
+This section describes the Drive drill. The phrase table, speech settings, runner and learned lengths are shared with the other drills.
 
 ### Phrases
 
@@ -486,7 +434,7 @@ The first Drive call has the internal id `READ` but is shown as **READY** and sp
 | LAY_UP_RIGHT_SIDE | LAY UP RIGHT SIDE | lay up right side | 1000 | long |
 | LAY_UP_CENTER_SIDE | LAY UP CENTER SIDE | lay up center side | 1100 | long |
 
-The estimates are only a starting point. The app measures the real lengths on your device and uses those once it has them. The Shooters phrases live in the same table (see [Shooters phrases](#shooters-phrases)).
+The estimates are only a starting point. The app measures the real lengths on your device and uses those once it has them. The other drills' phrases live in the same table.
 
 ### State machine
 
@@ -530,11 +478,11 @@ Raising CUT OFF and LAY UP makes drives longer and busier, and raising the finis
 | `readMinMs` / `readMaxMs` (read time) | 800 / 3500 | Wait after READY before the drive starts, picked uniformly (whole ms). Wide on purpose, so the drive call can't be anticipated |
 | `driveMinMs` / `driveMaxMs` | 1400 / 2000 | Drive window `D`, picked uniformly (whole ms) in this range when LEFT/RIGHT is called |
 | `resetPauseMs` | 1000 | Wait after the drive ends before READY is called again |
-| `baseRate` | 1.25 | Normal speech rate (shared with Shooters) |
-| `maxRate` | 1.6 | Speech rate ceiling (shared with Shooters) |
-| `minGapMs` | 120 | Minimum silence between calls in a drive (shared with Shooters, per window) |
+| `baseRate` | 1.25 | Normal speech rate (shared by every drill) |
+| `maxRate` | 1.6 | Speech rate ceiling (shared by every drill) |
+| `minGapMs` | 120 | Minimum silence between calls in a drive (shared by every drill) |
 | `finisherBufferMs` | 0 | The finisher must finish being spoken this long before `D` ends |
-| `speechLeadMs` | 0 | Speak each call this much early to offset voice start-up delay (shared with Shooters) |
+| `speechLeadMs` | 0 | Speak each call this much early to offset voice start-up delay (shared by every drill) |
 | `maxCutOffsPerDrive` | 3 | Cap on CUT OFFs per drive (0–3) |
 | `maxLayUpsPerDrive` | 2 | Cap on LAY UPs per drive (0–5) |
 
@@ -579,7 +527,7 @@ The planned drive is then wrapped into a **rep plan** (see [Drill profiles and r
 
 The same runner executes every drill's rep plan:
 
-1. When a rep starts, the app records the rep clock origin with `performance.now()` (plus `speechLeadMs`, so t = 0 is when the first call should be *heard*). The first call (READY, or a Shooters start call) is spoken right away.
+1. When a rep starts, the app records the rep clock origin with `performance.now()` (plus `speechLeadMs`, so t = 0 is when the first call should be *heard*). The first call (READY, or a Move Lab start call) is spoken right away.
 2. Every later call gets its own `setTimeout`, computed from that origin rather than chained from the previous timer, so drift doesn't accumulate. Each fires `speechLeadMs` early. The word appears at the same moment it is sent to the voice, at the call's planned rate.
 3. The countdown bar is drawn **only from `plan.windows`**. At each window's start it drains on `requestAnimationFrame` from the same clock, then sits empty at "0.0 s". It is hidden from the start of the rep until the first window.
 4. When `endMs + restMs` has passed, the runner plans and starts the next rep. If the rep was the **last of its set**, the runner instead ends the set at `endMs` (the rest is not waited for): it says "set done" with `cancel: false` and shows the set log form. **Next set** starts the next set's first rep inside that tap (see [sessions, sets and reps](#offense-sessions-sets-and-reps)).
@@ -591,7 +539,7 @@ Every timer goes into one list, so Stop clears all of them in any state. The ses
 
 Real spoken lengths depend on the voice and device. For every offense call the app listens to the utterance's `onstart` and `onend` events, measures the time between them and normalizes it to rate 1.0 (`measured × rate`). Then:
 
-This covers every offense phrase, Drive and Shooters alike. Shared phrases (LEFT, RIGHT, CUT OFF) share one learned value.
+This covers every offense phrase, whatever the drill. Shared phrases (LEFT, RIGHT, CUT OFF) share one learned value.
 
 - the measurement is ignored if it is more than 2.5× or less than 0.4× the current value (outliers), if an event is missing, if the utterance errors, or if Stop interrupted it;
 - otherwise the stored value moves 30% of the way toward it (an exponential moving average);
@@ -619,129 +567,20 @@ If the error is in Advanced or Speech, that section opens automatically.
 
 ---
 
-## Shooters only drill in depth
-
-### Shooters phrases
-
-The Shooters drill adds six phrases to the shared phrase table and reuses LEFT (350), RIGHT (350) and CUT_OFF (450).
-
-| id | display | spoken | est. ms at rate 1.0 | role |
-|---|---|---|---|---|
-| SPRINT_FROM_PAINT | SPRINT FROM PAINT | sprint from paint | 900 | start call |
-| SPRINT_FROM_LEFT_CORNER | SPRINT FROM LEFT CORNER | sprint from left corner | 1100 | start call |
-| SPRINT_FROM_RIGHT_CORNER | SPRINT FROM RIGHT CORNER | sprint from right corner | 1150 | start call |
-| CATCH | CATCH | catch | 400 | start call |
-| SHOT | SHOT | shot | 350 | closes a window |
-| NOPE | NOPE | nope | 350 | after SHOT: start another window |
-
-### Shooters state machine
-
-| From | Allowed next |
-|---|---|
-| (rep start) | exactly one of the four start calls |
-| any start call | LEFT, RIGHT |
-| LEFT, RIGHT, CUT_OFF | CUT_OFF, SHOT |
-| SHOT | NOPE, or the rep ends |
-| NOPE | LEFT, RIGHT |
-
-A **window** is LEFT or RIGHT, then 0 or more CUT OFFs, then SHOT. A **rep** is one start call followed by one or two windows (a NOPE after SHOT starts the next window).
-
-**Caps:** at most `maxCutOffsPerWindow` (2) CUT OFFs per window, counted per window (they reset after a NOPE), and at most `maxNopesPerRep` (1) NOPEs per rep. A choice that would break a cap is never offered.
-
-Example reps:
-
-```
-SPRINT FROM PAINT > LEFT > SHOT
-CATCH > RIGHT > CUT OFF > SHOT
-SPRINT FROM LEFT CORNER > LEFT > CUT OFF > CUT OFF > SHOT > NOPE > RIGHT > SHOT
-```
-
-### Shooters weights
-
-All in `OFFENSE_DEFAULTS.shooters`. Weights are normalized at pick time, after illegal and non-fitting choices are removed.
-
-| Table | Used | Defaults |
-|-------|------|----------|
-| `startWeights` | picking the rep's start call | SPRINT FROM PAINT 25, LEFT CORNER 25, RIGHT CORNER 25, CATCH 25 |
-| `afterStartWeights` | start call → first direction | LEFT 50, RIGHT 50 |
-| `afterDirectionOrCutOffWeights` | after LEFT, RIGHT or CUT OFF | CUT OFF 30, SHOT 70 |
-| `afterShotWeights` | after SHOT | END 65, NOPE 35 (END = the rep ends) |
-| `afterNopeWeights` | after NOPE | LEFT 50, RIGHT 50 |
-
-The direction after a NOPE is random by default (no bias to the opposite side). Change `afterNopeWeights` to bias it.
-
-If every remaining choice has weight 0, the fallbacks are: after a direction or CUT OFF, SHOT; after SHOT, END; after a start call or NOPE, a random fitting direction. (Validation requires every table to add up to more than 0, so these only matter when caps or fit remove the weighted choices.)
-
-### Shooters timing rules
-
-| Setting | Default | Meaning |
-|---|---|---|
-| `windowMinMs` / `windowMaxMs` | 1000 / 1800 | Create-space window `D`, picked uniformly (whole ms) per window when LEFT/RIGHT is called |
-| `getSetMs` per start call | paint 1200–2500, left corner 1000–2300, right corner 1040–2300, catch 440–1100 | Time from the start of the start call to the first LEFT/RIGHT. Wide on purpose (about 300 ms wider on each side than before), so the first call can't be anticipated. Each minimum is at least the start call's estimated length at `baseRate` + `minGapMs` (paint 840, left corner 1000, right corner 1040, catch 440 ms), which is why the right corner and catch minimums are slightly higher |
-| `shotBufferMs` | 0 | SHOT must finish being spoken this long before `D` ends |
-| `nopeGapMinMs` / `nopeGapMaxMs` | 150 / 400 | Silence from the end of SHOT to the start of NOPE |
-| `afterNopeGapMinMs` / `afterNopeGapMaxMs` | 200 / 400 | Silence from the end of NOPE to the next LEFT/RIGHT |
-| `resetPauseMs` | 1000 | Pause after the last window ends before the next start call (separate from the Drive reset pause) |
-| `maxCutOffsPerWindow` | 2 | Cap on CUT OFFs per window (0–5) |
-| `maxNopesPerRep` | 1 | Cap on NOPEs per rep (0–3) |
-| speech settings | shared | `baseRate`, `maxRate`, `minGapMs` and `speechLeadMs` are the same settings as Drive |
-
-**Get-set clamp.** The planner uses `max(sampled get-set, start call length at baseRate + minGapMs)`, so the first LEFT/RIGHT can never overlap the start call. The default minimums already respect it (e.g. CATCH 440 ms = 400 / 1.25 + 120), so it only acts when you lower a minimum, slow the base rate, raise the min gap, or the voice turns out slower than estimated (learned lengths). This is a silent clamp, not a validation error.
-
-The start call and NOPE are spoken at `baseRate`. Within a window, every call uses the window's one rate, computed exactly like a drive's: with `avail = D - shotBufferMs`, `gaps = (n - 1) * minGapMs` and `S` the sum of the lengths at rate 1.0, `rate = max(baseRate, S / (avail - gaps))`, and the window fits only if that is ≤ `maxRate`.
-
-### Planning a Shooters rep
-
-`planShootersRep` builds a rep plan:
-
-1. Pick a start call by `startWeights` and place it at 0.
-2. Sample the get-set time, apply the clamp, and start window 1 there.
-3. **Plan the window** (feasibility-aware, no retries): pick `D`; pick LEFT/RIGHT by `afterStartWeights` (or `afterNopeWeights` after a NOPE) among the directions where direction + SHOT fits; then add CUT OFFs one at a time. A CUT OFF is offered only if the cap allows it and the path so far plus the CUT OFF plus the closing SHOT still fits at `maxRate`. Then close with SHOT.
-4. **Schedule the window** like a drive: LEFT/RIGHT at the window start, SHOT anchored to end at `D - shotBufferMs`, and any CUT OFFs spaced evenly between them (every gap ≥ `minGapMs`, guaranteed by the fit check).
-5. After the window's SHOT, pick END or NOPE by `afterShotWeights` (NOPE is removed once `maxNopesPerRep` is reached).
-   - **END**: `endMs` is the end of this window, `restMs` is the Shooters reset pause.
-   - **NOPE**: it starts a random nope gap after SHOT's end (`windowStart + D - shotBufferMs`), so it can never overlap or cut off SHOT. The next window starts a random after-nope gap after NOPE ends, with a fresh `D`. Go back to step 3.
-
-```
-0            get-set                  window 1 (D₁)                     nope gap       after-nope gap      window 2 (D₂)
-│ SPRINT FROM … │ … │ LEFT │ gap │ CUT OFF │ gap │ SHOT ││ 150–400 │ NOPE │ 200–400 │ RIGHT │ gap │ SHOT ││ reset pause
-```
-
-`windows` has one entry per window (`startMs` = the LEFT/RIGHT call, `durMs` = `D`).
-
-### Shooters validation
-
-Pressing Start in the Shooters drill checks:
-
-| Rule | Where the error shows |
-|------|-----------------------|
-| Base and max speech rate are between 0.5 and 2.0, base ≤ max; min gap and speech lead ≥ 0 | Speech |
-| Min window is a whole number ≥ 600 ms and not greater than max | Under the window fields |
-| Reset pause is a whole number ≥ 0 | Under the window fields |
-| Each get-set min/max is a whole number ≥ 0 and min ≤ max | Advanced |
-| Shot buffer, nope gap and after-nope gap values are whole numbers ≥ 0, and each min ≤ its max | Advanced |
-| Max cut offs per window is a whole number 0–5; max nopes per rep is a whole number 0–3 | Advanced |
-| Every weight is a number ≥ 0 and each of the five tables (including END + NOPE) adds up to more than 0 | Advanced |
-| **The shortest window fits at `maxRate` in the min window** (cheapest LEFT/RIGHT + SHOT). The message names what it needs, e.g. with min gap 200: "The shortest window (LEFT + SHOT) needs at least 638 ms at max speech rate 1.6." With the defaults the shortest window needs 558 ms, so this can only fail after you change the speech settings or the voice turns out slow. | Under the window fields |
-
-The Drive read time fields are not used or checked in this drill.
-
----
-
 ## Drill profiles and rep plans
 
 Offense is built around two ideas, so that a future **mixed** drill (a random drill per rep) is a small addition:
 
-**A drill profile** (`OffensePlanner.PROFILES.drive`, `PROFILES.shooters`, `PROFILES.moveLab`) bundles one drill:
+**A drill profile** (`OffensePlanner.PROFILES.drive`, `PROFILES.moveLab`) bundles one drill:
 
-| Field | Drive | Shooters | Move Lab |
-|-------|-------|----------|----------|
-| `phraseIds` | READ (shown READY), LEFT, RIGHT, CUT_OFF, LAY_UP, finishers | start calls, LEFT, RIGHT, CUT_OFF, SHOT, NOPE | the three Move Lab start calls, LEFT, RIGHT, the moves, SHOT |
-| `next` (state table) | `NEXT` | `SHOOTERS_NEXT` | `MOVE_LAB_NEXT` (MOVE stands for any picked move) |
-| `weightTables` | `WEIGHT_TABLES` | `SHOOTERS_WEIGHT_TABLES` (under `settings.shooters`) | `afterMoveWeights` (under `settings.moveLab`) |
-| `planRep(settings, durations, rng)` | `planDriveRep` | `planShootersRep` | `planMoveLabRep` |
-| `validate(settings, durations)` | `validateOffense` | `validateShooters` | `validateMoveLab` |
-| `fitTable` / `selfTest` | `fitTable` / Drive checks | `shootersFitTable` / Shooters checks | none / Move Lab checks |
+| Field | Drive | Move Lab |
+|-------|-------|----------|
+| `phraseIds` | READ (shown READY), LEFT, RIGHT, CUT_OFF, LAY_UP, finishers | the three Move Lab start calls, LEFT, RIGHT, the moves, SHOT |
+| `next` (state table) | `NEXT` | `MOVE_LAB_NEXT` (MOVE stands for any picked move) |
+| `weightTables` | `WEIGHT_TABLES` | `afterMoveWeights` (under `settings.moveLab`) |
+| `planRep(settings, durations, rng)` | `planDriveRep` | `planMoveLabRep` |
+| `validate(settings, durations)` | `validateOffense` | `validateMoveLab` |
+| `fitTable` / `selfTest` | `fitTable` / Drive checks | none / Move Lab checks |
 
 Phrases stay in one shared table keyed by id, so LEFT, RIGHT and CUT_OFF are shared, and so are their learned lengths.
 
@@ -758,7 +597,7 @@ Phrases stay in one shared table keyed by id, so LEFT, RIGHT and CUT_OFF are sha
 
 The runner ([Running a rep](#running-a-rep)) knows nothing about drills: it speaks `calls`, draws `windows` and starts the next rep after `endMs + restMs`. The countdown bar covers each window. A single bar over the whole rep would be a change to what the planner puts in `windows`, not a runner change.
 
-A mixer is **not built yet**. It would be a third profile (e.g. `mixed`) whose `planRep` picks Drive or Shooters per rep and calls that profile's `planRep`, plus a third button in the drill switch. Its settings would need both drills' validations, and the Drive read time.
+A mixer is **not built yet**. It would be a third profile (e.g. `mixed`) whose `planRep` picks a drill per rep and calls that profile's `planRep`, plus a button in the drill switch. Its settings would need every mixed drill's validation.
 
 ### The training log
 
@@ -772,7 +611,7 @@ Every logged Offense set is stored in `localStorage` under `reactionCaller.log`.
     startedAt,   // ISO time of Start
     endedAt,     // ISO time of the last saved set, then of End session
     sets: [{
-      drill,             // "drive" | "shooters" | "moveLab"
+      drill,             // "drive" | "moveLab" (and "shooters" in sets logged before it was removed)
       level,             // 1-5 with Auto difficulty on, null with it off
       reps,              // reps completed (fewer than reps per set for a partial set)
       startedAt, endedAt,// ISO times: the set's first rep starts / the set ends
@@ -790,11 +629,10 @@ Every logged Offense set is stored in `localStorage` under `reactionCaller.log`.
 
 A session only appears in the log once its first set is saved. Partial sets are kept as normal sets with fewer `reps`; compare with `settingsSnapshot.repsPerSet` to spot them.
 
-**`settingsSnapshot`** keeps old sets interpretable after you change settings. It holds, for both drills, the speech settings (`baseRate`, `maxRate`, `minGapMs`, `speechLeadMs`) and `repsPerSet`, plus:
+**`settingsSnapshot`** keeps old sets interpretable after you change settings. It holds, for every drill, the speech settings (`baseRate`, `maxRate`, `minGapMs`, `speechLeadMs`) and `repsPerSet`, plus:
 
 - **Drive**: read time (`readMinMs` / `readMaxMs`), drive window, reset pause, finisher buffer, both caps and the three weight tables;
-- **Shooters**: the whole `shooters` settings object (window, get-set times, shot buffer, nope gaps, reset pause, caps and the five weight tables);
-- **Move Lab**: the whole `moveLab` settings object (picked moves, max moves per rep, gap between moves, weights, reset pause), plus the Shooters timing it borrows: `shooters.getSetMs`, `shooters.nopeGapMinMs` and `shooters.nopeGapMaxMs`.
+- **Move Lab**: the whole `moveLab` settings object (picked moves, max moves per rep, gap between moves, weights, reset pause). Sets logged before Shooters only was removed hold the borrowed get-set and nope gap under `shooters` instead, and old Shooters sets hold the whole Shooters settings object; both stay valid.
 
 **Summaries** (pure helpers in `TrainingLog`):
 
@@ -835,25 +673,14 @@ const OFFENSE_DEFAULTS = {
   startWeights: { … }, afterDriveOrCutOffWeights: { … }, afterLayUpWeights: { … },
   learnAlpha: 0.3, learnOutlierLow: 0.4, learnOutlierHigh: 2.5,
   readMinMs: 800, readMaxMs: 3500,   // provisional
-  phrases: { READ: { display: "READY", spoken: "ready", estMs: 350 }, …, SHOT: { … }, NOPE: { … } },
+  phrases: { READ: { display: "READY", spoken: "ready", estMs: 350 }, …, SHOT: { … } },
 
-  // Shooters only drill (speech settings above are shared)
-  shooters: {
-    windowMinMs: 1000, windowMaxMs: 1800,
-    getSetMs: { SPRINT_FROM_PAINT: { minMs: 1500, maxMs: 2200 }, …, CATCH: { minMs: 400, maxMs: 800 } },
-    shotBufferMs: 0,
-    nopeGapMinMs: 150, nopeGapMaxMs: 400,
-    afterNopeGapMinMs: 200, afterNopeGapMaxMs: 400,
-    resetPauseMs: 1000,
-    maxCutOffsPerWindow: 2, maxNopesPerRep: 1,
-    startWeights: { … }, afterStartWeights: { … }, afterDirectionOrCutOffWeights: { … },
-    afterShotWeights: { END: 65, NOPE: 35 }, afterNopeWeights: { … },
-  },
-
-  // Move Lab drill (borrows shooters.getSetMs and the shooters nope gap)
+  // Move Lab drill
   moveLab: {
     moveIds: ["CROSSOVER", "HESI"],
     maxMovesPerRep: 3,                      // 1-6
+    getSetMs: { SPRINT_FROM_LEFT_CORNER: { minMs: 1000, maxMs: 2300 }, …, CATCH: { minMs: 440, maxMs: 1100 } }, // provisional
+    firstMoveGapMinMs: 150, firstMoveGapMaxMs: 400,
     moveGapMinMs: 800, moveGapMaxMs: 1500,  // provisional
     afterMoveWeights: { MOVE: 50, SHOT: 50 }, // provisional
     resetPauseMs: 1000,
@@ -864,9 +691,8 @@ const OFFENSE_DEFAULTS = {
 - Values here are the **defaults** the start screen shows. Values you type into the start screen are saved and **override** these on that device. After changing a default in the file, clear the saved settings (`localStorage.removeItem("reactionCaller.settings")`) to see the new default in the form.
 - The **phrase table** (`phrases`) is where you fix pronunciation (`spoken`), change on-screen text (`display`) or adjust the length estimates (`estMs`). Learned lengths (`reactionCaller.learnedMs`) override `estMs` per phrase. Delete that key to start learning from scratch after changing the voice or the spoken text.
 - The Drive read time is `readMinMs` / `readMaxMs` (800 / 3500). Defense's Min/Max delay fields are separate (HTML defaults 1000 / 3000).
-- The state tables (`NEXT` for Drive, `SHOOTERS_NEXT` for Shooters) and the finisher and start-call lists sit in the planner script. They are structure, not tuning.
-- `OFFENSE_DEFAULTS.shooters` holds every Shooters-only number. The Shooters phrases (`SPRINT_FROM_…`, `CATCH`, `SHOT`, `NOPE`) are in the shared `phrases` table, where you also fix their pronunciation or estimates.
-- `OFFENSE_DEFAULTS.moveLab` holds the Move Lab numbers. Move Lab also uses the Shooters `getSetMs` (for its three start calls) and `nopeGapMinMs` / `nopeGapMaxMs` (LEFT / RIGHT to the first move), so changing those changes both drills.
+- The state tables (`NEXT` for Drive, `MOVE_LAB_NEXT` for Move Lab) and the finisher and start-call lists sit in the planner script. They are structure, not tuning.
+- `OFFENSE_DEFAULTS.moveLab` holds every Move Lab number, including the get-set time after each start call (`getSetMs`) and the gap from LEFT / RIGHT to the first move (`firstMoveGapMinMs` / `firstMoveGapMaxMs`). Its start calls and SHOT are in the shared `phrases` table.
 
 ### `TRAINING_DEFAULTS`
 
@@ -892,7 +718,6 @@ const TRAINING_DEFAULTS = {
   levels: {
     drive:    [{ driveMinMs: 2200, driveMaxMs: 2800, readMinMs: 2000, readMaxMs: 3500,
                  "afterDriveOrCutOffWeights.CUT_OFF": 10, "afterDriveOrCutOffWeights.LAY_UP": 10 }, …],
-    shooters: [{ "shooters.windowMinMs": 1600, …, "shooters.afterShotWeights.END": 85 }, …],
   },
 };
 ```
@@ -903,11 +728,9 @@ Rules of thumb:
 
 - **Drives feel rushed or words sound sped up**: raise `driveMaxMs`/`driveMinMs`, lower `minGapMs`, or lower `baseRate`.
 - **Long drives (several CUT OFFs) never happen**: they don't fit. Check the fit table below and raise `driveMaxMs` or `maxRate`.
-- **Calls lag behind the countdown on a phone**: the voice starts late. Set `speechLeadMs` (e.g. 100–200), or add a `finisherBufferMs` (Drive) / `shotBufferMs` (Shooters).
+- **Calls lag behind the countdown on a phone**: the voice starts late. Set `speechLeadMs` (e.g. 100–200), or add a `finisherBufferMs` (Drive).
 - **A word is mispronounced**: change its `spoken` text.
-- **Shooters: not enough time to get to the spot**: raise that start call's `getSetMs` range.
-- **Shooters: too many / too few NOPEs or CUT OFFs**: change `afterShotWeights` (END vs NOPE) or `afterDirectionOrCutOffWeights` (CUT OFF vs SHOT), or the caps.
-- **Shooters: NOPE comes too soon after SHOT**: raise `nopeGapMinMs` / `nopeGapMaxMs`.
+- **Move Lab: not enough time to get to the spot**: raise that start call's `getSetMs` range.
 - **Move Lab: not enough time to finish a move before the next call**: raise `moveGapMinMs` / `moveGapMaxMs` (Gap between moves). **Too many or too few moves per rep**: change Max moves per rep or `afterMoveWeights`.
 
 ### Self-test (`?selftest=1`)
@@ -920,9 +743,9 @@ http://localhost:8080/index.html?selftest=1
 
 Use `/index.html?selftest=1`, not `/?selftest=1`. The bundled `server.js` only maps a bare `/` to `index.html`, so `/?selftest=1` returns "Not found".
 
-Instead of the app, the page runs a simulation of both offense planners (every drill profile's self-test) plus checks of the session helpers and the training log, and prints **PASS** / **FAIL** for each check to the console and to an on-page banner (green when everything passes, red otherwise). There are 69 checks in total: 18 Drive, 21 Shooters, 4 Move Lab, 6 Session, 2 Defaults, 3 Levels, 8 Training log and 7 History.
+Instead of the app, the page runs a simulation of every offense planner (every drill profile's self-test) plus checks of the session helpers and the training log, and prints **PASS** / **FAIL** for each check to the console and to an on-page banner (green when everything passes, red otherwise). There are 48 checks in total: 18 Drive, 4 Move Lab, 6 Session, 2 Defaults, 3 Levels, 8 Training log and 7 History.
 
-**Move Lab.** It checks the move list (8 moves, 6 handle and 2 shot, each a phrase with an estimate; the default picks are real moves); validation (each single move, all moves, 1 and 6 moves per rep, zero gaps and one-sided weights pass; no moves, unknown moves, non-move phrases, duplicates, 0, 7 or fractional moves per rep, bad gap ranges, all-zero or negative weights, a negative reset pause, and a bad Shooters get-set or nope gap are rejected; a bad speech rate is reported as a speech error); the plans (10,000 reps spread over 1–6 max moves with random picks: a start call that is never SPRINT FROM PAINT, then LEFT/RIGHT, then 1..max picked moves, then SHOT; every move count from 1 to max happens; every start call, direction and move gets called; the get-set time, the first-move gap (nope gap) and each gap between moves stay in range; every call at the base rate, none overlapping; one countdown window from LEFT/RIGHT to the end of SHOT, and the reset pause as rest); and the weights (MOVE vs SHOT within 2 points of the default weights, SHOT always at the max, MOVE weight 0 means always one move, SHOT weight 0 always the max). Session adds a check that Move Lab uses its own reps per set; Training log adds a check of Move Lab sets (picked moves, or an old move + side, and clean reps 0..reps), their snapshot (including the borrowed Shooters timing) and clean-rep totals.
+**Move Lab.** It checks the move list (8 moves, 6 handle and 2 shot, each a phrase with an estimate; the default picks are real moves); validation (each single move, all moves, 1 and 6 moves per rep, zero gaps and one-sided weights pass; no moves, unknown moves, non-move phrases, duplicates, 0, 7 or fractional moves per rep, bad gap ranges, all-zero or negative weights, a negative reset pause, and a bad get-set or first-move gap are rejected; a bad speech rate is reported as a speech error); the plans (10,000 reps spread over 1–6 max moves with random picks: a start call, then LEFT/RIGHT, then 1..max picked moves, then SHOT; every move count from 1 to max happens; every start call, direction and move gets called; the get-set time, the first-move gap and each gap between moves stay in range; every call at the base rate, none overlapping; one countdown window from LEFT/RIGHT to the end of SHOT, and the reset pause as rest); and the weights (MOVE vs SHOT within 2 points of the default weights, SHOT always at the max, MOVE weight 0 means always one move, SHOT weight 0 always the max). Session adds a check that Move Lab uses its own reps per set; Training log adds a check of Move Lab sets (picked moves, or an old move + side, and clean reps 0..reps), their snapshot and clean-rep totals.
 
 **Drive.** It runs 10,000 drives at the **default** settings and 10,000 at **tight** settings (`D` fixed at 1400 ms, `maxRate` 2.0, `minGapMs` 40), and checks:
 
@@ -935,18 +758,6 @@ Instead of the app, the page runs a simulation of both offense planners (every d
 7. with loose timing (a 30-second window, 40,000 drives), the observed pick frequencies match the weights within 2 percentage points (counting only picks where every legal choice was available);
 8. (rep wrapper) READY is at 0 at `baseRate`, the read time is within the default 800–3500 ms and spreads over the whole range (the shortest and longest of 10,000 read times are within 2% of the ends), and every drive call lies inside the rep's window.
 
-**Shooters.** It runs 10,000 reps at the default settings and 10,000 at tight settings (`windowMinMs = windowMaxMs = 1000`, `maxRate` 2.0, `minGapMs` 40), and checks:
-
-1. every rep starts with one of the four start calls, and the next call is LEFT or RIGHT;
-2. every transition is in the shooters state table, and NOPE appears only directly after SHOT;
-3. every window contains exactly one SHOT, as its last call, and the rep ends right after a window's SHOT (`endMs` = end of the last window);
-4. CUT OFFs per window ≤ `maxCutOffsPerWindow`, NOPEs per rep ≤ `maxNopesPerRep`;
-5. each window's `D` is in range and its one rate is between `baseRate` and `maxRate`; every call in a window lies within `[window start, window start + D - shotBufferMs]`, gaps are ≥ `minGapMs`, and SHOT ends exactly at `D - shotBufferMs`;
-6. NOPE starts `nopeGapMinMs`–`nopeGapMaxMs` after SHOT ends (never before), and the next LEFT/RIGHT starts `afterNopeGapMinMs`–`afterNopeGapMaxMs` after NOPE ends;
-7. the first LEFT/RIGHT starts at least start call length + `minGapMs` after the start call, and within the (clamped) get-set range;
-8. the start call and NOPE are at `baseRate`, no two calls in the rep overlap, and `restMs` is the Shooters reset pause;
-9. with loose timing (a 30-second window, `maxRate` 2.0, 40,000 reps), observed pick frequencies match all five weight tables within 2 percentage points (counting only picks where every legal choice was available).
-
 **Session.** It checks the pure session helpers:
 
 1. `TRAINING_DEFAULTS` passes `validateSession`;
@@ -958,17 +769,17 @@ Instead of the app, the page runs a simulation of both offense planners (every d
 **Defaults.** It checks:
 
 1. the `READ` phrase is shown as READY and spoken "ready"; `migrateLearned` drops a stored `READ` length on the first load but keeps other phrases, records `read-to-ready`, sets the marker even when nothing was stored, and doesn't drop a re-learned value on later loads;
-2. every default Shooters get-set minimum is at least the start call's estimated length at `baseRate` + `minGapMs`, every get-set range is at least 600 ms wide, and the Drive read time range is at least 2000 ms wide.
+2. every default Move Lab get-set minimum is at least the start call's estimated length at `baseRate` + `minGapMs`, every get-set range is at least 600 ms wide, and the Drive read time range is at least 2000 ms wide.
 
 **Levels.** It checks:
 
-1. both drills have exactly 5 levels that set the same settings, every path exists in `OFFENSE_DEFAULTS`, every level passes the drill's validation (including the shortest-drive / shortest-window fit), plans 500 reps without error, and no level has a longer window than the one below it;
+1. Drive has exactly 5 levels that set the same settings, every path exists in `OFFENSE_DEFAULTS`, every level passes the drill's validation (including the shortest-drive fit), plans 500 reps without error, and no level has a longer window than the one below it;
 2. `levelDecision` / `nextLevel`: up at 8/10 with 0.1 errors per rep and exactly at both thresholds (4/5, 1 error in 10 reps); hold at 79% success, at error rate 0.11, and at 50% with 0.29; down at 49% and at error rate 0.30; clamped at 5 and 1; hold with only 4 attempts, for a skipped set and when errors weren't logged; a partial set with 5 attempts counts;
-3. `applyLevel` sets only the level's settings without changing its input (e.g. Shooters Level 4: window 1050, NOPE 40, SHOT 60; Drive Level 1: read 2000, CUT OFF 10, finishers still 20); `normalizeLevels` replaces missing, fractional or out-of-range levels with the start level; `progressLabel` adds " · LVL 3" only when a level is given; `levelMessage` reads "Level 3 → 4: nice, timing gets tighter" and "Holding at Level 3".
+3. `applyLevel` sets only the level's settings without changing its input (e.g. Drive Level 4: window 1500, CUT OFF 28, LAY UP 25; Drive Level 1: read 2000, CUT OFF 10, finishers still 20); `normalizeLevels` replaces missing, fractional or out-of-range levels with the start level; `progressLabel` adds " · LVL 3" only when a level is given; `levelMessage` reads "Level 3 → 4: nice, timing gets tighter" and "Holding at Level 3".
 
 **Training log.** It checks `TrainingLog`:
 
-1. valid sets pass `validateSet`: a full set, a skipped set (all outcomes `null`), a note, made = attempted, 0 of 0, every rating, both drills;
+1. valid sets pass `validateSet`: a full set, a skipped set (all outcomes `null`), a note, made = attempted, 0 of 0, every rating, Drive and the removed Shooters only (old sets stay valid);
 2. `validateSet` rejects made > attempted, negative, fractional, NaN and string counts, made without attempted, unknown or wrongly cased ratings ("great", "Clean"), an unknown drill, 0 reps, a note over 500 characters, a missing `extra`, snapshot or end time;
 3. the math: `setSuccess` (5/8, and `null` when skipped or 0 attempted), `setErrorRate` (3 errors in 6 reps = 0.5, `null` when skipped), and `summarizeSession` on a 4-set session with a skipped and a partial set (28 reps, 10/20 made = 50%, 4 errors over 20 logged reps = 0.2 per rep, 2 of 3 rated sets clean), plus an empty session (all rates `null`);
 4. `snapshotSettings` holds the drill's own windows, read or get-set times, weights, caps and speech settings (and nothing from the other drill), as a deep copy that later setting changes don't affect;
@@ -996,18 +807,6 @@ It also prints a **Drive fit table**: for 0–3 cut-offs and each finisher, the 
 | 3 | 2168 ms ✗ | 2230 ms ✗ | 2350 ms ✗ | 2413 ms ✗ |
 
 So with the defaults, **a drive can contain at most 2 CUT OFFs**, and the 3-cut-off cap never comes into play. Raise `driveMaxMs` to about 2420 ms, or raise `maxRate`, to make 3-cut-off drives possible.
-
-And a **Shooters fit table**: for 0 up to `maxCutOffsPerWindow` cut offs, the minimum window needed at `maxRate` and whether it fits at `windowMaxMs`. With the defaults (`maxRate` 1.6, `minGapMs` 120, shot buffer 0, `windowMaxMs` 1800):
-
-| Cut offs | Sequence | Min window | Fits at 1800? |
-|---|---|---|---|
-| 0 | LEFT > SHOT | 558 ms | ✓ |
-| 1 | LEFT > CUT OFF > SHOT | 959 ms | ✓ |
-| 2 | LEFT > CUT OFF > CUT OFF > SHOT | 1360 ms | ✓ |
-
-So every window size in the default 1000–1800 range can take 0 or 1 CUT OFF, and windows of 1360 ms or more can take 2.
-
-Both fit tables depend only on the windows, the speech settings and the phrase lengths, so widening the read time and the get-set ranges didn't change them (re-run and confirmed).
 
 The self-test uses `OFFENSE_DEFAULTS`, `TRAINING_DEFAULTS` and the seed estimates only. It ignores saved settings and learned lengths, and in self-test mode the normal app never starts.
 
@@ -1113,7 +912,7 @@ The app is dark-themed only. Global rules remove the tap highlight, disable pull
 
 Notable pieces:
 
-- **`.segmented`**: the Defense | Offense switch and the Drive | Shooters only switch. The selected button has `aria-pressed="true"` and a lighter background. Inside a panel (the drill switch) the track uses the page background and tighter padding.
+- **`.segmented`**: the Defense | Offense switch and the drill switch. The selected button has `aria-pressed="true"` and a lighter background. Inside a panel (the drill switch) the track uses the page background and tighter padding.
 - **`.panel`**: rounded settings panels. `.panel-section` groups one drill's settings, `.range-row` puts two fields side by side, and `.field-grid` lays out Advanced fields and weights in two columns.
 - **`details.advanced`**: the collapsible Advanced and Speech sections (native `<details>` / `<summary>`).
 - **`#word`**: the called word, `clamp(3rem, 16vw, 6rem)`, weight 800, uppercase. It is invisible by default (opacity 0, scale 0.85). Adding `.show` fades and grows it in over 120 ms. **`#word.long`** (over 7 characters) drops to `clamp(2rem, 10vw, 3.75rem)`, centers and allows wrapping. **`#word.xlong`** (over 18 characters, i.e. "SPRINT FROM LEFT/RIGHT CORNER") drops further to `clamp(1.6rem, 8vw, 3rem)`, which puts it on two lines at 320 px.
@@ -1124,12 +923,12 @@ Notable pieces:
 - **Adaptive difficulty**: `.toggle-row` / `.toggle-btn` (the 88 × 48 px On/Off button, blue when on), `.level-row` with a `.small-btn` (Reset level), `.level-locked` (a field set by a level, dimmed) with its `.level-note`, and `.level-line` (the rest-screen level message).
 - **Summary and history**: `.stack` stacks cards; `.drill-card` with a `.stat-grid` (a two-column `<dl>`) and `.compare-line`; `.chart` styles the inline SVG (`.axis`, `.tick`, solid `.line-make` in the accent blue, dashed `.line-lost` in orange, dots and axis titles in the same colors) and `.legend`; `.history-item` is a session row (a full-width button plus its `.history-detail` of `.set-line`s); `.confirm` is the red-bordered confirmation box; `.secondary-btn` (grey, 52 px), `.danger-btn` (red) and `.button-row` (side-by-side buttons); `.reminder` is the start-screen export reminder (yellow left border, like the fatigue banner).
 - **`.countdown`**: the track and fill bar plus a tabular-number readout. The fill shrinks via `transform: scaleX(remaining / D)`. `.idle` hides it without changing the layout.
-- Word color classes: `.word-left`, `.word-right`, `.word-up`, `.word-back` (Defense), `.word-read`, `.word-center`, `.word-cut`, `.word-layup` (Drive; LEFT/RIGHT variants reuse the Defense blue and green) and `.word-sprint`, `.word-catch`, `.word-shot`, `.word-nope` (Shooters).
+- Word color classes: `.word-left`, `.word-right`, `.word-up`, `.word-back` (Defense), `.word-read`, `.word-center`, `.word-cut`, `.word-layup` (Drive; LEFT/RIGHT variants reuse the Defense blue and green), `.word-sprint`, `.word-catch`, `.word-shot` and `.word-move` (Move Lab).
 
 ### Markup
 
-- **Start screen**: mode switch, title, subtitle (changes with the mode and drill), Defense's Min/Max delay panel (`#rangePanel`, hidden in Offense), the offense panel and **Start**. The offense panel holds the drill switch, `#levelSettings` (the Auto difficulty toggle `#autoLevelBtn`, each drill's level with a Reset level button, and `#levelStatus`), `#driveSettings` (read time and drive window fields plus Advanced), `#shootersSettings` (window fields, reset pause, Advanced), the shared `#sessionSettings` group (stepper inputs with `data-training` keys into `TRAINING_DEFAULTS`) and the shared `#speech` group. The weight inputs and the Shooters get-set inputs are generated from `OFFENSE_DEFAULTS` at load, so the form always matches the tables in code.
-- **Game screen**: fatigue banner (Offense, hidden until due), mode label (`DEFENSE`, `OFFENSE · DRIVE` or `OFFENSE · SHOOTERS`), set/rep line and session clock (Offense only), word stage, countdown (Offense only) and **Stop**.
+- **Start screen**: mode switch, title, subtitle (changes with the mode and drill), Defense's Min/Max delay panel (`#rangePanel`, hidden in Offense), the offense panel and **Start**. The offense panel holds the drill switch, `#levelSettings` (the Auto difficulty toggle `#autoLevelBtn`, each drill's level with a Reset level button, and `#levelStatus`), `#driveSettings` (read time and drive window fields plus Advanced), `#moveLabSettings` (move picker, moves per rep, Advanced), the shared `#sessionSettings` group (stepper inputs with `data-training` keys into `TRAINING_DEFAULTS`) and the shared `#speech` group. The weight inputs and the Move Lab get-set inputs are generated from `OFFENSE_DEFAULTS` at load, so the form always matches the tables in code.
+- **Game screen**: fatigue banner (Offense, hidden until due), mode label (`DEFENSE`, `OFFENSE · DRIVE` or `OFFENSE · MOVE LAB`), set/rep line and session clock (Offense only), word stage, countdown (Offense only) and **Stop**.
 - **Set log screen** (`#logScreen`, Offense only): drill label, set title, the four stepper rows, the rating buttons, the collapsed note, an error line and the save / skip / discard buttons.
 - **Rest screen** (`#restScreen`, Offense only): drill label, countdown, session summary, save status, the level line (`#restLevel`, Auto difficulty only), **Next set** (hidden until the rest is over) and **End session**.
 - **Summary screen** (`#summaryScreen`): session length, one card per drill (`#summaryDrills`) and **Done**.
@@ -1143,11 +942,10 @@ A pure module (an IIFE assigned to `const OffensePlanner`). It contains:
 
 | Export | Purpose |
 |--------|---------|
-| `OFFENSE_DEFAULTS` | All tunable offense numbers (with the `shooters` section) and the shared phrase table |
+| `OFFENSE_DEFAULTS` | All tunable offense numbers (with the `moveLab` section) and the shared phrase table |
 | `NEXT`, `FINISHERS`, `LONG_FINISHERS`, `SHORT_FINISHERS`, `WEIGHT_TABLES` | The Drive state machine |
 | `MOVE_LAB_START_CALLS`, `MOVE_LAB_NEXT`, `MOVE_LAB_MIN_MOVES`, `MOVE_LAB_MAX_MOVES` | The Move Lab state machine and the 1–6 moves-per-rep limits |
-| `START_CALLS`, `SHOOTERS_NEXT`, `SHOOTERS_WEIGHT_TABLES` | The Shooters state machine |
-| `PROFILES` | The drill profiles `drive` and `shooters` (see [Drill profiles and rep plans](#drill-profiles-and-rep-plans)) |
+| `PROFILES` | The drill profiles `drive` and `moveLab` (see [Drill profiles and rep plans](#drill-profiles-and-rep-plans)) |
 | `cloneSettings(s)` | Deep copy of a settings object |
 | `durationsFor(s, learned)` | Per-phrase length at rate 1.0: learned value if present, else `estMs` |
 | `fitRate(ids, D, s, dur)` | The one speech rate a drive sequence needs in window `D`, or `null` if it can't fit |
@@ -1155,22 +953,21 @@ A pure module (an IIFE assigned to `const OffensePlanner`). It contains:
 | `planDrive(s, dur, rng, onPick)` | Builds one drive plan `{ D, rate, calls }` |
 | `planDriveRep(s, dur, rng, onPick)` | Wraps READY, the read time and a drive into a rep plan |
 | `migrateLearned(learned, done)` | Applies one-time learned-length migrations not yet in `done` (currently `read-to-ready`, which drops `READ`); returns `{ learned, done, changed }` |
-| `planShootersRep(s, dur, rng, onPick)` | Builds one Shooters rep plan |
 | `planMoveLabRep(s, dur, rng, onPick)` | Builds one Move Lab rep plan (`onPick(state, legal, pick)` sees each MOVE-or-SHOT decision) |
-| `validateOffense(s, dur)` / `validateShooters(s, dur)` / `validateMoveLab(s, dur)` | Setting checks per drill; return `null` or `{ field, message }` |
+| `validateOffense(s, dur)` / `validateMoveLab(s, dur)` | Setting checks per drill; return `null` or `{ field, message }` |
 | `learnDuration(current, measured, rate, s)` | One learning step, or `null` for an outlier |
-| `fitTable(s, dur)` / `shootersFitTable(s, dur)` | Rows for the fit tables |
+| `fitTable(s, dur)` | Rows for the Drive fit table |
 | `TRAINING_DEFAULTS` | Session structure: reps per set, planned sets, session time warning, rest between sets, the "set done" phrase |
 | `validateSession(t)` | Session settings check; returns `null` or `{ field: "session", message }` |
 | `newSession()` / `beginRep(p)` / `isSetComplete(p, t)` / `beginSet(p)` | The set and rep counter. Progress is `{ set, rep }` (current set from 1, reps started in it) |
 | `progressLabel(p, t, level)` | "SET 2 / 4 · REP 5 / 8", plus " · LVL 3" when `level` is given |
 | `LEVEL_COUNT`, `levelPaths(drill, t)`, `applyLevel(s, drill, level, t)` | 5; the settings paths a drill's levels set; a copy of the settings with a level applied |
-| `normalizeLevels(stored, t)` | Stored levels → `{ drive, shooters }`, each 1–5 (else `startLevel`) |
+| `normalizeLevels(stored, t)` | Stored levels → one per levelled drill (`{ drive }`), each 1–5 (else `startLevel`) |
 | `levelDecision(level, set, cfg)` / `nextLevel(level, set, cfg)` | The adjustment rule: `{ level, change }` (`up`, `down`, `hold`, `atTop`, `atBottom`, `tooFew`, `skipped`) / just the level |
 | `levelMessage(from, decision, cfg)` | The rest-screen line |
 | `formatElapsed(ms)` | Session clock text, mm:ss |
 | `sessionWarningDue(elapsedMs, t)` / `sessionWarningText(t)` | When the fatigue banner is due, and its text |
-| `runSelfTest(log, reps)` | The simulation (every profile's self-test, then the session checks); returns `{ passed, results, fitTable, fitTables: { drive, shooters } }` |
+| `runSelfTest(log, reps)` | The simulation (every profile's self-test, then the session checks); returns `{ passed, results, fitTable, fitTables: { drive, moveLab } }` |
 
 `runSelfTest(log, reps, extraSuites)` also runs each function in `extraSuites` as `suite(check)`; the self-test page passes `[TrainingLog.selfTest]`.
 
@@ -1197,7 +994,7 @@ The same script also defines **`TrainingLog`**, a second pure module (an IIFE as
 | `openLog(store)` / `saveLog(state, store, nowMs)` | Load from, and save to, an injected `{ get, set }` store, backing up unreadable text first; `saveLog` returns `{ state, saved }` |
 | `selfTest(check)` | The training log checks |
 
-Internally, `fitRateIn` / `minWindowIn` / `scheduleCalls` take the end buffer as a parameter, so a drive window (finisher buffer) and a Shooters window (shot buffer) use the same math.
+Internally, `fitRateIn` / `minWindowIn` / `scheduleCalls` take the end buffer as a parameter, so any window can keep a buffer free at its end with the same math.
 
 ### Script 2: the app
 
@@ -1207,10 +1004,10 @@ Wrapped in an IIFE, so nothing leaks into the global scope. If `?selftest=1` is 
   - `speak` cancels before speaking unless `cancel: false` is passed. Defense uses the default (cancel, rate 1), and Offense passes `cancel: false` and the drive's rate.
   - `primeSpeech` speaks a silent blank utterance inside the Start tap. iPhone Safari only allows speech that starts from a user gesture, and this unlocks it for the timer-driven calls that follow.
   - `showWord` sets the text and classes, removes `.show`, forces a reflow (`void wordEl.offsetWidth`) and adds `.show` back. The reflow makes the fade-in replay reliably even when the same call (e.g. CUT OFF) repeats.
-- **Modes**: each mode is an object with `start(settings)` and `stop()`. `MODES` maps `defense` / `offense` to the mode object plus its labels. `DRILLS` maps `drive` / `shooters` to the offense game label and subtitle.
+- **Modes**: each mode is an object with `start(settings)` and `stop()`. `MODES` maps `defense` / `offense` to the mode object plus its labels. `DRILLS` maps `drive` / `moveLab` to the offense game label and subtitle.
   - `defenseMode` chains `setTimeout` calls with a fresh random delay each time: pick a word, show it, speak it, schedule the next.
   - `offenseMode` runs rep plans from the selected profile, as in [Running a rep](#running-a-rep), grouped into sets. `startRep()` counts the rep, plans and schedules it, and schedules either the next rep (counting `repsCompleted` at each rep's `endMs`) or `finishSet()` (says "set done", opens the set log). `haltSet()` clears the timers and countdown for Stop mid-set but keeps the session clock; `stop()` also stops the clock. `nextSet()` starts the next set from the **Next set** tap and records the set's start time. `startClock()` updates the session clock and shows the fatigue banner once. `runCountdown()` drains the bar for one window. `later(fn, ms)` wraps every timer and records its id so `stop()` can clear them all. `say(id, rate)` shows and speaks a phrase and attaches the measuring handlers. `runId` lets late `onend` events from a stopped run be ignored.
-- **Settings form**: inputs carry `data-setting` paths into `OFFENSE_DEFAULTS` (e.g. `shooters.windowMinMs`, `shooters.getSetMs.CATCH.minMs`), read and written with `getPath` / `setPath`. Session inputs carry `data-training` keys into `TRAINING_DEFAULTS`, read by `readTrainingSettings()` into `settings.training`. `wireSteppers(root)` makes each − / + button inside `root` (the offense panel and the set log) step its input by the input's `step`, clamped to its `min` / `max`, and fires `input` so the value is handled like typing. `buildWeightTables()` (once per drill), `buildGetSetFields()`, `fillOffenseDefaults()`, `readOffenseSettings()` (empty fields become `NaN` so validation catches them), `saveSettings()` / `loadSettings()`.
+- **Settings form**: inputs carry `data-setting` paths into `OFFENSE_DEFAULTS` (e.g. `moveLab.moveGapMinMs`, `moveLab.getSetMs.CATCH.minMs`), read and written with `getPath` / `setPath`. Session inputs carry `data-training` keys into `TRAINING_DEFAULTS`, read by `readTrainingSettings()` into `settings.training`. `wireSteppers(root)` makes each − / + button inside `root` (the offense panel and the set log) step its input by the input's `step`, clamped to its `min` / `max`, and fires `input` so the value is handled like typing. `buildWeightTables()` (once per drill), `buildGetSetFields()`, `fillOffenseDefaults()`, `readOffenseSettings()` (empty fields become `NaN` so validation catches them), `saveSettings()` / `loadSettings()`.
 - **`updateView`, `selectMode`, `selectDrill`**: show the right panels, labels and subtitle for the mode and drill.
 - **`startGame` / `stopGame`**: validate (the Min/Max fields only for Defense and Drive, then the drill's `validate`, then `validateSession`; `showError` puts the message in the right place via `ERROR_TARGETS`), prime speech, switch screens, show the session clock and set/rep line only in Offense, start a new session record (Offense), start or stop the active mode, and cancel speech. `stopGame` ends the session and writes its end time to the log if it has saved sets. `stopPressed` (the Stop button) halts the set and opens the partial-set log instead when an Offense set has at least one finished rep.
 - **Adaptive difficulty**: `levels` (from `reactionCaller.levels` via `normalizeLevels`) and `autoLevel` hold the state. `updateLevelView()` shows the levels and toggle, and with Auto on calls `lockInput()` on every setting or weight input whose path a level sets (it keeps the manual value in `data-manual-value`, makes the input read-only and adds the "set by Level N" note); `unlockInput()` restores it. `manualValue(input)` is what `saveSettings()` and `readOffenseSettings()` use, so level values are never saved as your own. `startGame` keeps the manual settings in `runBaseSettings` and applies the level on top (`settings.level`, or `null` with Auto off). After a set is committed, `adjustLevel(set)` runs `levelDecision`, stores the new level and prepares the rest-screen line; `applyCurrentLevel()` (in the **Next set** tap) re-applies the level to `runBaseSettings` for the next set, keeping the spoken lengths validated at Start (if those settings don't validate, the previous ones are kept).
@@ -1247,9 +1044,8 @@ Runs only with `?selftest=1`. It hides the app, calls `OffensePlanner.runSelfTes
 - **Defense: the first call isn't immediate**, repeats are possible, and short delays clip speech (Defense always cancels before speaking, by design).
 - **Offense: queued speech can lag.** Calls never clip, so if the voice is slower than planned (before it has learned real lengths, or with voice start-up delay), later calls queue behind earlier ones and are heard late. Learned lengths and `speechLeadMs` / `finisherBufferMs` reduce this.
 - **Offense: 3-cut-off drives don't fit at the default timings.** See the fit table above.
-- **Shooters: the countdown bar covers each create-space window, not the whole rep.** It is hidden during the start call and get-set time, and empty around a NOPE and during the reset pause.
-- **No mixed drill yet.** Each Start runs either Drive or Shooters only. The code is structured for a mixer (see [Drill profiles and rep plans](#drill-profiles-and-rep-plans)), but it isn't built.
-- **Shooters: the get-set time is not checked against how long the sprint really takes you.** Tune the `getSetMs` ranges to your court and speed.
+- **No mixed drill yet.** Each Start runs one drill. The code is structured for a mixer (see [Drill profiles and rep plans](#drill-profiles-and-rep-plans)), but it isn't built.
+- **Move Lab: the get-set time is not checked against how long the sprint really takes you.** Tune the `getSetMs` ranges to your court and speed.
 - **Results are self-reported.** You count shots, lost handles and missed calls yourself and enter them after the set; there is no automatic scoring or reaction-time measurement.
 - **The log lives in one browser, at one address.** Clearing site data (or Safari clearing it after weeks without a visit) deletes it, and `file://`, `http://localhost:8080` and `http://<LAN IP>:8080` each keep a separate log. Export regularly from **History**; importing a backup at a new address merges it in.
 - **Trends are per drill and per session.** Make % and lost handles are drawn on two axes in one small chart; missed calls and clean share are only in the session summary and the session list.
@@ -1298,13 +1094,10 @@ Runs only with `?selftest=1`. It hides the app, calls `OffensePlanner.runSelfTes
 | The level never changes | Auto difficulty is off, sets are skipped, or sets have fewer than 5 shots attempted | Log made/attempted with at least 5 attempts (the rest screen says why it held) |
 | Changed a default in code but the form still shows the old value | A saved value overrides it | Run `localStorage.removeItem("reactionCaller.settings")` on the app's page |
 | Defense words sound cut off | Delay shorter than the spoken word | Raise the **Min delay** |
-| "The shortest window (LEFT + SHOT) needs at least N ms…" | Shooters min window too small for LEFT/RIGHT + SHOT at the max rate (possibly because learned lengths grew) | Raise the **Min window** to N, raise the max speech rate, or lower the min gap |
 | Offense: the Min/Max delay fields disappeared | They are Defense only. Drive has its own **Min / Max read time** fields | Expected. Drive read time defaults to 800–3500 ms; a value you saved in the old shared fields stays with Defense |
-| Shooters: two CUT OFFs in one window never happen | Two CUT OFFs need a 1360 ms window at the defaults, and short windows can't take them | Raise the **Min / Max window** or the max speech rate (check the Shooters fit table) |
-| Shooters: a LEFT/RIGHT comes later than its get-set min | The get-set time is clamped to at least the start call's length + min gap (the defaults already respect this; it acts if you lower a min or the voice is slow) | Expected. Lower the min gap or raise the base rate if you want it sooner |
-| Shooters: no NOPE ever | `afterShotWeights` NOPE is 0, or **Max nopes per rep** is 0 | Raise them in the Shooters Advanced section |
-| Shooters: the bar shows "0.0 s" while NOPE is called | Between windows the bar sits empty by design | Expected. It drains again when the next LEFT/RIGHT is called |
-| Settings saved before the Shooters drill or the Session group | They load as before. The new fields start at their defaults | Nothing to do |
+| Move Lab: LEFT/RIGHT comes later than its get-set min | The get-set time is clamped to at least the start call's length + min gap (the defaults already respect this; it acts if you lower a min or the voice is slow) | Expected. Lower the min gap or raise the base rate if you want it sooner |
+| Settings saved before the Session group, or for the removed Shooters only drill | They load as before; the new fields start at their defaults. Shooters' get-set and nope gap values load into Move Lab | Nothing to do |
+| The Shooters only drill is gone | It was removed. Its logged sets stay in History (with their own trend while the log holds them) and in exports | Expected |
 | "Reps per set must be a whole number from 3 to 30." (or planned sets / session time warning) | A Session value is out of range or empty | Use the − / + steppers, which stay within range |
 | Offense stopped calling after a few reps and shows the set log | The set has ended (Reps per set reached) | Log it and tap **Save & rest**, then **Next set** when the rest is over |
 | "Couldn't save to this device. Storage may be blocked or full." | Private browsing, blocked site data or full storage | Training continues, but this set isn't kept. Allow site data for the app's address |
@@ -1318,8 +1111,7 @@ Runs only with `?selftest=1`. It hides the app, calls `OffensePlanner.runSelfTes
 
 ## Ideas for future work
 
-- A **mixed** offense drill that picks Drive or Shooters at random per rep (a third profile; see [Drill profiles and rep plans](#drill-profiles-and-rep-plans)).
-- An option for one countdown bar over the whole Shooters rep (a change to what the planner puts in `windows`).
+- A **mixed** offense drill that picks a drill at random per rep (another profile; see [Drill profiles and rep plans](#drill-profiles-and-rep-plans)).
 - A "Reset to defaults" button and a way to view or clear learned lengths from the UI.
 - Charts for missed calls and clean share, and a per-week view.
 - Tune the level thresholds from real logs, e.g. adjust over the last two or three sets instead of one, and chart the level in History.
