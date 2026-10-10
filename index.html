@@ -758,6 +758,27 @@
   .word-sprint { color: #ff7a4f; }
   .word-catch { color: var(--text); }
   .word-shot { color: #ffd24f; }
+
+  /* Read the D: one color per role, so the categories stay distinct. */
+  .word-momentum { color: #ff7a4f; }
+  .word-distance { color: #c47bff; }
+  .word-foot { color: #45d6e0; }
+  .word-hands { color: #ff6bd6; }
+  /* NOW: a short flash (yellow block fading to yellow text). */
+  .word-now {
+    color: #ffd24f;
+    border-radius: 16px;
+    padding: 0 0.25em;
+    animation: now-flash 0.45s ease-out;
+  }
+  @keyframes now-flash {
+    0% { background: #ffd24f; color: var(--bg); }
+    100% { background: transparent; color: #ffd24f; }
+  }
+
+  /* An on / off setting (toggle button bound to a hidden number input). */
+  .flag-field .toggle-row label { color: var(--text); font-size: 1rem; }
+  .toggle-btn:disabled { opacity: 0.6; cursor: default; }
   .word-center { color: #c47bff; }
   .word-cut { color: #ff4f5e; }
   .word-layup { color: #ffd24f; }
@@ -797,6 +818,7 @@
     <div class="panel hidden" id="offensePanel">
       <div class="segmented" role="group" aria-label="Offense drill">
         <button type="button" data-drill="drive" aria-pressed="true">Drive</button>
+        <button type="button" data-drill="readTheD" aria-pressed="false">Read the D</button>
         <button type="button" data-drill="moveLab" aria-pressed="false">Move Lab</button>
       </div>
 
@@ -809,6 +831,10 @@
         <div class="level-row">
           <span id="levelText-drive">Drive: Level 3</span>
           <button type="button" class="small-btn" data-reset-level="drive">Reset level</button>
+        </div>
+        <div class="level-row">
+          <span id="levelText-readTheD">Read the D: Level 3</span>
+          <button type="button" class="small-btn" data-reset-level="readTheD">Reset level</button>
         </div>
         <p class="status-text" id="levelStatus" role="status"></p>
       </div>
@@ -860,6 +886,80 @@
             </div>
             <div id="weightTables"></div>
             <div class="error" id="advancedError"></div>
+          </div>
+        </details>
+      </div>
+
+      <!-- Read the D drill only. On / off settings are hidden number inputs (0 / 1)
+           driven by toggle buttons, so levels and saved settings treat them like any field. -->
+      <div class="panel-section hidden" id="readTheDSettings">
+        <div class="field flag-field">
+          <div class="toggle-row">
+            <label for="rtdPractice" class="toggle-label">Practice mode<span class="hint">After each decision the voice says the right move and why</span></label>
+            <button type="button" class="toggle-btn" data-flag-for="rtdPractice" aria-pressed="false">Off</button>
+          </div>
+          <input type="number" id="rtdPractice" class="hidden" min="0" max="1" step="1" data-setting="readTheD.practice">
+        </div>
+        <div class="range-row">
+          <div class="field">
+            <label for="rtdRate">Cue speech rate</label>
+            <input type="number" id="rtdRate" min="0.5" max="2" step="0.05" inputmode="decimal" data-setting="readTheD.rate">
+          </div>
+          <div class="field">
+            <label for="rtdDecisionMs">Decision window (ms)</label>
+            <input type="number" id="rtdDecisionMs" min="500" step="100" data-setting="readTheD.decisionMs">
+          </div>
+        </div>
+        <div class="error" id="readTheDError"></div>
+
+        <details class="advanced" id="readTheDAdvanced">
+          <summary>Advanced</summary>
+          <div class="advanced-body">
+            <div class="field flag-field">
+              <div class="toggle-row">
+                <label for="rtdHands" class="toggle-label">Hands call<span class="hint">HANDS UP / DOWN, a distractor that never changes the answer</span></label>
+                <button type="button" class="toggle-btn" data-flag-for="rtdHands" aria-pressed="false">Off</button>
+              </div>
+              <input type="number" id="rtdHands" class="hidden" min="0" max="1" step="1" data-setting="readTheD.hands">
+            </div>
+            <div class="field flag-field">
+              <div class="toggle-row">
+                <label for="rtdMidDribble" class="toggle-label">Mid-dribble<span class="hint">LIVE at the start, the read comes while you dribble</span></label>
+                <button type="button" class="toggle-btn" data-flag-for="rtdMidDribble" aria-pressed="false">Off</button>
+              </div>
+              <input type="number" id="rtdMidDribble" class="hidden" min="0" max="1" step="1" data-setting="readTheD.midDribble">
+            </div>
+            <div class="field-grid">
+              <div class="field">
+                <label for="rtdCueGapMs">Gap between cue calls (ms)</label>
+                <input type="number" id="rtdCueGapMs" min="0" step="10" data-setting="readTheD.cueGapMs">
+              </div>
+              <div class="field">
+                <label for="rtdResetPauseMs">Reset pause (ms)</label>
+                <input type="number" id="rtdResetPauseMs" min="0" step="100" data-setting="readTheD.resetPauseMs">
+              </div>
+              <div class="field">
+                <label for="rtdReadMinMs">Min read time (ms)</label>
+                <input type="number" id="rtdReadMinMs" min="100" step="100" data-setting="readTheD.readMinMs">
+              </div>
+              <div class="field">
+                <label for="rtdReadMaxMs">Max read time (ms)</label>
+                <input type="number" id="rtdReadMaxMs" min="100" step="100" data-setting="readTheD.readMaxMs">
+              </div>
+              <div class="field">
+                <label for="rtdLiveDelayMinMs">LIVE delay min (ms)</label>
+                <input type="number" id="rtdLiveDelayMinMs" min="0" step="100" data-setting="readTheD.liveDelayMinMs">
+              </div>
+              <div class="field">
+                <label for="rtdLiveDelayMaxMs">LIVE delay max (ms)</label>
+                <input type="number" id="rtdLiveDelayMaxMs" min="0" step="100" data-setting="readTheD.liveDelayMaxMs">
+              </div>
+              <div class="field">
+                <label for="rtdPracticePauseMs">Practice pause (ms)</label>
+                <input type="number" id="rtdPracticePauseMs" min="0" step="100" data-setting="readTheD.practicePauseMs">
+              </div>
+            </div>
+            <p class="muted-text">The rules that decide the right move, and how often each move comes up, are in TRAINING_DEFAULTS.readTheD in index.html.</p>
           </div>
         </details>
       </div>
@@ -1236,6 +1336,12 @@ const OffensePlanner = (function () {
       D_HANDS_DOWN: { display: "HANDS DOWN", spoken: "hands down", estMs: 600 },  // distractor
       D_NOW:        { display: "NOW",        spoken: "now",        estMs: 300 },  // go signal
       D_LIVE:       { display: "LIVE",       spoken: "live",       estMs: 350 },  // mid-dribble lead-in
+      // Read the D practice mode: the correct action, said after the decision window.
+      // (Each rule's why is added below as W_<rule id>, from TRAINING_DEFAULTS.readTheD.rules.)
+      A_DRIVE_LEFT:   { display: "DRIVE LEFT",   spoken: "drive left",   estMs: 600 },
+      A_DRIVE_RIGHT:  { display: "DRIVE RIGHT",  spoken: "drive right",  estMs: 600 },
+      A_PULL_UP:      { display: "PULL UP",      spoken: "pull up",      estMs: 450 },
+      A_CREATE_SPACE: { display: "CREATE SPACE", spoken: "create space", estMs: 700 },
       // The move names (CROSSOVER, HESI, PULL UP, …) are added to this table from
       // TRAINING_DEFAULTS.moves, so each move is defined in one place.
     },
@@ -1301,6 +1407,10 @@ const OffensePlanner = (function () {
       liveDelayMaxMs: 1500, // provisional
       // Wait after the decision window ends before the next lead-in (ms).
       resetPauseMs: 1000,
+      // Practice mode (1 = on): after each decision window, a pause of practicePauseMs,
+      // then the correct action and its why, at baseRate. Not set by levels.
+      practice: 0,
+      practicePauseMs: 600, // provisional
     },
   };
 
@@ -1718,6 +1828,9 @@ const OffensePlanner = (function () {
       // How often each correct action comes up. States are drawn by first picking
       // an action by these weights, then one of its states at random.
       actionWeights: { DRIVE_LEFT: 25, DRIVE_RIGHT: 25, PULL_UP: 25, CREATE_SPACE: 25 }, // provisional
+      // Practice mode speaks each rule's why; its length estimate is this many ms per
+      // character at rate 1.0 until the real length is learned.
+      whyEstMsPerChar: 65, // provisional
     },
 
     // ---- Move Lab: the move vocabulary. ----
@@ -1742,6 +1855,12 @@ const OffensePlanner = (function () {
   // Each move is also a phrase (shared table, so learned lengths work for it too).
   TRAINING_DEFAULTS.moves.forEach(m => {
     OFFENSE_DEFAULTS.phrases[m.id] = { display: m.display, spoken: m.spoken, estMs: m.estMs };
+  });
+  // So is each Read the D rule's why (spoken in practice mode).
+  TRAINING_DEFAULTS.readTheD.rules.forEach(r => {
+    OFFENSE_DEFAULTS.phrases["W_" + r.id] = {
+      display: r.why, spoken: r.why, estMs: Math.round(r.why.length * TRAINING_DEFAULTS.readTheD.whyEstMsPerChar),
+    };
   });
 
   const LEVEL_COUNT = 5;
@@ -2132,8 +2251,21 @@ const OffensePlanner = (function () {
       return nowAt + rd.decisionMs;
     };
 
+    // Practice mode: a pause after the window, then the correct action and its why
+    // (shown as the caption under the action). Returns when the why has been spoken.
+    const explain = (cue, fromMs) => {
+      const answer = "A_" + cue.correct;
+      const why = "W_" + cue.ruleId;
+      const answerAt = fromMs + rd.practicePauseMs;
+      calls.push({ id: answer, atMs: answerAt, durMs: dur[answer] / base, rate: base });
+      const whyAt = answerAt + dur[answer] / base + s.minGapMs;
+      calls.push({ id: why, atMs: whyAt, durMs: dur[why] / base, rate: base, show: "caption" });
+      return whyAt + dur[why] / base;
+    };
+
     const state = sampleState(cfg, rd.hands === 1, ctx && ctx.lastState, rng);
-    const endMs = decide(state, firstAt);
+    let endMs = decide(state, firstAt);
+    if (rd.practice === 1) endMs = explain(cues[0], endMs);
     return { calls, windows, endMs, restMs: rd.resetPauseMs, cues };
   }
 
@@ -2160,7 +2292,10 @@ const OffensePlanner = (function () {
     }
     if (!isWholeNonNegative(rd.cueGapMs)) return main("Gap between cue calls must be a whole number of 0 ms or more.");
     if (!isWhole(rd.decisionMs) || rd.decisionMs < 500) return main("Decision window must be a whole number of at least 500 ms.");
-    if ([rd.hands, rd.midDribble].some(f => f !== 0 && f !== 1)) return main("Hands call and mid-dribble must each be off or on.");
+    if ([rd.hands, rd.midDribble, rd.practice].some(f => f !== 0 && f !== 1)) {
+      return main("Hands call, mid-dribble and practice mode must each be off or on.");
+    }
+    if (!isWholeNonNegative(rd.practicePauseMs)) return main("Practice pause must be a whole number of 0 ms or more.");
     if (!isWhole(rd.readMinMs) || !isWhole(rd.readMaxMs) || rd.readMinMs < 100 || rd.readMaxMs < 100) {
       return main("Read times must be whole numbers of at least 100 ms.");
     }
@@ -2179,6 +2314,7 @@ const OffensePlanner = (function () {
       if (RTD_EVIDENCE.indexOf(rule.evidence) === -1 || typeof rule.why !== "string" || typeof rule.answer !== "string") {
         return main(name + " needs an answer, a why and an evidence tag.");
       }
+      if (!(dur["W_" + rule.id] > 0)) return main(name + " has no spoken why (W_" + rule.id + ").");
       if (!Array.isArray(rule.when) || rule.when.length === 0) return main(name + " needs at least one when entry.");
       for (const entry of rule.when) {
         const keys = Object.keys(entry.match || {});
@@ -2365,6 +2501,7 @@ const OffensePlanner = (function () {
     plan.calls.forEach(c => {
       if (!hasKey(phrases, c.id)) p.push("unknown phrase " + c.id);
       if (!(c.atMs >= 0) || !(c.durMs > 0) || !(c.rate >= 0.5 && c.rate <= 2)) p.push(c.id + " timing");
+      if (c.show !== undefined && c.show !== "caption") p.push(c.id + " show " + c.show);
       if (c.atMs < prevEnd - EPS) p.push(c.id + " overlaps the call before");
       prevEnd = c.atMs + c.durMs;
     });
@@ -2394,6 +2531,8 @@ const OffensePlanner = (function () {
       const levels = LEVEL_DRILLS.indexOf(id) === -1 ? [null] : [1, 2, 3, 4, 5];
       levels.forEach(level => {
         const ls = level === null ? s : applyLevel(s, id, level, TRAINING_DEFAULTS);
+        // Read the D: odd levels in practice mode.
+        if (id === "readTheD") ls.readTheD.practice = level % 2;
         for (let n = 0; n < Math.min(reps, 1000); n++) {
           const plan = PROFILES[id].planRep(ls, dur, Math.random, null, ctx);
           if (plan.cues) ctx.lastState = plan.cues[0].state;
@@ -2478,7 +2617,7 @@ const OffensePlanner = (function () {
       return s;
     };
     [[{ rate: 1.7 }], [{ rate: 0.4 }], [{ cueGapMs: -1 }], [{ cueGapMs: 1.5 }], [{ decisionMs: 400 }], [{ decisionMs: NaN }],
-     [{ hands: 2 }], [{ midDribble: 0.5 }], [{ readMinMs: 50 }], [{ readMinMs: 4000 }], [{ liveDelayMinMs: 1600 }],
+     [{ hands: 2 }], [{ midDribble: 0.5 }], [{ practice: -1 }], [{ practicePauseMs: -5 }], [{ readMinMs: 50 }], [{ readMinMs: 4000 }], [{ liveDelayMinMs: 1600 }],
      [{ liveDelayMinMs: -1 }], [{ resetPauseMs: -1 }],
      [null, { rules: cfg.rules.filter(r => r.id !== "cushionSet") }],
      [null, { rules: cfg.rules.concat({ id: "x", when: [{ match: { hands: ["up"] }, situation: "x" }], action: "PULL_UP", answer: "x", why: "x", evidence: "study-based" }) }],
@@ -2575,6 +2714,36 @@ const OffensePlanner = (function () {
     });
     check("read the d: correct-action shares match the weights within 2 points over " + reps * 4 + " reps", ff);
     check("read the d: the same state never comes twice in a row, and every state comes up", pf);
+
+    // 10. Practice mode: after the window, the pause, the correct action, then its why as the caption.
+    const xf = [];
+    RTD_ACTIONS.forEach(a => { if (!(dur["A_" + a] > 0)) xf.push("A_" + a + " phrase"); });
+    cfg.rules.forEach(r => {
+      const p = defaults.phrases["W_" + r.id];
+      if (!p || p.display !== r.why || p.spoken !== r.why || !(p.estMs > 0)) xf.push("W_" + r.id + " phrase");
+    });
+    [1, 3, 5].forEach(level => {
+      const s = atLevel(level);
+      s.readTheD.practice = 1;
+      const rd = s.readTheD;
+      if (validateReadTheD(s, dur)) xf.push("L" + level + " practice does not validate");
+      for (let n = 0; n < 500; n++) {
+        const plan = planReadTheDRep(s, dur, Math.random);
+        const ids = plan.calls.map(x => x.id);
+        const where = "L" + level + ": " + ids.join(" > ");
+        const cue = plan.cues[0];
+        const k = ids.indexOf("D_NOW");
+        const answer = plan.calls[k + 1];
+        const why = plan.calls[k + 2];
+        const windowEnd = cue.atMs + cue.durMs;
+        if (!answer || answer.id !== "A_" + cue.correct || Math.abs(answer.atMs - windowEnd - rd.practicePauseMs) > EPS) xf.push(where + " (answer)");
+        if (!why || why.id !== "W_" + cue.ruleId || why.show !== "caption" || why.atMs < answer.atMs + answer.durMs + s.minGapMs - EPS) xf.push(where + " (why)");
+        if (answer && answer.show !== undefined) xf.push(where + " (answer shown as caption)");
+        if (why && Math.abs(plan.endMs - (why.atMs + why.durMs)) > EPS) xf.push(where + " (endMs)");
+        repPlanProblems(plan, s.phrases).forEach(x => xf.push(where + " " + x));
+      }
+    });
+    check("read the d: practice mode says the correct action after the window and its why as a caption, then rests", xf);
 
     return readTheDFitTable(defaults, dur);
   }
@@ -3073,7 +3242,7 @@ const TrainingLog = (function () {
   const LOG_KEY = "reactionCaller.log";
   const BACKUP_PREFIX = LOG_KEY + ".backup.";
   // "shooters" (the removed Shooters only drill) stays valid so its logged sets keep loading.
-  const DRILLS = ["drive", "shooters", "moveLab"];
+  const DRILLS = ["drive", "shooters", "moveLab", "readTheD"];
   // Move Lab sides (extra.side), in sets logged before the redesign.
   const SIDES = ["left", "right", "alternate"];
   // "How did the set feel?" One of these, or null (not rated).
@@ -3154,6 +3323,7 @@ const TrainingLog = (function () {
     };
     // (Sets of the removed Shooters only drill kept { shooters: {...} } here.)
     if (s.drill === "moveLab") return clone(Object.assign({ moveLab: s.moveLab }, shared));
+    if (s.drill === "readTheD") return clone(Object.assign({ readTheD: s.readTheD }, shared));
     return clone(Object.assign({
       readMinMs: s.readMinMs, readMaxMs: s.readMaxMs,
       driveMinMs: s.driveMinMs, driveMaxMs: s.driveMaxMs,
@@ -3548,7 +3718,10 @@ const TrainingLog = (function () {
     ["readMinMs", "driveMinMs", "driveMaxMs", "maxCutOffsPerDrive", "afterLayUpWeights", "maxRate", "repsPerSet"].forEach(k => {
       if (drive[k] === undefined) snap.push("drive snapshot missing " + k);
     });
-    if (drive.moveLab !== undefined || drive.phrases !== undefined) snap.push("drive snapshot has unrelated settings");
+    if (drive.moveLab !== undefined || drive.readTheD !== undefined || drive.phrases !== undefined) snap.push("drive snapshot has unrelated settings");
+    const rtd = snapshotSettings(Object.assign({}, settings, { drill: "readTheD" }));
+    if (!rtd.readTheD || rtd.readTheD.decisionMs !== settings.readTheD.decisionMs || rtd.repsPerSet !== 8 ||
+        rtd.driveMinMs !== undefined || rtd.moveLab !== undefined) snap.push("read the d snapshot");
     const moveLab = snapshotSettings(Object.assign({}, settings, { drill: "moveLab" }));
     settings.moveLab.getSetMs.CATCH.minMs = 1;
     settings.afterLayUpWeights.CUT_OFF = 1;
@@ -3856,8 +4029,16 @@ const TrainingLog = (function () {
     SPRINT_FROM_LEFT_CORNER: "word-sprint", SPRINT_FROM_RIGHT_CORNER: "word-sprint",
     CATCH: "word-catch",
     SHOT: "word-shot",
+    // Read the D: a color per role (momentum, distance, lead foot, hands), NOW flashes.
+    D_LIVE: "word-read",
+    D_NOW: "word-now",
+    A_DRIVE_LEFT: "word-left", A_DRIVE_RIGHT: "word-right", A_PULL_UP: "word-shot", A_CREATE_SPACE: "word-catch",
   };
   P.TRAINING_DEFAULTS.moves.forEach(m => { PHRASE_CLASS[m.id] = "word-move"; });
+  const RTD_ROLE_CLASS = { momentum: "word-momentum", distance: "word-distance", leadFoot: "word-foot", hands: "word-hands" };
+  Object.keys(P.RTD_PHRASE).forEach(key => Object.keys(P.RTD_PHRASE[key]).forEach(value => {
+    PHRASE_CLASS[P.RTD_PHRASE[key][value]] = RTD_ROLE_CLASS[key];
+  }));
 
   const WEIGHT_TABLE_TITLES = {
     startWeights: "Start weights (after READY)",
@@ -3881,6 +4062,10 @@ const TrainingLog = (function () {
       label: "OFFENSE · DRIVE",
       subtitle: "Call & Execute: move fluency and readiness under unpredictable timing. " +
         "Stay ready, then drive, counter and finish on the calls.",
+    },
+    readTheD: {
+      label: "OFFENSE · READ THE D",
+      subtitle: "Read the D: decide the move from what the defender's doing — no move is named for you.",
     },
     moveLab: {
       label: "OFFENSE · MOVE LAB",
@@ -3981,6 +4166,10 @@ const TrainingLog = (function () {
   const captionEl = document.getElementById("caption");
   const logCleanRow = document.getElementById("logCleanRow");
   const logClean = document.getElementById("logClean");
+  const readTheDSettings = document.getElementById("readTheDSettings");
+  const readTheDError = document.getElementById("readTheDError");
+  const readTheDAdvanced = document.getElementById("readTheDAdvanced");
+  const flagButtons = document.querySelectorAll("button[data-flag-for]");
 
   const STORAGE_MODE = "reactionCaller.mode";
   const STORAGE_DRILL = "reactionCaller.offenseDrill";
@@ -3999,6 +4188,7 @@ const TrainingLog = (function () {
     advanced: { el: advancedError, details: advancedEl },
     speech: { el: speechError, details: speechEl },
     moveLab: { el: moveLabError },
+    readTheD: { el: readTheDError, details: readTheDAdvanced },
     session: { el: sessionError },
   };
 
@@ -4184,6 +4374,9 @@ const TrainingLog = (function () {
     repsCompleted: 0,    // reps of the current set whose endMs has passed
     repMoves: [],        // moves called in each rep of the current set (from plan.moves)
     lastMoveId: null,    // the last move called this session (so planners never repeat it)
+    repCues: [],         // Read the D: each rep's decisions in the current set (plan.cues)
+    lastState: null,     // Read the D: the last defender state called (never repeated next rep)
+    captionFromCall: false,  // the caption shows a call (practice mode's why), not plan.caption
 
     start(settings) {
       this.settings = settings;
@@ -4191,6 +4384,7 @@ const TrainingLog = (function () {
       this.runId++;
       this.progress = P.newSession();
       this.lastMoveId = null;
+      this.lastState = null;
       countdownEl.classList.remove("hidden");
       this.startClock();
       this.beginSetClock();
@@ -4201,6 +4395,7 @@ const TrainingLog = (function () {
       this.setStartedAt = new Date().toISOString();
       this.repsCompleted = 0;
       this.repMoves = [];
+      this.repCues = [];
     },
 
     // Session clock (mm:ss) and the one-time fatigue warning. Runs for the
@@ -4261,11 +4456,22 @@ const TrainingLog = (function () {
       this.timers.push(id);
     },
 
-    say(id, rate) {
+    // show "caption": the call goes in the small line under the word (practice
+    // mode's why); otherwise it is the big word, which clears such a caption.
+    say(id, rate, show) {
       const phrase = this.settings.phrases[id];
-      const len = phrase.display.length;
-      const long = len > 18 ? " long xlong" : len > 7 ? " long" : "";
-      showWord(phrase.display, PHRASE_CLASS[id] + long);
+      if (show === "caption") {
+        showCaption([id]);
+        this.captionFromCall = true;
+      } else {
+        const len = phrase.display.length;
+        const long = len > 18 ? " long xlong" : len > 7 ? " long" : "";
+        showWord(phrase.display, PHRASE_CLASS[id] + long);
+        if (this.captionFromCall) {
+          hideCaption();
+          this.captionFromCall = false;
+        }
+      }
       const utter = speak(phrase.spoken, { rate, cancel: false });
       if (utter) this.measure(utter, id, rate);
     },
@@ -4290,10 +4496,13 @@ const TrainingLog = (function () {
       this.progress = P.beginRep(this.progress);
       sessionProgress.textContent = P.progressLabel(this.progress, s.training, s.level);
       const plan = this.profile.planRep(s, s.durations, Math.random, null,
-        { repInSet: this.progress.rep, lastMoveId: this.lastMoveId });
+        { repInSet: this.progress.rep, lastMoveId: this.lastMoveId, lastState: this.lastState });
       const moves = plan.moves || [];
       this.repMoves.push(moves);
       if (moves.length) this.lastMoveId = moves[moves.length - 1];
+      // Read the D: what was called and the right answer, for the decision review.
+      this.repCues.push(plan.cues || []);
+      if (plan.cues && plan.cues.length) this.lastState = plan.cues[0].state;
 
       // Rep clock: t = 0 is when the first call should be heard. Every call is
       // spoken speechLeadMs before its planned time to cover TTS start-up, so the
@@ -4305,6 +4514,7 @@ const TrainingLog = (function () {
       countdownEl.classList.add("idle");
       // The caption (e.g. the named move) stays from its atMs until the next rep.
       hideCaption();
+      this.captionFromCall = false;
       if (plan.caption) {
         const ids = plan.caption.ids;
         const delay = at(plan.caption.atMs);
@@ -4313,8 +4523,8 @@ const TrainingLog = (function () {
       }
       plan.calls.forEach(call => {
         const delay = at(call.atMs);
-        if (delay <= 0) this.say(call.id, call.rate);
-        else this.later(() => this.say(call.id, call.rate), delay);
+        if (delay <= 0) this.say(call.id, call.rate, call.show);
+        else this.later(() => this.say(call.id, call.rate, call.show), delay);
       });
 
       // The countdown bar is drawn only from plan.windows.
@@ -4499,7 +4709,7 @@ const TrainingLog = (function () {
   // ---- Adaptive difficulty: levels and Auto difficulty ----
 
   const TD = P.TRAINING_DEFAULTS;
-  const LEVEL_DRILLS = ["drive"];  // drills with levels (not Move Lab)
+  const LEVEL_DRILLS = ["drive", "readTheD"];  // drills with levels (not Move Lab)
 
   function loadLevels() {
     let stored = null;
@@ -4573,6 +4783,35 @@ const TrainingLog = (function () {
       if (autoLevel) lockInput(input, owner[path], path);
       else unlockInput(input);
     });
+    renderFlags();
+  }
+
+  // ---- On / off settings: a toggle button drives a hidden 0 / 1 input ----
+
+  function flagInput(btn) {
+    return document.getElementById(btn.dataset.flagFor);
+  }
+
+  // Show each toggle's value; a level-locked one is shown but can't be tapped.
+  function renderFlags() {
+    flagButtons.forEach(btn => {
+      const input = flagInput(btn);
+      const on = input.value === "1";
+      btn.setAttribute("aria-pressed", String(on));
+      btn.textContent = on ? "On" : "Off";
+      btn.disabled = input.readOnly;
+      btn.classList.toggle("level-locked", input.readOnly);
+    });
+  }
+
+  function wireFlags() {
+    flagButtons.forEach(btn => btn.addEventListener("click", () => {
+      const input = flagInput(btn);
+      if (input.readOnly) return;
+      input.value = input.value === "1" ? "0" : "1";
+      input.dispatchEvent(new Event("input"));
+      renderFlags();
+    }));
   }
 
   // ---- Move Lab: move picker ----
@@ -4704,6 +4943,7 @@ const TrainingLog = (function () {
     // The Min/Max delay fields are Defense only (Drive has its own read time fields).
     rangePanel.classList.toggle("hidden", offense);
     driveSettings.classList.toggle("hidden", selectedDrill !== "drive");
+    readTheDSettings.classList.toggle("hidden", selectedDrill !== "readTheD");
     moveLabSettings.classList.toggle("hidden", !moveLab);
     // Move Lab has no levels, and its own reps per set.
     levelSettings.classList.toggle("hidden", moveLab);
@@ -4990,7 +5230,7 @@ const TrainingLog = (function () {
 
   // ---- Session summary ----
 
-  const DRILL_NAMES = { drive: "Drive", shooters: "Shooters only", moveLab: "Move Lab" };
+  const DRILL_NAMES = { drive: "Drive", shooters: "Shooters only", moveLab: "Move Lab", readTheD: "Read the D" };
   const QUALITY_NAMES = { clean: "Clean", rushed: "Rushed", off_balance: "Off-balance" };
 
   function el(tag, className, text) {
@@ -5410,6 +5650,7 @@ const TrainingLog = (function () {
   fillOffenseDefaults();
   loadSettings();
   persistedInputs().forEach(input => input.addEventListener("input", saveSettings));
+  wireFlags();
   updateLevelView();
   autoLevelBtn.addEventListener("click", () => {
     autoLevel = !autoLevel;
@@ -5502,6 +5743,13 @@ const TrainingLog = (function () {
   result.fitTables.drive.forEach(r => {
     lines.push(r.cutOffs + " cut-offs  " + (r.finisher + "                  ").slice(0, 19) +
       String(r.minWindowMs).padStart(5) + " ms  fits: " + r.fitsAtDriveMax);
+  });
+
+  console.table(result.fitTables.readTheD);
+  lines.push("\nRead the D per level: longest cue sequence (first cue to the end of NOW) at the cue rate, max rate " + s.maxRate);
+  result.fitTables.readTheD.forEach(r => {
+    lines.push("Level " + r.level + "  rate " + r.rate.toFixed(2) + "  gap " + String(r.cueGapMs).padStart(3) + " ms  " +
+      r.sequence.padEnd(50) + String(r.sequenceMs).padStart(5) + " ms  window " + r.decisionMs + " ms  fits: " + r.fits);
   });
 
   banner.style.color = result.passed ? "#4fd87c" : "#ff4f5e";
