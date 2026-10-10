@@ -32,6 +32,17 @@
       r.sequence.padEnd(50) + String(r.sequenceMs).padStart(5) + " ms  window " + r.decisionMs + " ms  fits: " + r.fits);
   });
 
+  // Read the D rewrite (state machine, not wired in yet): how long its reps run.
+  const P = OffensePlanner;
+  const ms = P.cloneSettings(s);
+  const lengths = P.readTheDMachineLengthTable(ms, P.durationsFor(ms, null), 10000);
+  console.table(lengths);
+  lines.push("\nRead the D machine (in progress): rep length from GO to the end of the window, 10000 reps");
+  lengths.forEach(r => {
+    lines.push(r.entry.padEnd(12) + String(r.reps).padStart(6) + " reps  avg " + String(r.avgMs).padStart(5) + " ms  longest " +
+      String(r.maxMs).padStart(5) + " ms  calls avg " + r.avgCalls + ", max " + r.maxCalls);
+  });
+
   banner.style.color = result.passed ? "#4fd87c" : "#ff4f5e";
   banner.textContent = lines.join("\n");
 })();

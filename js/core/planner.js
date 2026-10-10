@@ -301,7 +301,11 @@ const OffensePlanner = (function () {
       if (!Array.isArray(plan.cues) || !Array.isArray(plan.windows) || plan.cues.length !== plan.windows.length) p.push("cues vs windows");
       else plan.cues.forEach((c, i) => {
         if (c.atMs !== plan.windows[i].startMs || c.durMs !== plan.windows[i].durMs) p.push("cue " + i + " is not its window");
-        if (api.RTD_ACTIONS.indexOf(c.correct) === -1 || !Array.isArray(c.ids) || !c.state) p.push("cue " + i + " fields");
+        // Two cue shapes: a Read the D decision ({ state, ids, correct }) or a
+        // Read the D machine window ({ chain, terminal, driveSide }).
+        const machine = Array.isArray(c.chain);
+        if (machine ? c.chain.length === 0 || typeof c.terminal !== "string"
+          : api.RTD_ACTIONS.indexOf(c.correct) === -1 || !Array.isArray(c.ids) || !c.state) p.push("cue " + i + " fields");
       });
     }
     return p;

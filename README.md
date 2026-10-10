@@ -64,6 +64,7 @@ There is no build step, no `package.json`, no framework and no third-party libra
    - [Read the D validation](#read-the-d-validation)
    - [Second read (Levels 4–5)](#second-read-levels-45)
    - [What three words can't capture](#what-three-words-cant-capture)
+   - [Read the D rewrite in progress](#read-the-d-rewrite-in-progress)
 5. [Drill profiles and rep plans](#drill-profiles-and-rep-plans)
    - [The training log](#the-training-log)
 6. [Tuning offense mode](#tuning-offense-mode)
@@ -784,6 +785,28 @@ A value in the mapping is fixed (`"set"`), a list to pick from at random (`["cus
 
 Three spoken words in a fixed order simplify something a real defender shows you almost all at once: his momentum, distance, stance and hands arrive together, change continuously, and come with fakes. The drill trains the decision rules and makes them fast, so the read is automatic when you see it. Reading a real defender on the court still needs practice against a real defender.
 
+### Read the D rewrite in progress
+
+A rewritten Read the D is being built **alongside** the current one, in `js/read-the-d/machine.js`. So far it is only pure logic with self-test checks: the runner, the settings form and the drill switch still play the drill described above. The next step replaces it.
+
+It is a branching state machine: after GO, each call is followed by a call a real defender could give next, until a terminal call or a shot.
+
+```
+GO ─read─▶ TIGHT ─jab─▶ LEFT FOOT / RIGHT FOOT ─quick─▶ CUT OFF (35%) ─quick─▶ CUT OFF (45%) / CROSSED ─quick─▶ LANE OPEN
+                                              └─quick─▶ LANE OPEN (65%)
+   ─read─▶ NO OPENING ─dribble─▶ LEFT FOOT 35 / RIGHT FOOT 35 / HANDS DOWN 30 (terminal: shoot)
+   ─read─▶ SAGGING / RETREATING ─quick─▶ HANDS UP (20% / 25%), else the rep ends on a shot
+HANDS UP ─dribble─▶ NO OPENING 30 / LEFT FOOT 15 / RIGHT FOOT 15 / HANDS DOWN 20 / SAGGING 20
+LANE OPEN ─finish─▶ HELP D ON LEFT / RIGHT (30%; the drive side 65, the other 35) ─finish─▶ a LAY call, never on the help side
+          ─finish─▶ LAY ON LEFT / RIGHT / CENTER (drive side 40, center 30, other side 30; terminal)
+```
+
+The entry weights after GO are TIGHT 25, NO OPENING 30, SAGGING 25, RETREATING 20. The drive side is set by each foot call and flipped by every CUT OFF. Per rep there are at most 2 CUT OFFs, 2 HANDS UPs and 1 HELP D. Each wait (read 800–3500, jab 900–2200, dribble 1000–2500, quick 250–700, finish 500–1300 ms) runs from the end of one call to the start of the next, and is never shorter than the min gap. GO is spoken at the base rate and every other call at `readTheD2.rate` (1.3). One 1800 ms countdown window follows the last call (or the silent end), then a 1000 ms rest. The new calls are GO, LANE OPEN, CUT OFF (`D_CUT_OFF`), CROSSED, HELP D ON LEFT / RIGHT and LAY ON LEFT / RIGHT / CENTER; it reuses TIGHT, NO OPENING, SAGGING, RETREATING, the foot calls and HANDS UP / DOWN.
+
+Every number is in `OFFENSE_DEFAULTS.readTheD2` (all `// provisional`), and what each call means for the player is in `TRAINING_DEFAULTS.readTheD2.reads`. The pure functions are `readTheDNext(node, ctx, cfg, rng)` (one step: `{ next, wait, ctx }`), `planReadTheDMachineRep` (a standard rep plan whose one `cues` entry is `{ atMs, durMs, chain, terminal, driveSide }`), `validateReadTheDMachine`, `readTheDMachineLengthTable` and the edge table `READTHED_MACHINE`. The runner contract (`repPlanProblems`) accepts both cue shapes.
+
+Its 5 self-test checks cover: the new calls and a meaning for every call; 40,000 reps of structure (at most 14 calls, GO first, every edge in the table, the TIGHT / foot / LANE OPEN / LAY / HELP D rules, terminals last, the caps, the drive side); the frequencies of every weight, chance and side split within 2 points (including LAY sides after a CUT OFF flipped the drive side); the timing (every wait in its type's range and at least the min gap, the rates, no overlaps, the window); and validation. The self-test page also prints the average and longest rep length by entry read (about 8 s on average, up to about 20 s, at most 12 calls with the defaults).
+
 ## Drill profiles and rep plans
 
 Offense is built around two ideas, so that a future **mixed** drill (a random drill per rep) is a small addition:
@@ -1004,7 +1027,7 @@ http://localhost:8080/index.html?selftest=1
 
 Use `/index.html?selftest=1`, not `/?selftest=1`. The bundled `server.js` only maps a bare `/` to `index.html`, so `/?selftest=1` returns "Not found".
 
-Instead of the app, the page runs a simulation of every offense planner (every drill profile's self-test) plus checks of the session helpers and the training log, and prints **PASS** / **FAIL** for each check to the console and to an on-page banner (green when everything passes, red otherwise). There are 64 checks in total: 19 Drive, 5 Move Lab, 11 Read the D, 1 Runner, 1 Learned lengths, 6 Session, 3 Levels, 2 Read the D scoring, 9 Training log and 7 History. Each drill file runs its own checks; the other files register theirs with `registerSuite`.
+Instead of the app, the page runs a simulation of every offense planner (every drill profile's self-test) plus checks of the session helpers and the training log, and prints **PASS** / **FAIL** for each check to the console and to an on-page banner (green when everything passes, red otherwise). There are 69 checks in total: 19 Drive, 5 Move Lab, 11 Read the D, 1 Runner, 1 Learned lengths, 6 Session, 3 Levels, 2 Read the D scoring, 5 Read the D machine (see [Read the D rewrite in progress](#read-the-d-rewrite-in-progress)), 9 Training log and 7 History. Each drill file runs its own checks; the other files register theirs with `registerSuite`.
 
 **Read the D.** It checks:
 
@@ -1120,6 +1143,7 @@ Reaction-game/
 │   ├── read-the-d/
 │   │   ├── read-the-d.js   ← Read the D: calls, rules, sampling, planner, second read, validation, self-test
 │   │   ├── scoring.js      ← decision scoring, feedback lines, its level rule
+│   │   ├── machine.js      ← the Read the D rewrite in progress: a branching state machine (not wired in yet)
 │   │   └── read-the-d-ui.js← (app) cue colors and the decision review
 │   ├── log/
 │   │   ├── training-log.js ← TrainingLog: set validation, snapshots, summaries, versioned load / save
