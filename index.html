@@ -966,6 +966,13 @@
               </div>
               <input type="number" id="rtdMidDribble" class="hidden" min="0" max="1" step="1" data-setting="readTheD.midDribble">
             </div>
+            <div class="field flag-field">
+              <div class="toggle-row">
+                <label for="rtdSecondRead" class="toggle-label">Second read<span class="hint">In about half the reps the defender reacts to your move: read again</span></label>
+                <button type="button" class="toggle-btn" data-flag-for="rtdSecondRead" aria-pressed="false">Off</button>
+              </div>
+              <input type="number" id="rtdSecondRead" class="hidden" min="0" max="1" step="1" data-setting="readTheD.secondRead">
+            </div>
             <div class="field-grid">
               <div class="field">
                 <label for="rtdCueGapMs">Gap between cue calls (ms)</label>
@@ -990,6 +997,14 @@
               <div class="field">
                 <label for="rtdLiveDelayMaxMs">LIVE delay max (ms)</label>
                 <input type="number" id="rtdLiveDelayMaxMs" min="0" step="100" data-setting="readTheD.liveDelayMaxMs">
+              </div>
+              <div class="field">
+                <label for="rtdSecondGapMinMs">Second read gap min (ms)</label>
+                <input type="number" id="rtdSecondGapMinMs" min="0" step="100" data-setting="readTheD.secondGapMinMs">
+              </div>
+              <div class="field">
+                <label for="rtdSecondGapMaxMs">Second read gap max (ms)</label>
+                <input type="number" id="rtdSecondGapMaxMs" min="0" step="100" data-setting="readTheD.secondGapMaxMs">
               </div>
               <div class="field">
                 <label for="rtdPracticePauseMs">Practice pause (ms)</label>
@@ -1454,6 +1469,13 @@ const OffensePlanner = (function () {
       liveDelayMaxMs: 1500, // provisional
       // Wait after the decision window ends before the next lead-in (ms).
       resetPauseMs: 1000,
+      // 1 = the defender can react to your first move with a second read (Levels 4-5):
+      // with probability TRAINING_DEFAULTS.readTheD.secondRead.chance, a second cue
+      // sequence starts secondGapMinMs..secondGapMaxMs after the first window ends
+      // (after practice mode's explanation, when on), with its own full decision window.
+      secondRead: 0,
+      secondGapMinMs: 700, // provisional
+      secondGapMaxMs: 1200, // provisional
       // Practice mode (1 = on): after each decision window, a pause of practicePauseMs,
       // then the correct action and its why, at baseRate. Not set by levels.
       practice: 0,
@@ -1841,15 +1863,15 @@ const OffensePlanner = (function () {
       // Every rate must stay within the max speech rate.
       readTheD: [
         { "readTheD.rate": 1.0, "readTheD.cueGapMs": 300, "readTheD.decisionMs": 3000,
-          "readTheD.hands": 0, "readTheD.midDribble": 0 }, // provisional
+          "readTheD.hands": 0, "readTheD.midDribble": 0, "readTheD.secondRead": 0 }, // provisional
         { "readTheD.rate": 1.15, "readTheD.cueGapMs": 250, "readTheD.decisionMs": 2500,
-          "readTheD.hands": 0, "readTheD.midDribble": 0 }, // provisional
+          "readTheD.hands": 0, "readTheD.midDribble": 0, "readTheD.secondRead": 0 }, // provisional
         { "readTheD.rate": 1.3, "readTheD.cueGapMs": 200, "readTheD.decisionMs": 2200,
-          "readTheD.hands": 1, "readTheD.midDribble": 0 }, // provisional
+          "readTheD.hands": 1, "readTheD.midDribble": 0, "readTheD.secondRead": 0 }, // provisional
         { "readTheD.rate": 1.45, "readTheD.cueGapMs": 150, "readTheD.decisionMs": 2000,
-          "readTheD.hands": 1, "readTheD.midDribble": 1 }, // provisional
+          "readTheD.hands": 1, "readTheD.midDribble": 1, "readTheD.secondRead": 1 }, // provisional
         { "readTheD.rate": 1.6, "readTheD.cueGapMs": 120, "readTheD.decisionMs": 1700,
-          "readTheD.hands": 1, "readTheD.midDribble": 1 }, // provisional
+          "readTheD.hands": 1, "readTheD.midDribble": 1, "readTheD.secondRead": 1 }, // provisional
       ],
     },
 
@@ -1882,6 +1904,24 @@ const OffensePlanner = (function () {
       // How often each correct action comes up. States are drawn by first picking
       // an action by these weights, then one of its states at random.
       actionWeights: { DRIVE_LEFT: 25, DRIVE_RIGHT: 25, PULL_UP: 25, CREATE_SPACE: 25 }, // provisional
+      // Second read (Levels 4-5): the defender reacts to your first move. The second
+      // state follows from the first CORRECT action and is scored with the same rules.
+      // Each option has a weight and the state to call; a value can be fixed, a list
+      // (one picked at random), "random" (any value) or, for leadFoot, "opposite"
+      // (the other side from the drive).
+      secondRead: {
+        chance: 0.5, // provisional: share of reps with a second read
+        afterDrive: [
+          // He cut the drive off: tight, set, lead foot now on the other side -> counter the other way.
+          { id: "cutOff", weight: 50, state: { momentum: "set", distance: "tight", leadFoot: "opposite" } }, // provisional
+          // He gave ground: retreating -> pull up.
+          { id: "retreat", weight: 50, state: { momentum: "retreating", distance: ["cushion", "sag"], leadFoot: "random" } }, // provisional
+        ],
+        afterPullUpOrCreateSpace: [
+          // A hard closeout -> drive past his front foot.
+          { id: "closeout", weight: 100, state: { momentum: "closing", distance: ["tight", "cushion"], leadFoot: "random" } }, // provisional
+        ],
+      },
       // Practice mode speaks each rule's why; its length estimate is this many ms per
       // character at rate 1.0 until the real length is learned.
       whyEstMsPerChar: 65, // provisional
@@ -2320,7 +2360,57 @@ const OffensePlanner = (function () {
     const state = sampleState(cfg, rd.hands === 1, ctx && ctx.lastState, rng);
     let endMs = decide(state, firstAt);
     if (rd.practice === 1) endMs = explain(cues[0], endMs);
+
+    // Second read: the defender reacts to the first correct action.
+    if (rd.secondRead === 1 && rng() < cfg.secondRead.chance) {
+      const reaction = reactionState(cues[0].correct, cfg, rng);
+      endMs = decide(reaction.state, endMs + randomInt(rd.secondGapMinMs, rd.secondGapMaxMs, rng));
+      cues[1].reaction = reaction.id;
+      if (rd.practice === 1) endMs = explain(cues[1], endMs);
+    }
     return { calls, windows, endMs, restMs: rd.resetPauseMs, cues };
+  }
+
+  // The defender's reaction to the first correct action, from cfg.secondRead:
+  // { id, state } (no hands call in a second read).
+  function reactionState(firstCorrect, cfg, rng) {
+    const drove = firstCorrect === "DRIVE_LEFT" || firstCorrect === "DRIVE_RIGHT";
+    const options = drove ? cfg.secondRead.afterDrive : cfg.secondRead.afterPullUpOrCreateSpace;
+    const weights = {};
+    options.forEach((o, i) => { weights[i] = o.weight; });
+    const index = pickWeighted(options.map((o, i) => String(i)), weights, rng);
+    const option = options[index === null ? 0 : Number(index)];
+    const state = {};
+    RTD_ORDER.forEach(key => {
+      const v = option.state[key];
+      if (Array.isArray(v)) state[key] = randomOf(v, rng);
+      else if (v === "random" || (v === "opposite" && !drove)) state[key] = randomOf(RTD_VALUES[key], rng);
+      else if (v === "opposite") state[key] = firstCorrect === "DRIVE_LEFT" ? "right" : "left";
+      else state[key] = v;
+    });
+    return { id: option.id, state };
+  }
+
+  // A second-read mapping problem, or null.
+  function secondReadProblem(sr) {
+    if (!sr || !(sr.chance >= 0 && sr.chance <= 1)) return "Second read chance must be from 0 to 1.";
+    for (const key of ["afterDrive", "afterPullUpOrCreateSpace"]) {
+      const options = sr[key];
+      if (!Array.isArray(options) || options.length === 0) return "Second read: " + key + " needs at least one option.";
+      if (!options.every(o => isNonNegative(o.weight)) || !(options.reduce((a, o) => a + o.weight, 0) > 0)) {
+        return "Second read: " + key + " weights must be 0 or more and add up to more than 0.";
+      }
+      for (const o of options) {
+        const ok = o.state && RTD_ORDER.every(k => {
+          const v = o.state[k];
+          const valid = x => RTD_VALUES[k].indexOf(x) !== -1;
+          return valid(v) || v === "random" || (k === "leadFoot" && v === "opposite") ||
+            (Array.isArray(v) && v.length > 0 && v.every(valid));
+        });
+        if (!ok) return "Second read: option " + o.id + " needs a momentum, distance and lead foot it can call.";
+      }
+    }
+    return null;
   }
 
   // The longest cue call of each kind, in call order (hands last).
@@ -2346,8 +2436,11 @@ const OffensePlanner = (function () {
     }
     if (!isWholeNonNegative(rd.cueGapMs)) return main("Gap between cue calls must be a whole number of 0 ms or more.");
     if (!isWhole(rd.decisionMs) || rd.decisionMs < 500) return main("Decision window must be a whole number of at least 500 ms.");
-    if ([rd.hands, rd.midDribble, rd.practice].some(f => f !== 0 && f !== 1)) {
-      return main("Hands call, mid-dribble and practice mode must each be off or on.");
+    if ([rd.hands, rd.midDribble, rd.secondRead, rd.practice].some(f => f !== 0 && f !== 1)) {
+      return main("Hands call, mid-dribble, second read and practice mode must each be off or on.");
+    }
+    if (!isWholeNonNegative(rd.secondGapMinMs) || !isWholeNonNegative(rd.secondGapMaxMs) || rd.secondGapMinMs > rd.secondGapMaxMs) {
+      return main("Second read gap: min and max must be whole numbers of 0 ms or more, min not above max.");
     }
     if (!isWholeNonNegative(rd.practicePauseMs)) return main("Practice pause must be a whole number of 0 ms or more.");
     if (!isWhole(rd.readMinMs) || !isWhole(rd.readMaxMs) || rd.readMinMs < 100 || rd.readMaxMs < 100) {
@@ -2385,6 +2478,8 @@ const OffensePlanner = (function () {
     const w = cfg.actionWeights;
     if (!RTD_ACTIONS.every(a => isNonNegative(w[a]))) return main("Action weights must be numbers of 0 or more.");
     if (!(sumOf(RTD_ACTIONS, w) > 0)) return main("Action weights must add up to more than 0.");
+    const srProblem = secondReadProblem(cfg.secondRead);
+    if (srProblem) return main(srProblem);
 
     if (layoutCues(longestCueIds(rd.hands === 1, dur).concat("D_NOW"), 0, s, dur) === null) {
       return main("The cue calls don't fit at cue speech rate " + rd.rate + ".");
@@ -2801,8 +2896,10 @@ const OffensePlanner = (function () {
         const where = "L" + level + ": " + ids.join(" > ");
         const leadIn = rd.midDribble === 1 ? "D_LIVE" : "READ";
         if (ids[0] !== leadIn || c[0].atMs !== 0 || c[0].rate !== s.baseRate) sf.push(where + " (lead-in)");
-        const seq = ids.slice(1);
-        if (seq.indexOf("D_NOW") !== seq.length - 1) sf.push(where + " (NOW not last)");
+        // The first decision: everything up to the first NOW (a second read follows it at Levels 4-5).
+        const fc = c.slice(0, ids.indexOf("D_NOW") + 1);
+        const seq = ids.slice(1, fc.length);
+        if (fc.length === 0 || seq.length < 4) sf.push(where + " (no NOW)");
         const core = seq.slice(0, -1).filter(id => !isHands(id));
         if (core.join() !== RTD_ORDER.map(k => RTD_PHRASE[k][st[k]]).join()) sf.push(where + " (order, or not the state's calls)");
         const h = seq.findIndex(isHands);
@@ -2817,15 +2914,16 @@ const OffensePlanner = (function () {
         const range = rd.midDribble === 1 ? [rd.liveDelayMinMs, rd.liveDelayMaxMs] : [rd.readMinMs, rd.readMaxMs];
         const clamp = end(c[0]) + s.minGapMs;
         if (c[1].atMs < Math.max(range[0], clamp) - EPS || c[1].atMs > Math.max(range[1], clamp) + EPS) tf.push(where + " (first cue at " + c[1].atMs + ")");
-        for (let k = 1; k < c.length; k++) {
+        for (let k = 1; k < fc.length; k++) {
           if (Math.abs(c[k].rate - rd.rate) > EPS || Math.abs(c[k].durMs - dur[c[k].id] / rd.rate) > EPS) tf.push(where + " (rate)");
           if (k > 1 && Math.abs(c[k].atMs - end(c[k - 1]) - rd.cueGapMs) > EPS) tf.push(where + " (gap)");
-          if (c[k].atMs < end(c[k - 1]) - EPS) tf.push(where + " (overlap)");
         }
-        const now = c[c.length - 1];
+        for (let k = 1; k < c.length; k++) if (c[k].atMs < end(c[k - 1]) - EPS) tf.push(where + " (overlap)");
+        const now = fc[fc.length - 1];
         const w = plan.windows;
-        if (w.length !== 1 || w[0].startMs !== now.atMs || w[0].durMs !== rd.decisionMs || cue.atMs !== now.atMs ||
-            cue.durMs !== rd.decisionMs || plan.endMs !== now.atMs + rd.decisionMs || plan.restMs !== rd.resetPauseMs) {
+        const single = plan.cues.length === 1;
+        if (w.length !== plan.cues.length || w[0].startMs !== now.atMs || w[0].durMs !== rd.decisionMs || cue.atMs !== now.atMs ||
+            cue.durMs !== rd.decisionMs || (single && plan.endMs !== now.atMs + rd.decisionMs) || plan.restMs !== rd.resetPauseMs) {
           tf.push(where + " (window)");
         }
         if (fitRateIn(seq, end(now) - c[1].atMs, 0, { baseRate: rd.rate, maxRate: s.maxRate, minGapMs: rd.cueGapMs }, dur) === null) {
@@ -2888,11 +2986,74 @@ const OffensePlanner = (function () {
         if (!answer || answer.id !== "A_" + cue.correct || Math.abs(answer.atMs - windowEnd - rd.practicePauseMs) > EPS) xf.push(where + " (answer)");
         if (!why || why.id !== "W_" + cue.ruleId || why.show !== "caption" || why.atMs < answer.atMs + answer.durMs + s.minGapMs - EPS) xf.push(where + " (why)");
         if (answer && answer.show !== undefined) xf.push(where + " (answer shown as caption)");
-        if (why && Math.abs(plan.endMs - (why.atMs + why.durMs)) > EPS) xf.push(where + " (endMs)");
+        const lastCall = plan.calls[plan.calls.length - 1];
+        if (Math.abs(plan.endMs - (lastCall.atMs + lastCall.durMs)) > EPS || plan.calls.filter(x => x.show === "caption").length !== plan.cues.length) {
+          xf.push(where + " (endMs, or not one why per decision)");
+        }
         repPlanProblems(plan, s.phrases).forEach(x => xf.push(where + " " + x));
       }
     });
     check("read the d: practice mode says the correct action after the window and its why as a caption, then rests", xf);
+
+    // 11. Second read (Levels 4-5): how often, the gap, the state that follows, its own full window.
+    const rdf = [];
+    const sr = cfg.secondRead;
+    for (let level = 1; level <= 5; level++) {
+      const s = atLevel(level);
+      const rd = s.readTheD;
+      const n = level >= 4 ? reps * 2 : Math.ceil(reps / 5);
+      let seconds = 0;
+      const reactions = {};
+      for (let i = 0; i < n; i++) {
+        const plan = planReadTheDRep(s, dur, Math.random);
+        const where = "L" + level + ": " + plan.calls.map(x => x.id).join(" > ");
+        if (plan.cues.length === 1) continue;
+        seconds++;
+        if (level < 4 || plan.cues.length !== 2) { rdf.push(where + " (second read at Level " + level + ")"); continue; }
+        const a = plan.cues[0];
+        const b = plan.cues[1];
+        // Gap from the end of the first window to the first call of the second sequence.
+        const firstCue = plan.calls.find(x => x.atMs > a.atMs + a.durMs - EPS);
+        const gap = firstCue.atMs - (a.atMs + a.durMs);
+        if (gap < rd.secondGapMinMs - EPS || gap > rd.secondGapMaxMs + EPS) rdf.push(where + " (gap " + gap + ")");
+        // Each window gets the level's full decision time; the rep ends with the second.
+        if (plan.windows.length !== 2 || plan.windows.some(w => w.durMs !== rd.decisionMs) ||
+            b.durMs !== rd.decisionMs || plan.endMs !== b.atMs + b.durMs) rdf.push(where + " (windows)");
+        // Same fixed order, no hands, then NOW; scored with the same rules.
+        const second = plan.calls.filter(x => x.atMs >= firstCue.atMs - EPS).map(x => x.id);
+        if (second.join() !== RTD_ORDER.map(k => RTD_PHRASE[k][b.state[k]]).concat("D_NOW").join() || b.state.hands !== undefined) {
+          rdf.push(where + " (second sequence)");
+        }
+        if (b.correct !== correctAction(b.state, cfg.rules).action) rdf.push(where + " (second answer)");
+        // The state follows the mapping from the first correct action.
+        const drove = a.correct === "DRIVE_LEFT" || a.correct === "DRIVE_RIGHT";
+        const other = a.correct === "DRIVE_LEFT" ? "DRIVE_RIGHT" : "DRIVE_LEFT";
+        const st = b.state;
+        const ok = drove
+          ? (b.reaction === "cutOff" && st.momentum === "set" && st.distance === "tight" && b.correct === other) ||
+            (b.reaction === "retreat" && st.momentum === "retreating" && b.correct === "PULL_UP")
+          : b.reaction === "closeout" && st.momentum === "closing" && b.correct === (st.leadFoot === "left" ? "DRIVE_LEFT" : "DRIVE_RIGHT");
+        if (!ok) rdf.push(where + " (reaction " + b.reaction + " after " + a.correct + ")");
+        reactions[b.reaction] = (reactions[b.reaction] || 0) + 1;
+      }
+      if (level >= 4) {
+        if (Math.abs(seconds / n - sr.chance) > 0.02) rdf.push("L" + level + ": second read in " + (seconds / n).toFixed(3) + " of reps");
+        ["cutOff", "retreat", "closeout"].forEach(id => { if (!reactions[id]) rdf.push("L" + level + ": " + id + " never came up"); });
+      }
+    }
+    const srBad = [{ chance: 1.5 }, { afterDrive: [] }, { afterDrive: [{ id: "x", weight: 0, state: sr.afterDrive[0].state }] },
+      { afterPullUpOrCreateSpace: [{ id: "x", weight: 1, state: { momentum: "closing", distance: "far", leadFoot: "random" } }] },
+      { afterPullUpOrCreateSpace: [{ id: "x", weight: 1, state: { momentum: "opposite", distance: "tight", leadFoot: "left" } }] }];
+    srBad.forEach(c => {
+      const s = cloneSettings(defaults);
+      s.training.readTheD = Object.assign({}, cfg, { secondRead: Object.assign({}, sr, c) });
+      if (!validateReadTheD(s, dur)) rdf.push("accepted second read " + JSON.stringify(c));
+    });
+    [{ secondRead: 2 }, { secondGapMinMs: 1300 }, { secondGapMinMs: -1 }].forEach(c => {
+      if (!validateReadTheD(Object.assign(cloneSettings(defaults), { readTheD: Object.assign({}, defaults.readTheD, c) }), dur)) rdf.push("accepted " + JSON.stringify(c));
+    });
+    check("read the d: second read only at Levels 4-5, in " + Math.round(sr.chance * 100) + "% of reps (within 2 points), " +
+      defaults.readTheD.secondGapMinMs + "-" + defaults.readTheD.secondGapMaxMs + " ms after the first window, following the mapping, each with a full window", rdf);
 
     return readTheDFitTable(defaults, dur);
   }

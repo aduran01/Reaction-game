@@ -16,7 +16,7 @@ The whole project is two files:
 
 | File | Size | Purpose |
 |------|------|---------|
-| `index.html` | ~231 KB | The entire app: markup, styles and JavaScript in one page |
+| `index.html` | ~290 KB | The entire app: markup, styles and JavaScript in one page |
 | `server.js` | ~1 KB | A tiny Node.js static file server so phones on your network can open the app |
 
 There is no build step, no `package.json`, no framework and no third-party library.
@@ -56,6 +56,7 @@ There is no build step, no `package.json`, no framework and no third-party libra
    - [Sampling states](#sampling-states)
    - [Read the D levels](#read-the-d-levels)
    - [Read the D validation](#read-the-d-validation)
+   - [Second read (Levels 4–5)](#second-read-levels-45)
    - [What three words can't capture](#what-three-words-cant-capture)
 5. [Drill profiles and rep plans](#drill-profiles-and-rep-plans)
    - [The training log](#the-training-log)
@@ -198,7 +199,7 @@ The countdown bar is visible only during the drive, from the LEFT/RIGHT call unt
 
 Read the D trains the **decision**, not the move. The voice describes what the defender is doing, in a fixed order, and nothing names the move: you combine the calls and decide whether to drive (to which side), pull up or create space. The rules behind the right answer, the call order, the levels and the caveats are in [Read the D drill in depth](#read-the-d-drill-in-depth).
 
-**A rep** (Levels 1–3): **READY** (stance, live dribble) → a random read time → momentum → distance → lead foot → **NOW** → the decision window (countdown bar) to make the move and shoot → reset pause. From Level 3 a **HANDS UP / HANDS DOWN** call is mixed in at a random place; it never changes the answer. At Levels 4–5 the rep starts with **LIVE** (start dribbling) and the calls come 600–1500 ms later, mid-dribble.
+**A rep** (Levels 1–3): **READY** (stance, live dribble) → a random read time → momentum → distance → lead foot → **NOW** → the decision window (countdown bar) to make the move and shoot → reset pause. From Level 3 a **HANDS UP / HANDS DOWN** call is mixed in at a random place; it never changes the answer. At Levels 4–5 the rep starts with **LIVE** (start dribbling) and the calls come 600–1500 ms later, mid-dribble, and in about half the reps the defender **reacts to your move**: 700–1200 ms after the first window, a second sequence (momentum, distance, lead foot, NOW) asks you to read again, with its own full decision window. See [Second read](#second-read-levels-45).
 
 | Calls say | Calls | Color |
 |---|---|---|
@@ -214,8 +215,8 @@ The cue calls are spoken at the level's cue speech rate with the level's gap bet
 **Settings** (shown when Read the D is selected):
 
 - **Practice mode** (off by default; not set by levels): after each decision window, a short pause (Practice pause, 600 ms), then the voice says the correct action (shown big, e.g. **DRIVE LEFT** in blue, **DRIVE RIGHT** green, **PULL UP** yellow, **CREATE SPACE** white) and its why (spoken and shown as the line under it, e.g. "attack the closeout past his front foot"). Use it to learn the rules; the rep then rests as usual.
-- **Cue speech rate** and **Decision window (ms)**, and under **Advanced** the **Hands call** and **Mid-dribble** toggles and the **Gap between cue calls**: with Auto difficulty on these five are set by the level (shown "set by Level N", the toggles greyed out); with it off your own values apply (defaults are the Level 3 values).
-- **Advanced** also has the read time (800–3500 ms), the LIVE delay (600–1500 ms), the reset pause (1000 ms) and the practice pause.
+- **Cue speech rate** and **Decision window (ms)**, and under **Advanced** the **Hands call**, **Mid-dribble** and **Second read** toggles and the **Gap between cue calls**: with Auto difficulty on these six are set by the level (shown "set by Level N", the toggles greyed out); with it off your own values apply (defaults are the Level 3 values).
+- **Advanced** also has the read time (800–3500 ms), the LIVE delay (600–1500 ms), the second read gap (700–1200 ms), the reset pause (1000 ms) and the practice pause.
 - **Auto difficulty** shows **Read the D: Level 3** with its own **Reset level**, like Drive.
 
 The on / off settings are toggle buttons (48 px tall) backed by hidden 0 / 1 inputs, so they are saved, validated and level-locked like any other field.
@@ -725,17 +726,17 @@ Other drills don't have `cues`.
 
 Difficulty comes from the speech rate, the gaps and the decision window, not from how long anything is shown. All values are provisional (`TRAINING_DEFAULTS.levels.readTheD`); the start level is 3, as for Drive.
 
-| Level | Cue speech rate | Cue gap (ms) | Decision window (ms) | Hands distractor | Cue timing | Longest sequence spoken in |
-|---|---|---|---|---|---|---|
-| 1 | 1.0 | 300 | 3000 | no | before the move (READY, read time) | 2900 ms |
-| 2 | 1.15 | 250 | 2500 | no | before | 2489 ms |
-| 3 | 1.3 | 200 | 2200 | yes | before | 2800 ms |
-| 4 | 1.45 | 150 | 2000 | yes | mid-dribble (LIVE, 600–1500 ms) | 2393 ms |
-| 5 | 1.6 (the max rate) | 120 | 1700 | yes | mid-dribble | 2105 ms |
+| Level | Cue speech rate | Cue gap (ms) | Decision window (ms) | Hands distractor | Cue timing | Second read | Longest sequence spoken in |
+|---|---|---|---|---|---|---|---|
+| 1 | 1.0 | 300 | 3000 | no | before the move (READY, read time) | no | 2900 ms |
+| 2 | 1.15 | 250 | 2500 | no | before | no | 2489 ms |
+| 3 | 1.3 | 200 | 2200 | yes | before | no | 2800 ms |
+| 4 | 1.45 | 150 | 2000 | yes | mid-dribble (LIVE, 600–1500 ms) | yes | 2393 ms |
+| 5 | 1.6 (the max rate) | 120 | 1700 | yes | mid-dribble | yes | 2105 ms |
 
 "Longest sequence" is RETREATING > CUSHION > LEFT FOOT (> HANDS DOWN) > NOW with the estimates, from the first cue to the end of NOW (the self-test page prints this table). The cue rate only applies to the cue calls and NOW; the lead-in stays at the base rate.
 
-The level values are the settings `readTheD.rate`, `cueGapMs`, `decisionMs`, `hands` and `midDribble` in `OFFENSE_DEFAULTS.readTheD`. Their defaults there (used with Auto difficulty off) are the Level 3 values.
+The level values are the settings `readTheD.rate`, `cueGapMs`, `decisionMs`, `hands`, `midDribble` and `secondRead` in `OFFENSE_DEFAULTS.readTheD`. Their defaults there (used with Auto difficulty off) are the Level 3 values.
 
 ### Read the D validation
 
@@ -743,11 +744,35 @@ The level values are the settings `readTheD.rate`, `cueGapMs`, `decisionMs`, `ha
 
 - the cue speech rate is between 0.5 and 2.0 and **not above the max speech rate** (Level 5 uses exactly 1.6, the default max);
 - the cue gap is a whole number ≥ 0 and the decision window a whole number ≥ 500 ms;
-- hands and mid-dribble are each off (0) or on (1);
+- hands, mid-dribble, second read and practice mode are each off (0) or on (1); the second read gap and the practice pause are whole numbers ≥ 0 (gap min ≤ max);
+- the second read mapping: a chance from 0 to 1, at least one option after a drive and after a pull-up / create-space, weights ≥ 0 adding up to more than 0, and states that only use valid values, `"random"`, lists of valid values, or (lead foot only) `"opposite"`;
 - the read time (whole numbers ≥ 100 ms, min ≤ max), the LIVE delay (whole numbers ≥ 0, min ≤ max) and the reset pause (whole number ≥ 0);
 - the rule table: every rule has a known action, an answer, a why, an evidence tag and `when` entries that only match momentum, distance and lead foot values; and **every state has an answer** (e.g. "No rule covers SET · CUSHION · LEFT FOOT.");
 - the action weights are numbers ≥ 0 that add up to more than 0;
 - the longest cue sequence fits at the cue rate.
+
+### Second read (Levels 4–5)
+
+At Levels 4–5 (setting `readTheD.secondRead` = 1) the defender reacts to your first move. In a share of reps (`TRAINING_DEFAULTS.readTheD.secondRead.chance`, 0.5, provisional) a second call sequence follows the first:
+
+```
+… NOW ──(decision window 1)──▶ 700-1200 ms ▶ momentum ▶ distance ▶ lead foot ▶ NOW ──(decision window 2)──▶ reset pause
+```
+
+- It starts `secondGapMinMs`–`secondGapMaxMs` (700–1200 ms, provisional) after the first window ends (in practice mode: after the first explanation).
+- It uses the same fixed order (momentum → distance → lead foot → NOW), with **no hands call**, at the level's cue rate and gap.
+- It gets the level's **full** decision window too, so the rep is extended by the gap, the second sequence and a second window; the countdown bar drains once per window.
+- It is scored with the **same** `correctAction` rules; no new rules.
+
+The second state **follows from the first correct action** (the app assumes you made the right first move), from the mapping in `TRAINING_DEFAULTS.readTheD.secondRead` (weights provisional):
+
+| After the first correct action | Reaction (weight) | Second state | Correct second action |
+|---|---|---|---|
+| DRIVE LEFT / DRIVE RIGHT | `cutOff` (50) | set, tight, lead foot on the **other** side | a counter drive back the other way |
+| DRIVE LEFT / DRIVE RIGHT | `retreat` (50) | retreating, cushion or sag, lead foot random | PULL UP |
+| PULL UP / CREATE SPACE | `closeout` (100) | closing (a hard closeout), tight or cushion, lead foot random | DRIVE past his front foot |
+
+A value in the mapping is fixed (`"set"`), a list to pick from at random (`["cushion", "sag"]`), `"random"` (any value) or, for the lead foot, `"opposite"` (the other side from the drive). The second decision is the rep's second `cues` entry (with `reaction`, the option's id), and the decision review shows it as "Rep 3 · read 2". Accuracy counts every decision.
 
 ### What three words can't capture
 
@@ -895,6 +920,8 @@ const OFFENSE_DEFAULTS = {
     rate: 1.3, cueGapMs: 200, decisionMs: 2200, hands: 1, midDribble: 0,
     readMinMs: 800, readMaxMs: 3500,          // provisional
     liveDelayMinMs: 600, liveDelayMaxMs: 1500, // provisional
+    secondRead: 0, secondGapMinMs: 700, secondGapMaxMs: 1200, // provisional
+    practice: 0, practicePauseMs: 600,         // provisional
     resetPauseMs: 1000,
   },
 };
@@ -941,6 +968,9 @@ const TRAINING_DEFAULTS = {
               action: "DRIVE_LEAD_SIDE", answer: "…", why: "attack the closeout past his front foot",
               evidence: "coaching heuristic" }, …],
     actionWeights: { DRIVE_LEFT: 25, DRIVE_RIGHT: 25, PULL_UP: 25, CREATE_SPACE: 25 }, // provisional
+    secondRead: { chance: 0.5, afterDrive: [{ id: "cutOff", weight: 50, state: { … } }, …],
+                  afterPullUpOrCreateSpace: [{ id: "closeout", weight: 100, state: { … } }] }, // provisional
+    whyEstMsPerChar: 65, // provisional
   },
 };
 ```
@@ -968,7 +998,7 @@ http://localhost:8080/index.html?selftest=1
 
 Use `/index.html?selftest=1`, not `/?selftest=1`. The bundled `server.js` only maps a bare `/` to `index.html`, so `/?selftest=1` returns "Not found".
 
-Instead of the app, the page runs a simulation of every offense planner (every drill profile's self-test) plus checks of the session helpers and the training log, and prints **PASS** / **FAIL** for each check to the console and to an on-page banner (green when everything passes, red otherwise). There are 62 checks in total: 18 Drive, 4 Move Lab, 10 Read the D, 1 Runner, 6 Session, 2 Defaults, 3 Levels, 2 Read the D scoring, 9 Training log and 7 History.
+Instead of the app, the page runs a simulation of every offense planner (every drill profile's self-test) plus checks of the session helpers and the training log, and prints **PASS** / **FAIL** for each check to the console and to an on-page banner (green when everything passes, red otherwise). There are 63 checks in total: 18 Drive, 4 Move Lab, 11 Read the D, 1 Runner, 6 Session, 2 Defaults, 3 Levels, 2 Read the D scoring, 9 Training log and 7 History.
 
 **Read the D.** It checks:
 
@@ -981,7 +1011,10 @@ Instead of the app, the page runs a simulation of every offense planner (every d
 7. the timing: the first cue within the read time or LIVE delay (clamped after the lead-in); every cue call at the level's rate with exactly the cue gap between calls, none overlapping; the sequence fits at the level's rate (`fitRateIn`); one window from NOW lasting the level's decision time, `endMs` at its end and the reset pause as rest;
 8. sampling: over 40,000 reps (Levels 1 and 3) each correct action's share is within 2 points of its weight;
 9. the same state never comes twice in a row, and every state (18, or 36 with hands) comes up;
-10. practice mode (Levels 1, 3 and 5, 500 reps each): the action phrases and each rule's why phrase exist; after the window, the practice pause, then the correct action, then (at least the min gap later) the deciding rule's why marked as a caption; `endMs` is when the why ends; every plan passes the runner contract.
+10. practice mode (Levels 1, 3 and 5, 500 reps each): the action phrases and each rule's why phrase exist; after the window, the practice pause, then the correct action, then (at least the min gap later) the deciding rule's why marked as a caption; `endMs` is when the last why ends, with one why per decision; every plan passes the runner contract;
+11. the second read (20,000 reps at Levels 4 and 5): never at Levels 1–3; in 50% of reps within 2 points; it starts 700–1200 ms after the first window; both windows last the level's decision time and the rep ends with the second; the second sequence is momentum > distance > lead foot > NOW with no hands, matching its state and scored with the same rules; after a drive it is a cut-off (set, tight, the counter drive the other way) or a retreat (PULL UP), after PULL UP / CREATE SPACE a closeout (drive to the lead-foot side); all three reactions come up; a bad chance, an empty or zero-weight option list, an invalid value, a bad flag or gap range are rejected.
+
+Checks 6 and 7 look at the first decision of each rep (up to the first NOW).
 
 **Read the D scoring.** Two checks:
 
