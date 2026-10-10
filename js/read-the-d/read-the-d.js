@@ -56,7 +56,7 @@
     D_SET:        { display: "SET",        spoken: "set",        estMs: 300 },  // momentum
     D_RETREATING: { display: "RETREATING", spoken: "retreating", estMs: 650 },  // momentum
     D_TIGHT:      { display: "TIGHT",      spoken: "tight",      estMs: 350 },  // distance
-    D_CUSHION:    { display: "CUSHION",    spoken: "cushion",    estMs: 500 },  // distance
+    D_CUSHION:    { display: "NO OPENING", spoken: "no opening", estMs: 700 },  // distance (state value "cushion")
     D_SAG:        { display: "SAGGING",    spoken: "sagging",    estMs: 500 },  // distance
     D_LEFT_FOOT:  { display: "LEFT FOOT",  spoken: "left foot",  estMs: 550 },  // lead foot
     D_RIGHT_FOOT: { display: "RIGHT FOOT", spoken: "right foot", estMs: 550 },  // lead foot
@@ -90,7 +90,7 @@
 
   // ---- Read the D: the rules that turn the defender's state into an action. ----
   // State (from the attacker's point of view): momentum "closing" | "set" | "retreating",
-  // distance "tight" (inside arm's reach) | "cushion" (about an arm's length) | "sag"
+  // distance "tight" (inside arm's reach) | "cushion" (about an arm's length; called NO OPENING) | "sag"
   // (well off, near the free-throw line), leadFoot "left" | "right" (the side his
   // forward foot is on), and from Level 3 hands "up" | "down" (never changes the answer).
   TRAINING_DEFAULTS.readTheD = {
@@ -110,7 +110,7 @@
       { id: "tightSet", when: [{ match: { momentum: ["set"], distance: ["tight"] }, situation: "tight, set defender" }],
         action: "DRIVE_LEAD_SIDE", answer: "drive to his front-foot side",
         why: "attack his front foot", evidence: "study-based" },
-      { id: "cushionSet", when: [{ match: { momentum: ["set"], distance: ["cushion"] }, situation: "set defender at a cushion" }],
+      { id: "cushionSet", when: [{ match: { momentum: ["set"], distance: ["cushion"] }, situation: "set defender, no opening" }],
         action: "CREATE_SPACE", answer: "create space: hesi or step-back into a jumper",
         why: "his foot doesn't matter at this distance", evidence: "coaching heuristic" },
     ],
@@ -452,7 +452,7 @@
 
     // 1. Vocabulary.
     const vf = [];
-    const words = { D_CLOSING: "CLOSING", D_SET: "SET", D_RETREATING: "RETREATING", D_TIGHT: "TIGHT", D_CUSHION: "CUSHION",
+    const words = { D_CLOSING: "CLOSING", D_SET: "SET", D_RETREATING: "RETREATING", D_TIGHT: "TIGHT", D_CUSHION: "NO OPENING",
       D_SAG: "SAGGING", D_LEFT_FOOT: "LEFT FOOT", D_RIGHT_FOOT: "RIGHT FOOT", D_HANDS_UP: "HANDS UP",
       D_HANDS_DOWN: "HANDS DOWN", D_NOW: "NOW", D_LIVE: "LIVE" };
     Object.keys(words).forEach(id => {

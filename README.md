@@ -5,7 +5,7 @@
 - **Defense mode**: after a random wait, the app calls one of **Left**, **Right**, **Up** or **Back**, again and again until you press **Stop**.
 - **Offense mode** is **Call & Execute: move fluency and readiness under unpredictable timing.** The app dictates every move; you execute it cleanly and on time. Drive and Move Lab are not decision-making training: the call tells you what to do. **Read the D** is the exception: it trains the decision. It has three drills:
   - **Drive** simulates a ball-handler driving from the top of the key to the basket. The app calls **READY** (get in your stance, live dribble, wait for the call), then a drive direction (**LEFT** / **RIGHT**), then zero or more reactions to the defense (**CUT OFF**, **LAY UP**), and finally a **finisher** such as **LAY UP LEFT SIDE**. All of it happens inside a timed drive window shown as a countdown bar.
-  - **Read the D** describes the defender instead of naming a move. Each rep calls his momentum (**CLOSING** / **SET** / **RETREATING**), his distance (**TIGHT** / **CUSHION** / **SAGGING**) and his lead foot (**LEFT FOOT** / **RIGHT FOOT**), then **NOW**: you decide whether to drive (and which way), pull up or create space, and do it inside the decision window. See [Read the D](#offense-read-the-d-drill).
+  - **Read the D** describes the defender instead of naming a move. Each rep calls his momentum (**CLOSING** / **SET** / **RETREATING**), his distance (**TIGHT** / **NO OPENING** / **SAGGING**) and his lead foot (**LEFT FOOT** / **RIGHT FOOT**), then **NOW**: you decide whether to drive (and which way), pull up or create space, and do it inside the decision window. See [Read the D](#offense-read-the-d-drill).
   - **Move Lab** trains your own moves: pick the moves you want to work on, and each rep calls **SPRINT FROM LEFT CORNER**, **SPRINT FROM RIGHT CORNER** or **CATCH**, then **LEFT** / **RIGHT**, then one or more of your moves (up to a max you set) and finally **SHOT**. You also log how many reps were clean. See [Move Lab](#offense-move-lab-drill).
 
   In every drill, calls are planned so that every spoken phrase fits inside its window and no call ever cuts off another. An Offense session is organized as **sets of reps**. After each set the app says "set done" and shows a quick big-button form where you log how the set went (shots made and attempted, lost handles, missed calls, how it felt). Every set is saved on the device as soon as you log it, then a rest countdown leads into the next set. Ending a session shows a summary compared with your recent sessions, and a **History** screen shows trends over weeks and lets you export and import the log as a backup. With **Auto difficulty** on, each drill has a level from 1 to 5 that sets its timing and moves up or down after each logged set, so the task stays hard but doable.
@@ -210,7 +210,7 @@ Read the D trains the **decision**, not the move. The voice describes what the d
 | Calls say | Calls | Color |
 |---|---|---|
 | His momentum | CLOSING, SET, RETREATING | Orange `#ff7a4f` |
-| His distance | TIGHT, CUSHION, SAGGING | Purple `#c47bff` |
+| His distance | TIGHT, NO OPENING, SAGGING | Purple `#c47bff` |
 | His lead foot | LEFT FOOT, RIGHT FOOT | Cyan `#45d6e0` |
 | His hands (distractor) | HANDS UP, HANDS DOWN | Pink `#ff6bd6` |
 | Go | NOW | A short yellow flash (yellow block fading to yellow text) |
@@ -652,7 +652,7 @@ The defender's state, always from the attacker's point of view:
 | Key | Values | Meaning |
 |---|---|---|
 | `momentum` | `closing`, `set`, `retreating` | Coming at you, standing in his stance, or backing off |
-| `distance` | `tight`, `cushion`, `sag` | Inside arm's reach, about an arm's length, or well off (near the free-throw line) |
+| `distance` | `tight`, `cushion`, `sag` | Inside arm's reach, about an arm's length (called **NO OPENING**), or well off (near the free-throw line) |
 | `leadFoot` | `left`, `right` | The side his forward foot is on |
 | `hands` (Level 3+) | `up`, `down` | A pure distractor: it never changes the correct answer |
 
@@ -664,7 +664,7 @@ The calls are in the shared phrase table (rough estimates at rate 1.0; the app l
 | D_SET | SET | 300 | momentum |
 | D_RETREATING | RETREATING | 650 | momentum |
 | D_TIGHT | TIGHT | 350 | distance |
-| D_CUSHION | CUSHION | 500 | distance |
+| D_CUSHION | NO OPENING | 700 | distance (state value `cushion`; the id and value kept their old name so saved logs still load) |
 | D_SAG | SAGGING | 500 | distance |
 | D_LEFT_FOOT | LEFT FOOT | 550 | lead foot |
 | D_RIGHT_FOOT | RIGHT FOOT | 550 | lead foot |
@@ -684,7 +684,7 @@ The Levels 1–3 lead-in is the Drive drill's READY (id `READ`), spoken once at 
 | 1 | `closing` | momentum closing | DRIVE to the lead-foot side | attack the closeout past his front foot | coaching heuristic |
 | 2 | `gaveShot` | distance sag, **or** momentum retreating | PULL UP | he gave you the shot | coaching heuristic |
 | 3 | `tightSet` | tight **and** set | DRIVE to the lead-foot side | attack his front foot | study-based |
-| 4 | `cushionSet` | cushion **and** set | CREATE SPACE: hesi or step-back into a jumper | his foot doesn't matter at this distance | coaching heuristic |
+| 4 | `cushionSet` | cushion (NO OPENING) **and** set | CREATE SPACE: hesi or step-back into a jumper | his foot doesn't matter at this distance | coaching heuristic |
 
 The actions are `DRIVE_LEFT`, `DRIVE_RIGHT`, `PULL_UP` and `CREATE_SPACE`. A rule's action `DRIVE_LEAD_SIDE` becomes DRIVE_LEFT when the lead foot is on the left and DRIVE_RIGHT when it is on the right. The four rules cover all 18 states (rule 1 catches every closing state, including a closing defender who is sagging).
 
@@ -734,13 +734,13 @@ Difficulty comes from the speech rate, the gaps and the decision window, not fro
 
 | Level | Cue speech rate | Cue gap (ms) | Decision window (ms) | Hands distractor | Cue timing | Second read | Longest sequence spoken in |
 |---|---|---|---|---|---|---|---|
-| 1 | 1.0 | 300 | 3000 | no | before the move (READY, read time) | no | 2900 ms |
-| 2 | 1.15 | 250 | 2500 | no | before | no | 2489 ms |
-| 3 | 1.3 | 200 | 2200 | yes | before | no | 2800 ms |
-| 4 | 1.45 | 150 | 2000 | yes | mid-dribble (LIVE, 600–1500 ms) | yes | 2393 ms |
-| 5 | 1.6 (the max rate) | 120 | 1700 | yes | mid-dribble | yes | 2105 ms |
+| 1 | 1.0 | 300 | 3000 | no | before the move (READY, read time) | no | 3100 ms |
+| 2 | 1.15 | 250 | 2500 | no | before | no | 2663 ms |
+| 3 | 1.3 | 200 | 2200 | yes | before | no | 2954 ms |
+| 4 | 1.45 | 150 | 2000 | yes | mid-dribble (LIVE, 600–1500 ms) | yes | 2531 ms |
+| 5 | 1.6 (the max rate) | 120 | 1700 | yes | mid-dribble | yes | 2230 ms |
 
-"Longest sequence" is RETREATING > CUSHION > LEFT FOOT (> HANDS DOWN) > NOW with the estimates, from the first cue to the end of NOW (the self-test page prints this table). The cue rate only applies to the cue calls and NOW; the lead-in stays at the base rate.
+"Longest sequence" is RETREATING > NO OPENING > LEFT FOOT (> HANDS DOWN) > NOW with the estimates, from the first cue to the end of NOW (the self-test page prints this table). The cue rate only applies to the cue calls and NOW; the lead-in stays at the base rate.
 
 The level values are the settings `readTheD.rate`, `cueGapMs`, `decisionMs`, `hands`, `midDribble` and `secondRead` in `OFFENSE_DEFAULTS.readTheD`. Their defaults there (used with Auto difficulty off) are the Level 3 values.
 
@@ -753,7 +753,7 @@ The level values are the settings `readTheD.rate`, `cueGapMs`, `decisionMs`, `ha
 - hands, mid-dribble, second read and practice mode are each off (0) or on (1); the second read gap and the practice pause are whole numbers ≥ 0 (gap min ≤ max);
 - the second read mapping: a chance from 0 to 1, at least one option after a drive and after a pull-up / create-space, weights ≥ 0 adding up to more than 0, and states that only use valid values, `"random"`, lists of valid values, or (lead foot only) `"opposite"`;
 - the read time (whole numbers ≥ 100 ms, min ≤ max), the LIVE delay (whole numbers ≥ 0, min ≤ max) and the reset pause (whole number ≥ 0);
-- the rule table: every rule has a known action, an answer, a why, an evidence tag and `when` entries that only match momentum, distance and lead foot values; and **every state has an answer** (e.g. "No rule covers SET · CUSHION · LEFT FOOT.");
+- the rule table: every rule has a known action, an answer, a why, an evidence tag and `when` entries that only match momentum, distance and lead foot values; and **every state has an answer** (e.g. "No rule covers SET · NO OPENING · LEFT FOOT.");
 - the action weights are numbers ≥ 0 that add up to more than 0;
 - the longest cue sequence fits at the cue rate.
 
@@ -775,8 +775,8 @@ The second state **follows from the first correct action** (the app assumes you 
 | After the first correct action | Reaction (weight) | Second state | Correct second action |
 |---|---|---|---|
 | DRIVE LEFT / DRIVE RIGHT | `cutOff` (50) | set, tight, lead foot on the **other** side | a counter drive back the other way |
-| DRIVE LEFT / DRIVE RIGHT | `retreat` (50) | retreating, cushion or sag, lead foot random | PULL UP |
-| PULL UP / CREATE SPACE | `closeout` (100) | closing (a hard closeout), tight or cushion, lead foot random | DRIVE past his front foot |
+| DRIVE LEFT / DRIVE RIGHT | `retreat` (50) | retreating, cushion (NO OPENING) or sag, lead foot random | PULL UP |
+| PULL UP / CREATE SPACE | `closeout` (100) | closing (a hard closeout), tight or cushion (NO OPENING), lead foot random | DRIVE past his front foot |
 
 A value in the mapping is fixed (`"set"`), a list to pick from at random (`["cushion", "sag"]`), `"random"` (any value) or, for the lead foot, `"opposite"` (the other side from the drive). The second decision is the rep's second `cues` entry (with `reaction`, the option's id), and the decision review shows it as "Rep 3 · read 2". Accuracy counts every decision.
 
