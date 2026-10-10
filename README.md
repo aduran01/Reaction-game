@@ -5,7 +5,7 @@
 - **Defense mode**: after a random wait, the app calls one of **Left**, **Right**, **Up** or **Back**, again and again until you press **Stop**.
 - **Offense mode** is **Call & Execute: move fluency and readiness under unpredictable timing.** The app dictates every move; you execute it cleanly and on time. Drive and Move Lab are not decision-making training: the call tells you what to do. **Read the D** is the exception: it trains the decision. It has three drills:
   - **Drive** simulates a ball-handler driving from the top of the key to the basket. The app calls **READY** (get in your stance, live dribble, wait for the call), then a drive direction (**LEFT** / **RIGHT**), then zero or more reactions to the defense (**CUT OFF**, **LAY UP**), and finally a **finisher** such as **LAY UP LEFT SIDE**. All of it happens inside a timed drive window shown as a countdown bar.
-  - **Read the D** describes the defender instead of naming a move. Each rep calls his momentum (**CLOSING** / **SET** / **RETREATING**), his distance (**TIGHT** / **NO OPENING** / **SAGGING**) and his lead foot (**LEFT FOOT** / **RIGHT FOOT**), then **NOW**: you decide whether to drive (and which way), pull up or create space, and do it inside the decision window. See [Read the D](#offense-read-the-d-drill).
+  - **Read the D** tells you what the defender does next instead of naming a move. After **GO**, each call (his distance, his front foot, his hands, a cut-off, an open lane, help defense, where to lay it in) is followed by a call a real defender could give next; you read each one and react, then finish or shoot in the end window. See [Read the D](#offense-read-the-d-drill).
   - **Move Lab** trains your own moves: pick the moves you want to work on, and each rep calls **SPRINT FROM LEFT CORNER**, **SPRINT FROM RIGHT CORNER** or **CATCH**, then **LEFT** / **RIGHT**, then one or more of your moves (up to a max you set) and finally **SHOT**. You also log how many reps were clean. See [Move Lab](#offense-move-lab-drill).
 
   In every drill, calls are planned so that every spoken phrase fits inside its window and no call ever cuts off another. An Offense session is organized as **sets of reps**. After each set the app says "set done" and shows a quick big-button form where you log how the set went (shots made and attempted, lost handles, missed calls, how it felt). Every set is saved on the device as soon as you log it, then a rest countdown leads into the next set. Ending a session shows a summary compared with your recent sessions, and a **History** screen shows trends over weeks and lets you export and import the log as a backup. With **Auto difficulty** on, each drill has a level from 1 to 5 that sets its timing and moves up or down after each logged set, so the task stays hard but doable.
@@ -56,15 +56,12 @@ There is no build step, no `package.json`, no framework and no third-party libra
    - [Learned spoken lengths](#learned-spoken-lengths)
    - [Validation](#validation)
 4. [Read the D drill in depth](#read-the-d-drill-in-depth)
-   - [Read the D vocabulary](#read-the-d-vocabulary)
-   - [The rules (correctAction)](#the-rules-correctaction)
-   - [Call order and the rep plan](#call-order-and-the-rep-plan)
-   - [Sampling states](#sampling-states)
-   - [Read the D levels](#read-the-d-levels)
+   - [The calls and what they mean](#the-calls-and-what-they-mean)
+   - [The call machine](#the-call-machine)
+   - [Read the D timing](#read-the-d-timing)
+   - [Planning a Read the D rep](#planning-a-read-the-d-rep)
    - [Read the D validation](#read-the-d-validation)
-   - [Second read (Levels 4–5)](#second-read-levels-45)
-   - [What three words can't capture](#what-three-words-cant-capture)
-   - [Read the D rewrite in progress](#read-the-d-rewrite-in-progress)
+   - [What spoken calls can't capture](#what-spoken-calls-cant-capture)
 5. [Drill profiles and rep plans](#drill-profiles-and-rep-plans)
    - [The training log](#the-training-log)
 6. [Tuning offense mode](#tuning-offense-mode)
@@ -156,7 +153,7 @@ Select **Offense** to see the offense panel. At its top is a **Drive | Read the 
 | Drill | When to use it |
 |-------|----------------|
 | **Drive** | Attacking off the dribble: stay ready, drive on the call, counter, finish on the side called. |
-| **Read the D** | Decision-making: read the defender from three calls and pick the right move yourself (drive left / right, pull up, create space). |
+| **Read the D** | Decision-making: follow what the defender does call by call (distance, front foot, hands, cut-offs, help) and pick your move yourself, then finish in the end window. |
 | **Move Lab** | Your own moves into a shot: sprint from a corner (or catch), go LEFT / RIGHT, then hit the moves you picked as they are called, until SHOT. |
 
 Each Start runs one drill for the whole session, set after set (see [sessions, sets and reps](#offense-sessions-sets-and-reps)). There is no mixed drill yet (see [Drill profiles and rep plans](#drill-profiles-and-rep-plans)).
@@ -204,52 +201,57 @@ The countdown bar is visible only during the drive, from the LEFT/RIGHT call unt
 
 ### Offense: Read the D drill
 
-Read the D trains the **decision**, not the move. The voice describes what the defender is doing, in a fixed order, and nothing names the move: you combine the calls and decide whether to drive (to which side), pull up or create space. The rules behind the right answer, the call order, the levels and the caveats are in [Read the D drill in depth](#read-the-d-drill-in-depth).
+Read the D trains the **read**, not a named move. After **GO**, the voice tells you what the defender does next, one call at a time, and each call is followed by one a real defender could give next: he's **TIGHT** on you, then his front foot shows (**LEFT FOOT**), then he **CUT OFF** your drive, you **CROSSED** him, the **LANE OPEN**s, **HELP D ON LEFT** comes, and you **LAY ON RIGHT**. Nothing names your move: you read each call and react. When the calls end, a countdown window (1.8 s) gives you time to finish or shoot. Every path the calls can take is in [The call machine](#the-call-machine), and what each call asks of you is in [The calls and what they mean](#the-calls-and-what-they-mean).
 
-**A rep** (Levels 1–3): **READY** (stance, live dribble) → a random read time → momentum → distance → lead foot → **NOW** → the decision window (countdown bar) to make the move and shoot → reset pause. From Level 3 a **HANDS UP / HANDS DOWN** call is mixed in at a random place; it never changes the answer. At Levels 4–5 the rep starts with **LIVE** (start dribbling) and the calls come 600–1500 ms later, mid-dribble, and in about half the reps the defender **reacts to your move**: 700–1200 ms after the first window, a second sequence (momentum, distance, lead foot, NOW) asks you to read again, with its own full decision window. See [Second read](#second-read-levels-45).
+A few example reps:
 
-| Calls say | Calls | Color |
-|---|---|---|
-| His momentum | CLOSING, SET, RETREATING | Orange `#ff7a4f` |
-| His distance | TIGHT, NO OPENING, SAGGING | Purple `#c47bff` |
-| His lead foot | LEFT FOOT, RIGHT FOOT | Cyan `#45d6e0` |
-| His hands (distractor) | HANDS UP, HANDS DOWN | Pink `#ff6bd6` |
-| Go | NOW | A short yellow flash (yellow block fading to yellow text) |
-| Lead-in | READY, LIVE | White |
+```
+GO · TIGHT · LEFT FOOT · CUT OFF · CROSSED · LANE OPEN · LAY ON RIGHT
+GO · SAGGING                                  (no more calls: shoot)
+GO · NO OPENING · HANDS DOWN
+GO · RETREATING · HANDS UP · NO OPENING · RIGHT FOOT · LANE OPEN · HELP D ON RIGHT · LAY ON CENTER
+```
 
-The cue calls are spoken at the level's cue speech rate with the level's gap between them, and planned so they never overlap or clip.
+Each call is shown as the big word, colored by role:
 
-**Settings** (shown when Read the D is selected):
+| Calls | Color |
+|---|---|
+| GO, LAY ON LEFT / RIGHT / CENTER | White |
+| TIGHT, NO OPENING, SAGGING | Purple `#c47bff` |
+| RETREATING | Orange `#ff7a4f` |
+| LEFT FOOT, RIGHT FOOT | Cyan `#45d6e0` |
+| HANDS UP, HANDS DOWN | Pink `#ff6bd6` |
+| LANE OPEN | Green `#4fd87c` |
+| CUT OFF | Red `#ff4f5e` |
+| CROSSED | Blue `#4f8cff` |
+| HELP D ON LEFT / RIGHT | Yellow `#ffd24f` |
 
-- **Practice mode** (off by default; not set by levels): after each decision window, a short pause (Practice pause, 600 ms), then the voice says the correct action (shown big, e.g. **DRIVE LEFT** in blue, **DRIVE RIGHT** green, **PULL UP** yellow, **CREATE SPACE** white) and its why (spoken and shown as the line under it, e.g. "attack the closeout past his front foot"). Use it to learn the rules; the rep then rests as usual.
-- **Cue speech rate** and **Decision window (ms)**, and under **Advanced** the **Hands call**, **Mid-dribble** and **Second read** toggles and the **Gap between cue calls**: with Auto difficulty on these six are set by the level (shown "set by Level N", the toggles greyed out); with it off your own values apply (defaults are the Level 3 values).
-- **Advanced** also has the read time (800–3500 ms), the LIVE delay (600–1500 ms), the second read gap (700–1200 ms), the reset pause (1000 ms) and the practice pause.
-- **Auto difficulty** shows **Read the D: Level 3** with its own **Reset level**, like Drive.
+There is no countdown bar while the calls come; it appears for the end window only. The game screen shows **OFFENSE · READ THE D**, the set and rep, and the session clock. Read the D has **no levels**: you set its timing yourself.
 
-The on / off settings are toggle buttons (48 px tall) backed by hidden 0 / 1 inputs, so they are saved, validated and level-locked like any other field.
+**Settings** (shown when Read the D is selected; every field is saved by id):
 
-The game screen shows **OFFENSE · READ THE D**, the set, rep and level, and the session clock.
+- **Speech rate** of every call after GO (1.3; GO uses the base rate). It must not be above the max speech rate.
+- **Timing**: a min / max pair for each wait (each picked at random in its range, from the end of one call to the start of the next), with a one-line hint saying which calls it controls, plus the **End window** and the **Reset pause**. Defaults are in [Read the D timing](#read-the-d-timing).
+- **Chances** (collapsed): every chance (0 to 1) and every weight table: the first read after GO, after TIGHT, after NO OPENING, after HANDS UP, the HELP D side and the LAY side.
+- **Caps** (collapsed): max CUT OFFs (2), HANDS UPs (2) and HELP Ds (1) per rep.
 
-**Decision review.** The app knows every state it called and the right answer for it, so you only have to say which reps you got wrong, after the set. The set log form for Read the D starts with a **Decisions** list, above the shot counts: one row per decision of the set's finished reps, e.g.
+**Review after each set.** The app knows every call of every rep, so after the set you only mark the reps you misread. The set log for Read the D starts with a **Reads** list, above the shot counts: one row per finished rep, e.g.
 
-> **Rep 3** CLOSING · TIGHT · LEFT FOOT
-> DRIVE LEFT — attack the closeout past his front foot
-> **✓ I did that**
+> **Rep 1** GO · TIGHT · LEFT FOOT · CUT OFF · CROSSED · LANE OPEN · LAY ON RIGHT
+> **✓ Read it right**
 
-Every row starts at ✓. Tap it (52 px button) to flip it to **✗ I did something else** and pick what you actually did: **Drive L**, **Drive R**, **Pull up**, **Create space** or **Froze** (52 px buttons, three per row). Picking the right action there counts as right. Tap ✗ again to set the row back to ✓, or **All correct** to reset every row. A flipped row without a pick stops the save ("Pick what you did for rep 3, or tap ✗ to set it back to ✓."). The rest of the form (shots made / attempted, lost handles, missed calls, rating, note) is as for every drill; **Skip logging** saves the decisions as not reviewed.
+Every row starts at ✓. Tap it (52 px) to flip it to **✗ Misread**; one chip per call of that rep (52 px; GO left out, each call once) then appears so you can tap the call you misread. That is optional; tap the chip again to clear it. **All correct** sets every row back to ✓. The rest of the form (shots made / attempted, lost handles, missed calls, rating, note) is as for every drill; **Skip logging** saves the reps as not reviewed.
 
-**Scoring** (pure, in `OffensePlanner`): `scoreDecisions(decisions)` gives the decision accuracy (right / reviewed), the right count per correct action, and the **most common miss**: the same situation with the same kind of wrong action (e.g. "sagging defender → you drove anyway", "closing defender → you drove the wrong way", "… → you froze"); ties go to the one that happened first.
+**Scoring** (pure, `js/read-the-d/scoring.js`): `scoreReads(reads)` gives the reads-right share (right / reviewed) and the **most-missed call** (the call picked most often; a tie goes to the call that was missed first).
 
-**Rest screen.** After a reviewed set, one line for accuracy and one for the most common miss with its rule, phrased about the defender and the shot:
+**Rest screen.** After a reviewed set, two lines:
 
-> **7/8 correct.**
-> Missed: sagging defender → pull up, he gave you the shot.
+> **7/8 reads right.**
+> Most missed: HANDS UP. Don't take the shot: hesi and relocate, drive, or keep reading.
 
-With no misses only the first line shows.
+The second sentence is that call's entry in `TRAINING_DEFAULTS.readTheD.reads`, so you can edit it. With no misses, or misses without a picked call, only the first line shows.
 
-**Summary and History.** The session card adds **Decisions right** (e.g. 22/26 · 85%), the per-action line (e.g. "Drive L 5/6 · Drive R 6/6 · Pull up 7/9 · Create space 4/5") and "Most common miss: …"; the comparison line starts with "Decisions 85% right (avg 78)". The trend chart adds a third line, **decisions right %** (dotted green, left axis), and each History set line shows "x/y decisions right".
-
-**Auto difficulty** for Read the D uses decision accuracy and shot success (see [adaptive difficulty](#offense-adaptive-difficulty)).
+**Summary and History.** The session card shows **Reads right** (e.g. 22/26 · 85%) and "Most missed: HANDS UP (3×)"; the comparison line starts with "Reads 85% right (avg 78)". The trend chart's third line is **reads right %**, and each History set line shows "x/y reads right". Sets logged by the first Read the D (before this rewrite) count their decisions right the same way, so old and new sets form one series.
 
 ### Offense: Move Lab drill
 
@@ -340,7 +342,7 @@ Buttons:
 |--------|--------------|
 | **Save & rest** | Saves the set and shows the rest countdown (**Rest between sets**, default 60 s), the level line when Auto difficulty is on (e.g. "Level 3 → 4: nice, timing gets tighter"), and a summary of the session so far, e.g. "This session: 3 sets · 14/24 made (58%) · 0.21 errors per rep · 2 of 3 rated sets clean". When it reaches 00:00 a big **Next set** button appears. **End session** is available throughout |
 | **Save & end session** | Saves the set, ends the session and shows the [session summary](#offense-session-summary) |
-| **Skip logging** | Saves the set with every outcome field (made, attempted, lost handles, missed calls, rating, note) empty (`null`), and Read the D decisions as not reviewed, then rests like Save & rest |
+| **Skip logging** | Saves the set with every outcome field (made, attempted, lost handles, missed calls, rating, note) empty (`null`), and Read the D reps as not reviewed, then rests like Save & rest |
 | **Discard** | Only after Stop mid-set: drops the partial set without saving it and ends the session |
 
 If a value is invalid (e.g. you typed made 9 with attempted 8, or left a field empty), the reason shows above the buttons and nothing is saved until you fix it.
@@ -355,7 +357,7 @@ When a session that has at least one saved set ends (**End session**, **Save & e
 
 - the **session length** (from Start to the end, mm:ss);
 - a card **per drill** played, with: sets, reps, made / attempted and make %, lost handles per 10 reps, missed calls per 10 reps, and the share of rated sets marked Clean. Values that weren't logged show "–" (skipped sets don't count toward the rates);
-- one plain-language line comparing today with the **mean of your previous 5 sessions of the same drill** (each earlier session's own rate, averaged), e.g. "Make % 62 (avg 55). Lost handles 1.2 per 10 reps (avg 2.0)" (Read the D starts with "Decisions 85% right (avg 78)"). With no earlier sessions of that drill it adds "No earlier sessions to compare with yet". With fewer than 5 earlier sessions it averages those it has.
+- one plain-language line comparing today with the **mean of your previous 5 sessions of the same drill** (each earlier session's own rate, averaged), e.g. "Make % 62 (avg 55). Lost handles 1.2 per 10 reps (avg 2.0)" (Read the D starts with "Reads 85% right (avg 78)"). With no earlier sessions of that drill it adds "No earlier sessions to compare with yet". With fewer than 5 earlier sessions it averages those it has.
 
 **Done** returns to the start screen. A session with no saved sets goes straight back to the start screen.
 
@@ -363,7 +365,7 @@ When a session that has at least one saved set ends (**End session**, **Save & e
 
 Tap **History** on the start screen.
 
-**Trends.** For each drill, a small chart of the last 20 sessions of that drill (oldest on the left). The solid blue line is **make %** (left axis, 0–100%), the dashed orange line is **lost handles per 10 reps** (right axis, 0 up to the highest value rounded up, at least 2), and for Read the D a dotted green line is **decisions right %** (left axis). The first and last session dates are under the x-axis. With fewer than 3 sessions of a drill it shows "Not enough data".
+**Trends.** For each drill, a small chart of the last 20 sessions of that drill (oldest on the left). The solid blue line is **make %** (left axis, 0–100%), the dashed orange line is **lost handles per 10 reps** (right axis, 0 up to the highest value rounded up, at least 2), and for Read the D a dotted green line is **reads right %** (left axis; old and new Read the D sets together). The first and last session dates are under the x-axis. With fewer than 3 sessions of a drill it shows "Not enough data".
 
 **Sessions.** Every saved session, newest first: date and time, drills, sets, make % and errors (lost handles + missed calls) per 10 reps. Tap one to see its sets (drill, reps, made / attempted, lost, missed, rating, note). **Delete session** asks for confirmation first ("Delete" / "Cancel"), then removes it from the log for good.
 
@@ -389,7 +391,7 @@ The history screen shows the **last export** date ("Never exported." until the f
 
 ### Offense: adaptive difficulty
 
-Learning is best when a task is hard but doable for your current skill (the "challenge point" idea). Instead of hand-editing windows and weights, **Auto difficulty** (in the offense panel, **on** by default) gives each drill a **level from 1 (easiest) to 5** that sets its timing, and moves the level after every logged set.
+Learning is best when a task is hard but doable for your current skill (the "challenge point" idea). Instead of hand-editing windows and weights, **Auto difficulty** (in the offense panel, **on** by default) gives the **Drive** drill a **level from 1 (easiest) to 5** that sets its timing, and moves the level after every logged set. Read the D and Move Lab have no levels (their sets are logged with `level: null`).
 
 **When Auto difficulty is on:**
 
@@ -434,13 +436,6 @@ Every level passes the drill's normal validation, including the shortest-drive a
 
 **These thresholds, the level values and the starting level are starting heuristics to tune, not research-proven values.** The challenge-point idea says to keep practice hard but doable; it doesn't say that 80% or 0.10 errors per rep is the right line for this drill. They are all marked `// provisional` in `TRAINING_DEFAULTS` (`startLevel`, `levelMinAttempts`, `levelUpSuccess`, `levelUpMaxErrorRate`, `levelDownSuccess`, `levelDownErrorRate`, `levels`). Watch your History trends and adjust them.
 
-**Read the D's rule** (`readTheDLevelDecision`; `levelDecisionFor(drill, …)` picks the right rule per drill) uses decision accuracy as well as shots:
-
-- A set only counts if its outcomes **and** its decisions were logged (not skipped), with at least 5 shots attempted and at least 5 decisions.
-- **Step down** one level if decision accuracy < **0.65** or error rate ≥ **0.30**. This is checked first, so a set with too many errors never steps up.
-- **Step up** one level if decision accuracy ≥ **0.85** and success (made / attempted) ≥ **0.60**.
-- Otherwise hold. All four thresholds are `// provisional` (`readTheDLevelUpAccuracy`, `readTheDLevelUpSuccess`, `readTheDLevelDownAccuracy`, `readTheDLevelDownErrorRate`).
-
 ### Stopping
 
 **Stop in the middle of an Offense set**, once at least one rep of that set has finished, halts the set and opens the log form for the **partial set**:
@@ -468,12 +463,12 @@ The app uses `localStorage` and saves only:
 | `reactionCaller.mode` | `"defense"` or `"offense"` | When you tap the mode switch |
 | `reactionCaller.offenseDrill` | `"drive"`, `"readTheD"` or `"moveLab"` (missing or unknown, including the removed `"shooters"`, means Drive) | When you tap the drill switch |
 | `reactionCaller.moveLab` | The Move Lab moves you picked, `{ "moveIds": [...] }` (missing means the default CROSSOVER and HESI) | When you tap a move in the Moves grid |
-| `reactionCaller.settings` | The raw text of Defense's Min/Max delay fields and every offense field: Drive read time, window and Advanced values, the shared speech settings, the Read the D fields (practice mode, cue rate, decision window, hands, mid-dribble, gaps, read time, LIVE delay, pauses), the Move Lab fields (max moves per rep, get-set times, gaps, reset pause), every weight and the Session fields (reps per set, planned sets, session time warning), keyed by input id | Whenever you edit any of those fields, by typing or with the − / + steppers |
+| `reactionCaller.settings` | The raw text of Defense's Min/Max delay fields and every offense field: Drive read time, window and Advanced values, the shared speech settings, the Read the D fields (speech rate, every wait, end window, reset pause, chances, weights and caps), the Move Lab fields (max moves per rep, get-set times, gaps, reset pause), every weight and the Session fields (reps per set, planned sets, session time warning), keyed by input id | Whenever you edit any of those fields, by typing or with the − / + steppers |
 | `reactionCaller.learnedMs` | Learned spoken length of each offense phrase, every drill alike (see [Learned spoken lengths](#learned-spoken-lengths)) | After each measured offense call |
 | `reactionCaller.log` | The training log: every Offense session and its logged sets (see [The training log](#the-training-log)) | After every saved set (Save & rest, Save & end session, Skip logging), and when a session with saved sets ends |
 | `reactionCaller.log.backup.<time>` | The raw text of a stored log that this version couldn't read (broken, or from a newer version), kept untouched | Once, just before the first new log is saved over it |
 | `reactionCaller.lastExportAt` | ISO time of the last JSON export (download, or copying the JSON text) | On export |
-| `reactionCaller.levels` | Each drill's current level, e.g. `{"drive":3,"readTheD":2}` (missing or invalid means Level 3) | After every logged set with Auto difficulty on, and on Reset level |
+| `reactionCaller.levels` | Each drill's current level, e.g. `{"drive":3}` (missing or invalid means Level 3; a `readTheD` level stored by the first Read the D is ignored) | After every logged set with Auto difficulty on, and on Reset level |
 | `reactionCaller.autoLevel` | `"on"` or `"off"` (missing means on) | When you tap the Auto difficulty toggle |
 | `reactionCaller.migrations` | Ids of one-time migrations already applied, e.g. `["read-to-ready"]` | Once, on the first load after a migration is added |
 
@@ -644,168 +639,95 @@ If the error is in Advanced or Speech, that section opens automatically.
 
 ## Read the D drill in depth
 
-Read the D is the one offense drill that is **not** Call & Execute. A short spoken sequence describes the defender's state, and nothing names the move: you combine the calls and decide whether to drive (and which way), pull up, or create space. It covers drive decisions only, no passing reads.
+Read the D is the one offense drill that is **not** Call & Execute: the calls describe what the defender does, and you decide your move. It covers drives, pull-ups and finishes, no passing reads. Everything is in `js/read-the-d/`: `read-the-d.js` (pure: calls, meanings, the machine, planner, validation, self-test), `scoring.js` (pure) and `read-the-d-ui.js` (the app part).
 
-### Read the D vocabulary
+### The calls and what they mean
 
-The defender's state, always from the attacker's point of view:
+Each call's meaning is in `TRAINING_DEFAULTS.readTheD.reads` (edit freely; the rest screen quotes it for the most-missed call). Estimates are at rate 1.0; the app learns the real lengths.
 
-| Key | Values | Meaning |
-|---|---|---|
-| `momentum` | `closing`, `set`, `retreating` | Coming at you, standing in his stance, or backing off |
-| `distance` | `tight`, `cushion`, `sag` | Inside arm's reach, about an arm's length (called **NO OPENING**), or well off (near the free-throw line) |
-| `leadFoot` | `left`, `right` | The side his forward foot is on |
-| `hands` (Level 3+) | `up`, `down` | A pure distractor: it never changes the correct answer |
-
-The calls are in the shared phrase table (rough estimates at rate 1.0; the app learns the real lengths like every other call):
-
-| id | display / spoken | est. ms | role |
+| id | Shown / spoken | est. ms | The read |
 |---|---|---|---|
-| D_CLOSING | CLOSING | 500 | momentum |
-| D_SET | SET | 300 | momentum |
-| D_RETREATING | RETREATING | 650 | momentum |
-| D_TIGHT | TIGHT | 350 | distance |
-| D_CUSHION | NO OPENING | 700 | distance (state value `cushion`; the id and value kept their old name so saved logs still load) |
-| D_SAG | SAGGING | 500 | distance |
-| D_LEFT_FOOT | LEFT FOOT | 550 | lead foot |
-| D_RIGHT_FOOT | RIGHT FOOT | 550 | lead foot |
-| D_HANDS_UP | HANDS UP | 550 | distractor |
-| D_HANDS_DOWN | HANDS DOWN | 600 | distractor |
-| D_NOW | NOW | 300 | go signal |
-| D_LIVE | LIVE | 350 | mid-dribble lead-in (Levels 4–5) |
+| D_GO | GO / go | 300 | Get the dribble live and watch him. |
+| D_TIGHT | TIGHT / tight | 350 | He's up on you: jab and read his front foot. |
+| D_CUSHION | NO OPENING / no opening | 700 | No lane yet: keep the dribble alive and keep reading. |
+| D_SAG | SAGGING / sagging | 500 | He gave you space: rise up and shoot. |
+| D_RETREATING | RETREATING / retreating | 650 | He's backing off: pull up and shoot. |
+| D_LEFT_FOOT | LEFT FOOT / left foot | 550 | His front foot is on your left: drive left, past it. |
+| D_RIGHT_FOOT | RIGHT FOOT / right foot | 550 | His front foot is on your right: drive right, past it. |
+| D_HANDS_UP | HANDS UP / hands up | 550 | Don't take the shot: hesi and relocate, drive, or keep reading. |
+| D_HANDS_DOWN | HANDS DOWN / hands down | 600 | His hands are down: shoot it. |
+| D_CUT_OFF | CUT OFF / cut off | 450 | He beat you to the spot: change direction. |
+| D_CROSSED | CROSSED / crossed | 500 | You've got him beat: keep going downhill. |
+| D_LANE_OPEN | LANE OPEN / lane open | 650 | The lane is open: get to the rim. |
+| D_HELP_LEFT | HELP D ON LEFT / help dee on left | 900 | Help is coming from the left: finish away from it. |
+| D_HELP_RIGHT | HELP D ON RIGHT / help dee on right | 900 | Help is coming from the right: finish away from it. |
+| D_LAY_LEFT | LAY ON LEFT / lay on left | 650 | Finish on the left side of the rim. |
+| D_LAY_RIGHT | LAY ON RIGHT / lay on right | 650 | Finish on the right side of the rim. |
+| D_LAY_CENTER | LAY ON CENTER / lay on center | 750 | Finish through the middle. |
 
-The Levels 1–3 lead-in is the Drive drill's READY (id `READ`), spoken once at the base rate.
+`D_CUT_OFF` is its own id, separate from Drive's `CUT_OFF`. The id `D_CUSHION` kept its old name (it is spoken NO OPENING), so learned lengths carry over.
 
-### The rules (correctAction)
+### The call machine
 
-`correctAction(state, rules)` (pure) returns `{ action, ruleId, situation, answer, why, evidence }`. The rules live in `TRAINING_DEFAULTS.readTheD.rules`, so you can edit them, and are checked **in this order**; the first match decides:
+`READTHED_MACHINE` lists, for each call, the wait before the next one and every call that may follow; `readTheDNext(node, ctx, cfg, rng)` (pure) picks one step: `{ next, wait, ctx }` (`next` null with a wait: the rep ends silently on a shot; both null: a terminal call). All weights, chances and caps are in `OFFENSE_DEFAULTS.readTheD` (`// provisional`).
 
-| # | Rule id | When | Correct action | Why | Evidence |
-|---|---|---|---|---|---|
-| 1 | `closing` | momentum closing | DRIVE to the lead-foot side | attack the closeout past his front foot | coaching heuristic |
-| 2 | `gaveShot` | distance sag, **or** momentum retreating | PULL UP | he gave you the shot | coaching heuristic |
-| 3 | `tightSet` | tight **and** set | DRIVE to the lead-foot side | attack his front foot | study-based |
-| 4 | `cushionSet` | cushion (NO OPENING) **and** set | CREATE SPACE: hesi or step-back into a jumper | his foot doesn't matter at this distance | coaching heuristic |
+| After | Wait | Next |
+|---|---|---|
+| GO | read | TIGHT 25 / NO OPENING 30 / SAGGING 25 / RETREATING 20 |
+| TIGHT | jab | LEFT FOOT 50 / RIGHT FOOT 50 |
+| NO OPENING | dribble | LEFT FOOT 35 / RIGHT FOOT 35 / HANDS DOWN 30 |
+| SAGGING | quick | HANDS UP (chance 0.20), else the rep ends on a shot |
+| RETREATING | quick | HANDS UP (chance 0.25), else the rep ends on a shot |
+| LEFT FOOT / RIGHT FOOT | quick | CUT OFF (chance 0.35), else LANE OPEN (a foot call is never last) |
+| CUT OFF | quick | CUT OFF again (chance 0.45), else CROSSED |
+| CROSSED | quick | LANE OPEN |
+| LANE OPEN | finish | HELP D (chance 0.30), else a LAY call |
+| HELP D ON LEFT / RIGHT | finish | a LAY call, never on the help side |
+| HANDS UP | dribble | NO OPENING 30 / LEFT FOOT 15 / RIGHT FOOT 15 / HANDS DOWN 20 / SAGGING 20 |
+| HANDS DOWN, LAY ON … | – | terminal |
 
-The actions are `DRIVE_LEFT`, `DRIVE_RIGHT`, `PULL_UP` and `CREATE_SPACE`. A rule's action `DRIVE_LEAD_SIDE` becomes DRIVE_LEFT when the lead foot is on the left and DRIVE_RIGHT when it is on the right. The four rules cover all 18 states (rule 1 catches every closing state, including a closing defender who is sagging).
+**Tracked per rep** (`ctx`): the **drive side** (set by each foot call to that foot's side, flipped by every CUT OFF), the counts of CUT OFFs, HANDS UPs and HELP Ds, the HELP D side, and the chain of calls so far.
 
-Each rule has `when`, a list of entries; an entry matches when every key in its `match` holds one of the listed values. Each entry has a `situation` (e.g. "sagging defender" or "retreating defender" for rule 2) used in feedback, and each rule has an `answer`, a `why` and an `evidence` tag. Rules can only look at momentum, distance and lead foot, never at hands, so the distractor can't change an answer.
+- **HELP D side**: the drive side (weight 65) or the other side (35).
+- **LAY side**: drive side 40, center 30, other side 30; the HELP D side (if any) is removed and the rest renormalized.
+- **Caps** (`maxCutOffsPerRep` 2, `maxHandsUpPerRep` 2, `maxHelpPerRep` 1): at the CUT OFF cap a foot call gives LANE OPEN and a CUT OFF gives CROSSED; at the HANDS UP cap SAGGING / RETREATING end the rep; HELP D comes at most once.
 
-"Study-based" marks the one rule backed by studies of defenders' stance (attacking the side of the lead foot of a tight, set defender). Everything else is a **coaching heuristic**: a common teaching rule, not a measured result.
+So a rep has at most 14 calls (13 is the most the caps allow).
 
-### Call order and the rep plan
+### Read the D timing
 
-Every rep calls **all three** of momentum, distance and lead foot, in that fixed order, even when the rule that decides doesn't use one of them, so silence never becomes a tell. From Level 3 a hands call (HANDS UP / HANDS DOWN) is inserted at a random place among them (first, between two of them or last, each equally likely). NOW always comes last.
+Every wait is picked uniformly (whole ms) in its range, runs from the **end** of the previous call (its length / rate) to the **start** of the next, and is never shorter than the min gap (`minGapMs`, 120). Defaults (all `// provisional`, in `OFFENSE_DEFAULTS.readTheD.waits`):
 
-```
-READY ──(read time)──▶ momentum ▶ distance ▶ lead foot ▶ NOW ──(decision window)──▶ reset pause
-                       └─ a hands call can go anywhere in here from Level 3 ─┘    └─ countdown bar ─┘
+| Wait | Default (ms) | Used after |
+|---|---|---|
+| read | 800–3500 | GO (before the first read) |
+| jab | 900–2200 | TIGHT |
+| dribble | 1000–2500 | NO OPENING, HANDS UP |
+| quick | 250–700 | a foot call, CUT OFF, CROSSED, SAGGING, RETREATING |
+| finish | 500–1300 | LANE OPEN, HELP D |
+| end window | 1800 | the countdown after the last call |
+| reset pause | 1000 | the rest before the next GO |
 
-Levels 4-5 (mid-dribble):
-LIVE ──(600-1500 ms)──▶ momentum ▶ distance ▶ lead foot ▶ NOW ──(decision window)──▶ …
-```
+With the defaults a rep lasts about 8 s on average (GO to the end of the window), about 10 s when it starts TIGHT or NO OPENING and about 6 s when it starts SAGGING or RETREATING, and up to about 20 s when HANDS UP loops twice. The self-test page prints this table.
 
-`planReadTheDRep(s, dur, rng, onPick, ctx)` (pure) builds the rep plan:
+### Planning a Read the D rep
 
-1. **Lead-in** at 0, at `baseRate`: READY (Levels 1–3, "before the move") or LIVE (Levels 4–5, "mid-dribble": start dribbling, the read comes while you're live).
-2. **Wait**: the read time (`readTheD.readMinMs`–`readMaxMs`, 800–3500 ms) after READY, or the LIVE delay (`liveDelayMinMs`–`liveDelayMaxMs`, 600–1500 ms) after LIVE, measured from the rep start and clamped so the first cue never overlaps the lead-in.
-3. **The cue sequence and NOW**, laid out with the same per-window rate-fit math as a drive window (`fitRateIn` and `scheduleCalls`): the window is exactly long enough for the calls at the level's cue rate with the cue gap between every two calls, so each call is spoken at that rate and none can overlap or clip another.
-4. **The decision window** starts at NOW and lasts the level's decision time: make the move and shoot. The countdown bar drains over it.
-5. **Rest**: `readTheD.resetPauseMs` (1000 ms), then the next lead-in.
+`planReadTheDRep(s, dur, rng)` (pure) walks the machine from GO:
 
-The plan has the usual `calls`, `windows`, `endMs` (the end of the decision window) and `restMs`, plus the optional field `cues`, one entry per decision:
+1. **GO** at 0, at `baseRate`.
+2. Each next call starts its wait after the previous call ends, at `readTheD.rate` (1.3).
+3. After the last call, **one countdown window** of `endWindowMs` (1800 ms). When SAGGING / RETREATING end the rep silently, the window starts once the quick wait passes with no HANDS UP.
+4. `endMs` is the end of the window, `restMs` the reset pause.
 
-```js
-cues: [{ atMs, durMs,     // the decision window (same as its windows entry)
-         state,           // { momentum, distance, leadFoot, hands? }
-         ids,             // the cue calls in the order spoken, without NOW
-         correct,         // "DRIVE_LEFT" | "DRIVE_RIGHT" | "PULL_UP" | "CREATE_SPACE"
-         ruleId }]        // the rule that decided
-```
-
-Other drills don't have `cues`.
-
-### Sampling states
-
-`sampleState(cfg, withHands, prev, rng)` draws the state in two steps: first a correct action by `TRAINING_DEFAULTS.readTheD.actionWeights` (25 each, provisional), then one of that action's states at random. So the four actions come up about equally often (the self-test checks within 2 points over 40,000 reps), the lead foot is random, and every state comes up. The state of the previous rep (`ctx.lastState`, passed by the runner) is never drawn again, so the exact same state never comes twice in a row.
-
-### Read the D levels
-
-Difficulty comes from the speech rate, the gaps and the decision window, not from how long anything is shown. All values are provisional (`TRAINING_DEFAULTS.levels.readTheD`); the start level is 3, as for Drive.
-
-| Level | Cue speech rate | Cue gap (ms) | Decision window (ms) | Hands distractor | Cue timing | Second read | Longest sequence spoken in |
-|---|---|---|---|---|---|---|---|
-| 1 | 1.0 | 300 | 3000 | no | before the move (READY, read time) | no | 3100 ms |
-| 2 | 1.15 | 250 | 2500 | no | before | no | 2663 ms |
-| 3 | 1.3 | 200 | 2200 | yes | before | no | 2954 ms |
-| 4 | 1.45 | 150 | 2000 | yes | mid-dribble (LIVE, 600–1500 ms) | yes | 2531 ms |
-| 5 | 1.6 (the max rate) | 120 | 1700 | yes | mid-dribble | yes | 2230 ms |
-
-"Longest sequence" is RETREATING > NO OPENING > LEFT FOOT (> HANDS DOWN) > NOW with the estimates, from the first cue to the end of NOW (the self-test page prints this table). The cue rate only applies to the cue calls and NOW; the lead-in stays at the base rate.
-
-The level values are the settings `readTheD.rate`, `cueGapMs`, `decisionMs`, `hands`, `midDribble` and `secondRead` in `OFFENSE_DEFAULTS.readTheD`. Their defaults there (used with Auto difficulty off) are the Level 3 values.
+Its one `cues` entry describes the window: `{ atMs, durMs, chain: [every call in order], terminal: the last call or "SHOT", driveSide }`. The runner keeps each rep's `cues` for the review after the set.
 
 ### Read the D validation
 
-`validateReadTheD(s, dur)` checks the speech settings, then:
+`validateReadTheD(s, dur)` checks the speech settings, then: the rate (0.5–2.0 and not above the max speech rate); every wait's min / max (whole numbers ≥ 0, min ≤ max); the end window (whole number ≥ 500 ms) and reset pause (≥ 0); every chance (0–1); every weight table (only calls that can follow, numbers ≥ 0, a sum above 0), the HELP D and LAY side weights (a LAY call must stay possible with the HELP D side removed); the caps (whole numbers ≥ 0, max HELP D 0 or 1); and that every call has a spoken length. Errors show under the Timing group and open Chances and Caps.
 
-- the cue speech rate is between 0.5 and 2.0 and **not above the max speech rate** (Level 5 uses exactly 1.6, the default max);
-- the cue gap is a whole number ≥ 0 and the decision window a whole number ≥ 500 ms;
-- hands, mid-dribble, second read and practice mode are each off (0) or on (1); the second read gap and the practice pause are whole numbers ≥ 0 (gap min ≤ max);
-- the second read mapping: a chance from 0 to 1, at least one option after a drive and after a pull-up / create-space, weights ≥ 0 adding up to more than 0, and states that only use valid values, `"random"`, lists of valid values, or (lead foot only) `"opposite"`;
-- the read time (whole numbers ≥ 100 ms, min ≤ max), the LIVE delay (whole numbers ≥ 0, min ≤ max) and the reset pause (whole number ≥ 0);
-- the rule table: every rule has a known action, an answer, a why, an evidence tag and `when` entries that only match momentum, distance and lead foot values; and **every state has an answer** (e.g. "No rule covers SET · NO OPENING · LEFT FOOT.");
-- the action weights are numbers ≥ 0 that add up to more than 0;
-- the longest cue sequence fits at the cue rate.
+### What spoken calls can't capture
 
-### Second read (Levels 4–5)
-
-At Levels 4–5 (setting `readTheD.secondRead` = 1) the defender reacts to your first move. In a share of reps (`TRAINING_DEFAULTS.readTheD.secondRead.chance`, 0.5, provisional) a second call sequence follows the first:
-
-```
-… NOW ──(decision window 1)──▶ 700-1200 ms ▶ momentum ▶ distance ▶ lead foot ▶ NOW ──(decision window 2)──▶ reset pause
-```
-
-- It starts `secondGapMinMs`–`secondGapMaxMs` (700–1200 ms, provisional) after the first window ends (in practice mode: after the first explanation).
-- It uses the same fixed order (momentum → distance → lead foot → NOW), with **no hands call**, at the level's cue rate and gap.
-- It gets the level's **full** decision window too, so the rep is extended by the gap, the second sequence and a second window; the countdown bar drains once per window.
-- It is scored with the **same** `correctAction` rules; no new rules.
-
-The second state **follows from the first correct action** (the app assumes you made the right first move), from the mapping in `TRAINING_DEFAULTS.readTheD.secondRead` (weights provisional):
-
-| After the first correct action | Reaction (weight) | Second state | Correct second action |
-|---|---|---|---|
-| DRIVE LEFT / DRIVE RIGHT | `cutOff` (50) | set, tight, lead foot on the **other** side | a counter drive back the other way |
-| DRIVE LEFT / DRIVE RIGHT | `retreat` (50) | retreating, cushion (NO OPENING) or sag, lead foot random | PULL UP |
-| PULL UP / CREATE SPACE | `closeout` (100) | closing (a hard closeout), tight or cushion (NO OPENING), lead foot random | DRIVE past his front foot |
-
-A value in the mapping is fixed (`"set"`), a list to pick from at random (`["cushion", "sag"]`), `"random"` (any value) or, for the lead foot, `"opposite"` (the other side from the drive). The second decision is the rep's second `cues` entry (with `reaction`, the option's id), and the decision review shows it as "Rep 3 · read 2". Accuracy counts every decision.
-
-### What three words can't capture
-
-Three spoken words in a fixed order simplify something a real defender shows you almost all at once: his momentum, distance, stance and hands arrive together, change continuously, and come with fakes. The drill trains the decision rules and makes them fast, so the read is automatic when you see it. Reading a real defender on the court still needs practice against a real defender.
-
-### Read the D rewrite in progress
-
-A rewritten Read the D is being built **alongside** the current one, in `js/read-the-d/machine.js`. So far it is only pure logic with self-test checks: the runner, the settings form and the drill switch still play the drill described above. The next step replaces it.
-
-It is a branching state machine: after GO, each call is followed by a call a real defender could give next, until a terminal call or a shot.
-
-```
-GO ─read─▶ TIGHT ─jab─▶ LEFT FOOT / RIGHT FOOT ─quick─▶ CUT OFF (35%) ─quick─▶ CUT OFF (45%) / CROSSED ─quick─▶ LANE OPEN
-                                              └─quick─▶ LANE OPEN (65%)
-   ─read─▶ NO OPENING ─dribble─▶ LEFT FOOT 35 / RIGHT FOOT 35 / HANDS DOWN 30 (terminal: shoot)
-   ─read─▶ SAGGING / RETREATING ─quick─▶ HANDS UP (20% / 25%), else the rep ends on a shot
-HANDS UP ─dribble─▶ NO OPENING 30 / LEFT FOOT 15 / RIGHT FOOT 15 / HANDS DOWN 20 / SAGGING 20
-LANE OPEN ─finish─▶ HELP D ON LEFT / RIGHT (30%; the drive side 65, the other 35) ─finish─▶ a LAY call, never on the help side
-          ─finish─▶ LAY ON LEFT / RIGHT / CENTER (drive side 40, center 30, other side 30; terminal)
-```
-
-The entry weights after GO are TIGHT 25, NO OPENING 30, SAGGING 25, RETREATING 20. The drive side is set by each foot call and flipped by every CUT OFF. Per rep there are at most 2 CUT OFFs, 2 HANDS UPs and 1 HELP D. Each wait (read 800–3500, jab 900–2200, dribble 1000–2500, quick 250–700, finish 500–1300 ms) runs from the end of one call to the start of the next, and is never shorter than the min gap. GO is spoken at the base rate and every other call at `readTheD2.rate` (1.3). One 1800 ms countdown window follows the last call (or the silent end), then a 1000 ms rest. The new calls are GO, LANE OPEN, CUT OFF (`D_CUT_OFF`), CROSSED, HELP D ON LEFT / RIGHT and LAY ON LEFT / RIGHT / CENTER; it reuses TIGHT, NO OPENING, SAGGING, RETREATING, the foot calls and HANDS UP / DOWN.
-
-Every number is in `OFFENSE_DEFAULTS.readTheD2` (all `// provisional`), and what each call means for the player is in `TRAINING_DEFAULTS.readTheD2.reads`. The pure functions are `readTheDNext(node, ctx, cfg, rng)` (one step: `{ next, wait, ctx }`), `planReadTheDMachineRep` (a standard rep plan whose one `cues` entry is `{ atMs, durMs, chain, terminal, driveSide }`), `validateReadTheDMachine`, `readTheDMachineLengthTable` and the edge table `READTHED_MACHINE`. The runner contract (`repPlanProblems`) accepts both cue shapes.
-
-Its 5 self-test checks cover: the new calls and a meaning for every call; 40,000 reps of structure (at most 14 calls, GO first, every edge in the table, the TIGHT / foot / LANE OPEN / LAY / HELP D rules, terminals last, the caps, the drive side); the frequencies of every weight, chance and side split within 2 points (including LAY sides after a CUT OFF flipped the drive side); the timing (every wait in its type's range and at least the min gap, the rates, no overlaps, the window); and validation. The self-test page also prints the average and longest rep length by entry read (about 8 s on average, up to about 20 s, at most 12 calls with the defaults).
+One spoken call at a time simplifies something a real defender shows you almost all at once: his distance, stance, feet and hands arrive together, change continuously, and come with fakes. The drill makes the reads and your reactions fast and automatic, and the machine keeps every sequence one a defender could plausibly give. Reading a real defender on the court still needs practice against a real defender.
 
 ## Drill profiles and rep plans
 
@@ -815,12 +737,12 @@ Offense is built around two ideas, so that a future **mixed** drill (a random dr
 
 | Field | Drive | Move Lab | Read the D |
 |-------|-------|----------|------------|
-| `phraseIds` | READ (shown READY), LEFT, RIGHT, CUT_OFF, LAY_UP, finishers | the three Move Lab start calls, LEFT, RIGHT, the moves, SHOT | READ (READY), D_LIVE, the ten cue calls, D_NOW |
-| `next` (state table) | `NEXT` | `MOVE_LAB_NEXT` (MOVE stands for any picked move) | none: a fixed call order (`RTD_ORDER`) |
-| `weightTables` | `WEIGHT_TABLES` | `afterMoveWeights` (under `settings.moveLab`) | none (action weights are in `TRAINING_DEFAULTS.readTheD`) |
+| `phraseIds` | READ (shown READY), LEFT, RIGHT, CUT_OFF, LAY_UP, finishers | the three Move Lab start calls, LEFT, RIGHT, the moves, SHOT | every call of `READTHED_MACHINE` (D_GO … D_LAY_CENTER) |
+| `next` (state table) | `NEXT` | `MOVE_LAB_NEXT` (MOVE stands for any picked move) | `READTHED_MACHINE` (with `readTheDNext`) |
+| `weightTables` | `WEIGHT_TABLES` | `afterMoveWeights` (under `settings.moveLab`) | `entryWeights`, `tightWeights`, `noOpeningWeights`, `handsUpWeights`, `helpSideWeights`, `laySideWeights` (under `settings.readTheD`) |
 | `planRep(settings, durations, rng, onPick, ctx)` | `planDriveRep` | `planMoveLabRep` | `planReadTheDRep` |
 | `validate(settings, durations)` | `validateOffense` | `validateMoveLab` | `validateReadTheD` |
-| `fitTable` / `selfTest` | `fitTable` / Drive checks | none / Move Lab checks | `readTheDFitTable` (per level) / Read the D checks |
+| `fitTable` / `selfTest` | `fitTable` / Drive checks | none / Move Lab checks | none (its self-test returns the rep-length table) / Read the D checks |
 
 Phrases stay in one shared table keyed by id, so LEFT, RIGHT and CUT_OFF are shared, and so are their learned lengths.
 
@@ -832,11 +754,11 @@ Phrases stay in one shared table keyed by id, so LEFT, RIGHT and CUT_OFF are sha
   windows: [{ startMs, durMs }],         // countdown windows the bar draws
   endMs,                                 // when the rep's last window ends
   restMs,                                // pause after endMs before the next rep
-  cues                                   // optional (Read the D): one entry per decision
+  cues                                   // optional (Read the D): [{ atMs, durMs, chain, terminal, driveSide }]
 }
 ```
 
-`ctx` is what the runner knows about earlier reps: `{ repInSet, lastMoveId, lastState }` (`lastState` is the previous Read the D state). Every plan must satisfy the **runner contract**, which `repPlanProblems(plan, phrases)` checks: known phrases, calls in time order that never overlap, a positive length and a rate of 0.5–2 for each, windows inside `[0, endMs]`, `endMs` at or after the last call ends, `restMs` ≥ 0, and (when present) one `cues` entry per window with the same start and length.
+`ctx` is what the runner knows about earlier reps: `{ repInSet, lastMoveId }`. Every plan must satisfy the **runner contract**, which `repPlanProblems(plan, phrases)` checks: known phrases, calls in time order that never overlap, a positive length and a rate of 0.5–2 for each, windows inside `[0, endMs]`, `endMs` at or after the last call ends, `restMs` ≥ 0, and (when present) one `cues` entry per window with the same start and length, a non-empty `chain` and a `terminal`.
 
 The runner ([Running a rep](#running-a-rep)) knows nothing about drills: it speaks `calls`, draws `windows` and starts the next rep after `endMs + restMs`. The countdown bar covers each window. A single bar over the whole rep would be a change to what the planner puts in `windows`, not a runner change.
 
@@ -877,20 +799,20 @@ A session only appears in the log once its first set is saved. Partial sets are 
 - **Drive**: read time (`readMinMs` / `readMaxMs`), drive window, reset pause, finisher buffer, both caps and the three weight tables;
 - **Move Lab**: the whole `moveLab` settings object (picked moves, max moves per rep, gap between moves, weights, reset pause). Sets logged before Shooters only was removed hold the borrowed get-set and nope gap under `shooters` instead, and old Shooters sets hold the whole Shooters settings object; both stay valid.
 
-**Read the D's `extra`** holds the decisions, one per decision of each finished rep (two for a rep with a second read):
+**Read the D's `extra`** holds one entry per finished rep:
 
 ```js
-extra: { decisions: [{
-  rep, read,          // rep number in the set (1..reps), 1 or 2 (second read)
-  ids,                // the cue calls in the order spoken, e.g. ["D_CLOSING", "D_TIGHT", "D_LEFT_FOOT"]
-  state,              // { momentum, distance, leadFoot, hands? }
-  correct, ruleId,    // the right action and the rule that decided it
-  situation,          // e.g. "closing defender" (for feedback)
-  actual              // what you did: DRIVE_LEFT | DRIVE_RIGHT | PULL_UP | CREATE_SPACE | FROZE, or null if not reviewed
+extra: { reads: [{
+  rep,                // rep number in the set (1..reps)
+  chain,              // every call in order, e.g. ["D_GO", "D_TIGHT", "D_LEFT_FOOT", "D_LANE_OPEN", "D_LAY_LEFT"]
+  terminal,           // the last call, or "SHOT" for a silent end
+  driveSide,          // "left" | "right" | null
+  ok,                 // true (read it right), false (misread) or null (not reviewed)
+  missedCall          // the call misread (one of chain), or null
 }] }
 ```
 
-`summarizeSets` adds `decisions`, `decisionsCorrect`, `decisionPct` and `decisionScore` (the full `scoreDecisions` result) over every set's reviewed decisions. The log `version` stays 1: the new fields are additions inside `extra`, which older sets don't have.
+Sets logged by the first Read the D (before the rewrite) hold `extra.decisions` instead (`rep`, `read`, `ids`, `state`, `correct`, `ruleId`, `situation`, `actual`); `validateSet` accepts both shapes, so they still load, validate and show in History. `summarizeSets` adds `reads`, `readsRight` and `readsPct` over both (a new rep is right when `ok` is true, an old decision when `actual` equals `correct`), and `readsScore` (`scoreReads` of the new reps, for the most-missed call). The log `version` stays 1: these are additions inside `extra`.
 
 **Summaries** (pure helpers in `TrainingLog`):
 
@@ -944,14 +866,16 @@ const OFFENSE_DEFAULTS = {
     resetPauseMs: 1000,
   },
 
-  // Read the D drill (the Level 3 values; with Auto difficulty on the level sets the first five)
+  // Read the D drill (every value provisional)
   readTheD: {
-    rate: 1.3, cueGapMs: 200, decisionMs: 2200, hands: 1, midDribble: 0,
-    readMinMs: 800, readMaxMs: 3500,          // provisional
-    liveDelayMinMs: 600, liveDelayMaxMs: 1500, // provisional
-    secondRead: 0, secondGapMinMs: 700, secondGapMaxMs: 1200, // provisional
-    practice: 0, practicePauseMs: 600,         // provisional
-    resetPauseMs: 1000,
+    rate: 1.3,
+    waits: { read: { minMs: 800, maxMs: 3500 }, jab: { … }, dribble: { … }, quick: { … }, finish: { … } },
+    endWindowMs: 1800, resetPauseMs: 1000,
+    entryWeights: { D_TIGHT: 25, D_CUSHION: 30, D_SAG: 25, D_RETREATING: 20 },
+    tightWeights: { … }, noOpeningWeights: { … }, handsUpWeights: { … },
+    helpSideWeights: { drive: 65, other: 35 }, laySideWeights: { drive: 40, center: 30, other: 30 },
+    sagHandsUpChance: 0.20, retreatHandsUpChance: 0.25, cutOffChance: 0.35, cutOffAgainChance: 0.45, helpChance: 0.30,
+    maxCutOffsPerRep: 2, maxHandsUpPerRep: 2, maxHelpPerRep: 1,
   },
 };
 ```
@@ -960,7 +884,7 @@ const OFFENSE_DEFAULTS = {
 - The **phrase table** (`phrases`) is where you fix pronunciation (`spoken`), change on-screen text (`display`) or adjust the length estimates (`estMs`). Learned lengths (`reactionCaller.learnedMs`) override `estMs` per phrase. Delete that key to start learning from scratch after changing the voice or the spoken text.
 - The Drive read time is `readMinMs` / `readMaxMs` (800 / 3500). Defense's Min/Max delay fields are separate (HTML defaults 1000 / 3000).
 - The state tables (`NEXT` for Drive, `MOVE_LAB_NEXT` for Move Lab) and the finisher and start-call lists sit in the drill files. They are structure, not tuning.
-- `OFFENSE_DEFAULTS.readTheD` holds the Read the D timing (cue rate and gap, decision window, read time, LIVE delay, reset pause) and the hands / mid-dribble switches. Its calls (`D_…`) are in the shared `phrases` table. The rules and action weights are in `TRAINING_DEFAULTS.readTheD`.
+- `OFFENSE_DEFAULTS.readTheD` holds every Read the D number: rate, waits, end window, reset pause, weights, chances and caps. Its calls (`D_…`) are in the shared `phrases` table. What each call means is in `TRAINING_DEFAULTS.readTheD.reads`.
 - `OFFENSE_DEFAULTS.moveLab` holds every Move Lab number, including the get-set time after each start call (`getSetMs`) and the gap from LEFT / RIGHT to the first move (`firstMoveGapMinMs` / `firstMoveGapMaxMs`). Its start calls and SHOT are in the shared `phrases` table.
 
 ### `TRAINING_DEFAULTS`
@@ -987,19 +911,12 @@ const TRAINING_DEFAULTS = {
   levels: {
     drive:    [{ driveMinMs: 2200, driveMaxMs: 2800, readMinMs: 2000, readMaxMs: 3500,
                  "afterDriveOrCutOffWeights.CUT_OFF": 10, "afterDriveOrCutOffWeights.LAY_UP": 10 }, …],
-    readTheD: [{ "readTheD.rate": 1.0, "readTheD.cueGapMs": 300, "readTheD.decisionMs": 3000,
-                 "readTheD.hands": 0, "readTheD.midDribble": 0 }, …],
   },
 
-  // Read the D: the rule table and how often each action comes up
+  // Read the D: what each call means (quoted on the rest screen for the most-missed call)
   readTheD: {
-    rules: [{ id: "closing", when: [{ match: { momentum: ["closing"] }, situation: "closing defender" }],
-              action: "DRIVE_LEAD_SIDE", answer: "…", why: "attack the closeout past his front foot",
-              evidence: "coaching heuristic" }, …],
-    actionWeights: { DRIVE_LEFT: 25, DRIVE_RIGHT: 25, PULL_UP: 25, CREATE_SPACE: 25 }, // provisional
-    secondRead: { chance: 0.5, afterDrive: [{ id: "cutOff", weight: 50, state: { … } }, …],
-                  afterPullUpOrCreateSpace: [{ id: "closeout", weight: 100, state: { … } }] }, // provisional
-    whyEstMsPerChar: 65, // provisional
+    reads: { D_GO: "Get the dribble live and watch him.", …,
+             D_HANDS_UP: "Don't take the shot: hesi and relocate, drive, or keep reading.", … },
   },
 };
 ```
@@ -1012,8 +929,8 @@ Rules of thumb:
 - **Long drives (several CUT OFFs) never happen**: they don't fit. Check the fit table below and raise `driveMaxMs` or `maxRate`.
 - **Calls lag behind the countdown on a phone**: the voice starts late. Set `speechLeadMs` (e.g. 100–200), or add a `finisherBufferMs` (Drive).
 - **A word is mispronounced**: change its `spoken` text.
-- **Read the D: the cues come too fast to take in**: lower the level, or with Auto difficulty off lower `readTheD.rate` or raise `cueGapMs`. **No time to act after NOW**: raise `decisionMs`.
-- **Read the D: one action comes up too often**: change `TRAINING_DEFAULTS.readTheD.actionWeights`. **You disagree with a rule**: edit `TRAINING_DEFAULTS.readTheD.rules` (validation makes sure every state still has an answer).
+- **Read the D: the calls come too fast to react**: lower the speech rate, or raise the wait for those calls (each Timing field says which calls it controls). **No time to finish**: raise the end window.
+- **Read the D: some reads come up too often or too rarely**: change the weights and chances under Chances (e.g. `entryWeights`, `cutOffChance`, `helpChance`). **Reps run too long**: lower the HANDS UP chances or `maxHandsUpPerRep`.
 - **Move Lab: not enough time to get to the spot**: raise that start call's `getSetMs` range.
 - **Move Lab: not enough time to finish a move before the next call**: raise `moveGapMinMs` / `moveGapMaxMs` (Gap between moves). **Too many or too few moves per rep**: change Max moves per rep or `afterMoveWeights`.
 
@@ -1027,30 +944,19 @@ http://localhost:8080/index.html?selftest=1
 
 Use `/index.html?selftest=1`, not `/?selftest=1`. The bundled `server.js` only maps a bare `/` to `index.html`, so `/?selftest=1` returns "Not found".
 
-Instead of the app, the page runs a simulation of every offense planner (every drill profile's self-test) plus checks of the session helpers and the training log, and prints **PASS** / **FAIL** for each check to the console and to an on-page banner (green when everything passes, red otherwise). There are 69 checks in total: 19 Drive, 5 Move Lab, 11 Read the D, 1 Runner, 1 Learned lengths, 6 Session, 3 Levels, 2 Read the D scoring, 5 Read the D machine (see [Read the D rewrite in progress](#read-the-d-rewrite-in-progress)), 9 Training log and 7 History. Each drill file runs its own checks; the other files register theirs with `registerSuite`.
+Instead of the app, the page runs a simulation of every offense planner (every drill profile's self-test) plus checks of the session helpers and the training log, and prints **PASS** / **FAIL** for each check to the console and to an on-page banner (green when everything passes, red otherwise). There are 59 checks in total: 19 Drive, 5 Move Lab, 5 Read the D, 1 Runner, 1 Learned lengths, 6 Session, 4 Levels, 1 Read the D scoring, 10 Training log and 7 History. Each drill file runs its own checks; the other files register theirs with `registerSuite`.
 
-**Read the D.** It checks:
+**Read the D.** Five checks:
 
-1. the vocabulary: the eleven cue phrases and LIVE exist, are shown as in the table, spoken as shown in lower case and have estimates, and every state value has its call;
-2. `correctAction` matches the rule table, written out independently in the test, for all 18 states and all 36 with hands;
-3. the hands call never changes the answer (or the deciding rule);
-4. every rule has an answer, a why, situations and an evidence tag, and only the tight, set lead-foot rule is study-based;
-5. validation: the defaults and all five levels pass; a cue rate of 1.7 (above the max rate) or 0.4, a negative or fractional cue gap, a 400 ms or empty decision window, flags other than 0/1, bad read time or LIVE delay ranges, a negative reset pause, a rule table that leaves a state uncovered, a rule matching hands, an unknown action or evidence tag, all-zero or negative weights are rejected, and a bad base rate is reported as a speech error;
-6. the sequence, at every level (2,000 reps each): READY (Levels 1–3) or LIVE (4–5) at 0 at the base rate; momentum, distance and lead foot in that order and matching the state; a hands call at Levels 3–5 only, in every rep, matching the state, at each of its four possible places; NOW last; the `cues` record matches what was called;
-7. the timing: the first cue within the read time or LIVE delay (clamped after the lead-in); every cue call at the level's rate with exactly the cue gap between calls, none overlapping; the sequence fits at the level's rate (`fitRateIn`); one window from NOW lasting the level's decision time, `endMs` at its end and the reset pause as rest;
-8. sampling: over 40,000 reps (Levels 1 and 3) each correct action's share is within 2 points of its weight;
-9. the same state never comes twice in a row, and every state (18, or 36 with hands) comes up;
-10. practice mode (Levels 1, 3 and 5, 500 reps each): the action phrases and each rule's why phrase exist; after the window, the practice pause, then the correct action, then (at least the min gap later) the deciding rule's why marked as a caption; `endMs` is when the last why ends, with one why per decision; every plan passes the runner contract;
-11. the second read (20,000 reps at Levels 4 and 5): never at Levels 1–3; in 50% of reps within 2 points; it starts 700–1200 ms after the first window; both windows last the level's decision time and the rep ends with the second; the second sequence is momentum > distance > lead foot > NOW with no hands, matching its state and scored with the same rules; after a drive it is a cut-off (set, tight, the counter drive the other way) or a retreat (PULL UP), after PULL UP / CREATE SPACE a closeout (drive to the lead-foot side); all three reactions come up; a bad chance, an empty or zero-weight option list, an invalid value, a bad flag or gap range are rejected.
+1. the calls: the new calls exist as in the table; NO OPENING and Drive's CUT OFF are unchanged; the old calls (CLOSING, SET, NOW, LIVE, the practice-mode phrases) are gone; every call of the machine has a phrase, a length and a meaning, and every edge names a known call;
+2. structure, over 40,000 reps: at most 14 calls; GO first and only once; every step is an edge of the machine; TIGHT is followed by a foot call; a foot call by CUT OFF or LANE OPEN; LANE OPEN only follows a foot call or CROSSED; a LAY call only follows LANE OPEN or HELP D, and never on the help side; HANDS DOWN and LAY calls are last; a rep ends on a terminal call or a silent shot (with the matching `cues` chain and terminal); at most 2 CUT OFFs, 2 HANDS UPs and 1 HELP D; the drive side is the last foot call flipped by each later CUT OFF; `readTheDNext` never changes the `ctx` it is given;
+3. frequencies within 2 points over 40,000 reps: the first read, the three NO OPENING outcomes, the HANDS UP follow-ups, HANDS UP after SAGGING / RETREATING, CUT OFF after a foot call and CUT OFF vs CROSSED (when under the cap), the HELP D chance and side, and the LAY sides with no help, help on the drive side and help on the other side (each with at least 1,000 samples), also after a CUT OFF flipped the drive side;
+4. timing: each wait in its type's range, matching the edge, whole ms and at least the min gap; GO at 0 at the base rate and every other call at the rate; no overlaps; the window right after the last call (or one quick wait after a silent end), lasting the end window, with `endMs`, `restMs` and the `cues` entry matching; every plan passes the runner contract;
+5. validation: the defaults pass; min > max, a negative or fractional wait, a chance of 1.2, an all-zero or unknown-call weight table, all-zero HELP D sides, LAY weights that leave nothing after the help side, a rate above the max rate, a negative cap, a HELP D cap of 2, a 400 ms end window and a negative reset pause are rejected; a bad base rate is a speech error.
 
-Checks 6 and 7 look at the first decision of each rep (up to the first NOW).
+**Read the D scoring.** One check: `scoreReads` on 8 reps with HANDS UP misread gives 7/8 and exactly "7/8 reads right." and "Most missed: HANDS UP. Don't take the shot: hesi and relocate, drive, or keep reading."; the most-missed call wins by count, and a tie goes to the call missed first; with no misses there is no second line; a miss without a picked call counts but names no call; unreviewed reps don't count.
 
-**Read the D scoring.** Two checks:
-
-1. `scoreDecisions` on 8 decisions with one sagging defender driven anyway: 7/8, the per-action counts, the lines "7/8 correct." and exactly "Missed: sagging defender → pull up, he gave you the shot.", and "sagging defender → you drove anyway"; two closing-defender misses beat one sag miss ("closing defender → you drove the wrong way (2×)"); all right gives no second line; unreviewed decisions give no score;
-2. the level rule: up at 17/20 right with 6/10 made; hold at 84% right, at 59% made, and at exactly 65% right; down at 64% right and at error rate 0.30 (even with every decision right); clamped at 5 and 1; hold with too few shots, unreviewed decisions or a skipped set; Drive still uses its own rule.
-
-**Runner.** One check runs 1,000 rep plans of every drill (Read the D at all five levels, odd levels in practice mode) through `repPlanProblems`: the runner contract described in [Drill profiles and rep plans](#drill-profiles-and-rep-plans).
+**Runner.** One check runs 1,000 rep plans of every drill (Drive at all five levels) through `repPlanProblems`: the runner contract described in [Drill profiles and rep plans](#drill-profiles-and-rep-plans).
 
 **Move Lab.** It checks the move list (8 moves, 6 handle and 2 shot, each a phrase with an estimate; the default picks are real moves); validation (each single move, all moves, 1 and 6 moves per rep, zero gaps and one-sided weights pass; no moves, unknown moves, non-move phrases, duplicates, 0, 7 or fractional moves per rep, bad gap ranges, all-zero or negative weights, a negative reset pause, and a bad get-set or first-move gap are rejected; a bad speech rate is reported as a speech error); the plans (10,000 reps spread over 1–6 max moves with random picks: a start call, then LEFT/RIGHT, then 1..max picked moves, then SHOT; every move count from 1 to max happens; every start call, direction and move gets called; the get-set time, the first-move gap and each gap between moves stay in range; every call at the base rate, none overlapping; one countdown window from LEFT/RIGHT to the end of SHOT, and the reset pause as rest); and the weights (MOVE vs SHOT within 2 points of the default weights, SHOT always at the max, MOVE weight 0 means always one move, SHOT weight 0 always the max). Session adds a check that Move Lab uses its own reps per set; Training log adds a check of Move Lab sets (picked moves, or an old move + side, and clean reps 0..reps), their snapshot and clean-rep totals.
 
@@ -1081,9 +987,10 @@ Checks 6 and 7 look at the first decision of each rep (up to the first NOW).
 
 **Levels.** It checks:
 
-1. Drive and Read the D each have exactly 5 levels that set the same settings, every path exists in `OFFENSE_DEFAULTS`, every level passes the drill's validation (including the shortest-drive fit), plans 500 reps without error, and no level has a longer window than the one below it;
+1. Drive has exactly 5 levels that set the same settings, every path exists in `OFFENSE_DEFAULTS`, every level passes the drill's validation (including the shortest-drive fit), plans 500 reps without error, and no level has a longer window than the one below it;
 2. `levelDecision` / `nextLevel`: up at 8/10 with 0.1 errors per rep and exactly at both thresholds (4/5, 1 error in 10 reps); hold at 79% success, at error rate 0.11, and at 50% with 0.29; down at 49% and at error rate 0.30; clamped at 5 and 1; hold with only 4 attempts, for a skipped set and when errors weren't logged; a partial set with 5 attempts counts;
-3. `applyLevel` sets only the level's settings without changing its input (e.g. Drive Level 4: window 1500, CUT OFF 28, LAY UP 25; Drive Level 1: read 2000, CUT OFF 10, finishers still 20); `normalizeLevels` replaces missing, fractional or out-of-range levels with the start level; `progressLabel` adds " · LVL 3" only when a level is given; `levelMessage` reads "Level 3 → 4: nice, timing gets tighter" and "Holding at Level 3".
+3. `applyLevel` sets only the level's settings without changing its input (e.g. Drive Level 4: window 1500, CUT OFF 28, LAY UP 25; Drive Level 1: read 2000, CUT OFF 10, finishers still 20); `normalizeLevels` replaces missing, fractional or out-of-range levels with the start level; `progressLabel` adds " · LVL 3" only when a level is given; `levelMessage` reads "Level 3 → 4: nice, timing gets tighter" and "Holding at Level 3";
+4. only Drive is levelled, Read the D has no levels, and `normalizeLevels` drops a stored `readTheD` level.
 
 **Training log.** It checks `TrainingLog`:
 
@@ -1093,8 +1000,9 @@ Checks 6 and 7 look at the first decision of each rep (up to the first NOW).
 4. `snapshotSettings` holds the drill's own windows, read or get-set times, weights, caps and speech settings (and nothing from the other drill), as a deep copy that later setting changes don't affect;
 5. `upsertSession` appends a new session, replaces one with the same id, and doesn't change the log it was given;
 6. `parseLog` reads a version 1 log; treats missing or empty text as a new log; and for a newer version (2, 99), a missing or string version, a non-array `sessions`, invalid JSON, `null`, an array, a number or a string returns a new empty log plus the original text to keep, without throwing;
-7. Read the D sets: reviewed, skipped and empty decision lists pass; a missing list, a rep beyond the set, a third read, unknown actions, no ids or no situation are rejected; totals (3 of 5 right), the comparison text "Decisions 60% right (avg 50). Make % 75 (avg 75). Lost handles 2.5 per 10 reps (avg 2.5)", and the decision trend series and line;
-8. with a fake store: opening a version 2 log doesn't change it; the first save copies it byte-for-byte to `reactionCaller.log.backup.<time>` and then writes the new log; a second save makes no new backup; when the backup can't be written, the broken log is left untouched and the save reports failure; a valid log keeps its sessions across reopen and save.
+7. Read the D sets in both shapes: new sets (reviewed, not reviewed, empty, a silent shot) and old decision sets (reviewed, skipped, empty) pass; a rep beyond the set, an empty chain, no terminal, a bad drive side, `ok` that isn't true / false / null, a missed call that isn't in the chain or on a right read, a set with neither shape, and old decisions with an unknown action, a rep beyond the set or no situation are rejected;
+8. a log holding both shapes: it loads, gives one reads-right total (5 of 9: 2 of 4 new, 3 of 5 old) with the new reps' most-missed call, the comparison text "Reads 50% right (avg 50). Make % 75 (avg 75). Lost handles 2.5 per 10 reps (avg 2.5)" and one trend series and line;
+9. with a fake store: opening a version 2 log doesn't change it; the first save copies it byte-for-byte to `reactionCaller.log.backup.<time>` and then writes the new log; a second save makes no new backup; when the backup can't be written, the broken log is left untouched and the save reports failure; a valid log keeps its sessions across reopen and save.
 
 **History.** It checks the summary, trend, merge and backup helpers in `TrainingLog`:
 
@@ -1141,10 +1049,9 @@ Reaction-game/
 │   │   ├── move-lab.js     ← Move Lab: defaults, move list, planner, validation, self-test
 │   │   └── move-lab-ui.js  ← (app) the move picker, get-set fields, move colors
 │   ├── read-the-d/
-│   │   ├── read-the-d.js   ← Read the D: calls, rules, sampling, planner, second read, validation, self-test
-│   │   ├── scoring.js      ← decision scoring, feedback lines, its level rule
-│   │   ├── machine.js      ← the Read the D rewrite in progress: a branching state machine (not wired in yet)
-│   │   └── read-the-d-ui.js← (app) cue colors and the decision review
+│   │   ├── read-the-d.js   ← Read the D: calls and their meanings, the call machine, planner, validation, self-test
+│   │   ├── scoring.js      ← reads right, the most-missed call, the rest-screen lines
+│   │   └── read-the-d-ui.js← (app) call colors, its weight-table fields, the review after a set
 │   ├── log/
 │   │   ├── training-log.js ← TrainingLog: set validation, snapshots, summaries, versioned load / save
 │   │   └── history.js      ← comparisons, trends, delete, import / merge, CSV, export names
@@ -1262,7 +1169,7 @@ Notable pieces:
 - **`.stepper`**: a number input between − and + buttons, each at least 48 px tall, for fields filled in by hand (the Session group).
 - **`.game-header`**, **`.session-progress`**, **`.session-clock`**, **`.session-banner`**: the game screen header (mode label, the muted "SET · REP" line and the mm:ss clock in its top-right corner) and the fatigue banner above it (panel background with a yellow left border).
 - **Set log**: `.log-row` puts a label (with a muted `.hint`) and a 56 px stepper on one row, wrapping to two lines on narrow screens; `.segmented.choice` is the 52 px rating row; the note is a `textarea` (16 px text so iPhone doesn't zoom). `#saveRestBtn` is the big blue primary button, `#saveEndBtn` grey, and `.log-minor` holds the outlined **Skip logging** and red **Discard** buttons. Inputs and the textarea re-enable text selection, which the page otherwise turns off.
-- **Read the D**: `.word-momentum`, `.word-distance`, `.word-foot`, `.word-hands` (one color per role) and `.word-now` (the `now-flash` keyframes: yellow block fading to yellow text in 0.45 s). `.flag-field` is an on / off setting: a `.toggle-btn` with `data-flag-for` pointing at a hidden 0 / 1 input; disabled (and dimmed) while a level sets it.
+- **Read the D**: `.word-distance`, `.word-retreat`, `.word-foot`, `.word-hands`, `.word-lane`, `.word-crossed`, `.word-help` (one color per role; GO and LAY use `.word-read`, CUT OFF `.word-cut`); `.field-hint` (the one-line hint under a timing field) and `.timing-pair`; the review's `.review-row`, `.review-toggle`, `.review-chips-title` and `.review-choices` (the call chips).
 - **Rest**: `.rest-count` is the huge mm:ss countdown. **`#nextSetBtn`** / **`#endSessionBtn`**: its big blue button (at least 80 px tall, shown when the rest is over) and grey secondary button.
 - **Adaptive difficulty**: `.toggle-row` / `.toggle-btn` (the 88 × 48 px On/Off button, blue when on), `.level-row` with a `.small-btn` (Reset level), `.level-locked` (a field set by a level, dimmed) with its `.level-note`, and `.level-line` (the rest-screen level message).
 - **Summary and history**: `.stack` stacks cards; `.drill-card` with a `.stat-grid` (a two-column `<dl>`) and `.compare-line`; `.chart` styles the inline SVG (`.axis`, `.tick`, solid `.line-make` in the accent blue, dashed `.line-lost` in orange, dots and axis titles in the same colors) and `.legend`; `.history-item` is a session row (a full-width button plus its `.history-detail` of `.set-line`s); `.confirm` is the red-bordered confirmation box; `.secondary-btn` (grey, 52 px), `.danger-btn` (red) and `.button-row` (side-by-side buttons); `.reminder` is the start-screen export reminder (yellow left border, like the fatigue banner).
@@ -1271,7 +1178,7 @@ Notable pieces:
 
 ### Markup
 
-- **Start screen**: mode switch, title, subtitle (changes with the mode and drill), Defense's Min/Max delay panel (`#rangePanel`, hidden in Offense), the offense panel and **Start**. The offense panel holds the drill switch, `#levelSettings` (the Auto difficulty toggle `#autoLevelBtn`, each drill's level with a Reset level button, and `#levelStatus`), `#driveSettings` (read time and drive window fields plus Advanced), `#readTheDSettings` (practice toggle, cue rate, decision window, Advanced with the hands / mid-dribble toggles and timing), `#moveLabSettings` (move picker, moves per rep, Advanced), the shared `#sessionSettings` group (stepper inputs with `data-training` keys into `TRAINING_DEFAULTS`) and the shared `#speech` group. The weight inputs and the Move Lab get-set inputs are generated from `OFFENSE_DEFAULTS` at load, so the form always matches the tables in code.
+- **Start screen**: mode switch, title, subtitle (changes with the mode and drill), Defense's Min/Max delay panel (`#rangePanel`, hidden in Offense), the offense panel and **Start**. The offense panel holds the drill switch, `#levelSettings` (the Auto difficulty toggle `#autoLevelBtn`, each drill's level with a Reset level button, and `#levelStatus`), `#driveSettings` (read time and drive window fields plus Advanced), `#readTheDSettings` (speech rate, Timing, and the collapsed `#readTheDChances` with `#readTheDWeightTables` and `#readTheDCaps`), `#moveLabSettings` (move picker, moves per rep, Advanced), the shared `#sessionSettings` group (stepper inputs with `data-training` keys into `TRAINING_DEFAULTS`) and the shared `#speech` group. The weight inputs and the Move Lab get-set inputs are generated from `OFFENSE_DEFAULTS` at load, so the form always matches the tables in code.
 - **Game screen**: fatigue banner (Offense, hidden until due), mode label (`DEFENSE`, `OFFENSE · DRIVE`, `OFFENSE · READ THE D` or `OFFENSE · MOVE LAB`), set/rep line and session clock (Offense only), word stage, countdown (Offense only) and **Stop**.
 - **Set log screen** (`#logScreen`, Offense only): drill label, set title, the four stepper rows, the rating buttons, the collapsed note, an error line and the save / skip / discard buttons.
 - **Rest screen** (`#restScreen`, Offense only): drill label, countdown, session summary, save status, the level line (`#restLevel`, Auto difficulty only), **Next set** (hidden until the rest is over) and **End session**.
@@ -1306,16 +1213,15 @@ All six screens are always in the DOM, and the `.hidden` class switches between 
 | `newSession()` / `beginRep(p)` / `isSetComplete(p, t)` / `beginSet(p)` | The set and rep counter. Progress is `{ set, rep }` (current set from 1, reps started in it) |
 | `progressLabel(p, t, level)` | "SET 2 / 4 · REP 5 / 8", plus " · LVL 3" when `level` is given |
 | `LEVEL_COUNT`, `levelPaths(drill, t)`, `applyLevel(s, drill, level, t)` | 5; the settings paths a drill's levels set; a copy of the settings with a level applied |
-| `normalizeLevels(stored, t)` | Stored levels → one per levelled drill (`{ drive, readTheD }`), each 1–5 (else `startLevel`) |
+| `normalizeLevels(stored, t)` | Stored levels → one per levelled drill (`{ drive }`; anything else, e.g. an old `readTheD`, is dropped), each 1–5 (else `startLevel`) |
 | `levelDecision(level, set, cfg)` / `nextLevel(level, set, cfg)` | The adjustment rule: `{ level, change }` (`up`, `down`, `hold`, `atTop`, `atBottom`, `tooFew`, `skipped`) / just the level |
 | `levelMessage(from, decision, cfg)` | The rest-screen line |
-| `RTD_REVIEW_ACTIONS`, `scoreDecisions(decisions)`, `confusionText(c)`, `decisionFeedback(score, rules)` | Read the D scoring: the review choices (the four actions and FROZE), accuracy / per action / most common miss, its text, and the two rest-screen lines |
-| `readTheDLevelDecision(level, set, cfg)` / `levelDecisionFor(drill, level, set, cfg)` | Read the D's adjustment rule; the rule for any levelled drill |
+| `scoreReads(reads)` / `readsFeedback(score, phrases, reads)` | Read the D scoring: reads right and the most-missed call; the two rest-screen lines |
+| `levelDecisionFor(drill, level, set, cfg)` | The adjustment rule of a levelled drill (its profile's `levelDecision`, else `levelDecision`) |
 | `formatElapsed(ms)` | Session clock text, mm:ss |
 | `sessionWarningDue(elapsedMs, t)` / `sessionWarningText(t)` | When the fatigue banner is due, and its text |
-| `RTD_ORDER`, `RTD_PHRASE`, `RTD_ACTIONS`, `RTD_ACTION_NAMES` | Read the D: the fixed call order, the call for each state value, the four actions and their names |
-| `correctAction(state, rules)` / `rtdStates(withHands)` / `sampleState(cfg, withHands, prev, rng)` | The correct action for a state; all 18 (or 36) states; one weighted state draw that never repeats `prev` |
-| `planReadTheDRep(s, dur, rng, onPick, ctx)` / `validateReadTheD(s, dur)` / `readTheDFitTable(s, dur)` | The Read the D rep plan (with `cues`), its settings check, and the per-level sequence table |
+| `READTHED_MACHINE`, `readTheDNext(node, ctx, cfg, rng)` | Read the D: the call machine, and one step of it (`{ next, wait, ctx }`) |
+| `planReadTheDRep(s, dur, rng, onPick)` / `validateReadTheD(s, dur)` / `readTheDLengthTable(s, dur, reps, rng)` | The Read the D rep plan (with `cues`), its settings check, and the rep-length table by first read |
 | `repPlanProblems(plan, phrases)` | The runner contract check: a list of problems, empty for a valid plan |
 | `registerDrill(profile)` / `registerSuite(fn)`, `PROFILES`, `LEVEL_DRILLS` | The drill registry (a profile with `levelled: true` joins `LEVEL_DRILLS`) and the extra self-test suites |
 | `runSelfTest(log, reps)` | The simulation (every drill's self-test, then every registered suite: runner contract, learned lengths, session, levels, Read the D scoring); returns `{ passed, results, fitTable, fitTables: { drive, moveLab, readTheD } }` |
@@ -1336,7 +1242,7 @@ All six screens are always in the DOM, and the `.hidden` class switches between 
 | `summarizeSets(sets)` | The same totals for any list of sets, plus `lostPer10` and `missedPer10` |
 | `setsOfDrill`, `sessionDrills`, `summarizeByDrill`, `sessionLengthMs` | Per-drill views of a session, and its length in ms |
 | `compareWithPrevious(log, session, drill, n)` / `comparisonText(cmp)` | Today vs the mean of the previous `n` sessions of the drill, and its one-line text |
-| `trendSeries(log, drill, n)` / `trendGeometry(series, box)` | The last `n` sessions' make %, lost handles per 10 reps and decision accuracy, and their chart coordinates (`make`, `lost`, `decision`) |
+| `trendSeries(log, drill, n)` / `trendGeometry(series, box)` | The last `n` sessions' make %, lost handles per 10 reps and reads right (`readsPct`), and their chart coordinates (`make`, `lost`, `reads`) |
 | `deleteSession(log, id)` | A new log without that session |
 | `parseImport(text)` / `mergeLogs(current, incoming, replaceConflicts)` | Read a backup; merge by session id (`{ log, added, identical, conflicts }`) |
 | `csvField(v)` / `setsToCsv(log)` | CSV export of every set |
@@ -1357,13 +1263,13 @@ Plain scripts sharing the global scope (see [Project structure](#project-structu
   - `showWord` sets the text and classes, removes `.show`, forces a reflow (`void wordEl.offsetWidth`) and adds `.show` back. The reflow makes the fade-in replay reliably even when the same call (e.g. CUT OFF) repeats.
 - **Modes**: each mode is an object with `start(settings)` and `stop()`. `MODES` maps `defense` / `offense` to the mode object plus its labels. `DRILLS` maps `drive` / `moveLab` to the offense game label and subtitle.
   - `defenseMode` chains `setTimeout` calls with a fresh random delay each time: pick a word, show it, speak it, schedule the next.
-  - `offenseMode` runs rep plans from the selected profile, as in [Running a rep](#running-a-rep), grouped into sets. `startRep()` counts the rep, plans and schedules it, and schedules either the next rep (counting `repsCompleted` at each rep's `endMs`) or `finishSet()` (says "set done", opens the set log). `haltSet()` clears the timers and countdown for Stop mid-set but keeps the session clock; `stop()` also stops the clock. `nextSet()` starts the next set from the **Next set** tap and records the set's start time. `startClock()` updates the session clock and shows the fatigue banner once. `runCountdown()` drains the bar for one window. `later(fn, ms)` wraps every timer and records its id so `stop()` can clear them all. `say(id, rate, show)` shows and speaks a phrase and attaches the measuring handlers; a call with `show: "caption"` (practice mode's why) goes in the line under the word instead, and the next normal call clears it. For Read the D the runner keeps each rep's `plan.cues` in `repCues` (for the set log) and passes the last state as `ctx.lastState`, so the same state never comes twice in a row, across sets too. `runId` lets late `onend` events from a stopped run be ignored.
+  - `offenseMode` runs rep plans from the selected profile, as in [Running a rep](#running-a-rep), grouped into sets. `startRep()` counts the rep, plans and schedules it, and schedules either the next rep (counting `repsCompleted` at each rep's `endMs`) or `finishSet()` (says "set done", opens the set log). `haltSet()` clears the timers and countdown for Stop mid-set but keeps the session clock; `stop()` also stops the clock. `nextSet()` starts the next set from the **Next set** tap and records the set's start time. `startClock()` updates the session clock and shows the fatigue banner once. `runCountdown()` drains the bar for one window. `later(fn, ms)` wraps every timer and records its id so `stop()` can clear them all. `say(id, rate)` shows and speaks a phrase and attaches the measuring handlers. For Read the D the runner keeps each rep's `plan.cues` in `repCues`, for the review on the set log. `runId` lets late `onend` events from a stopped run be ignored.
 - **Settings form**: inputs carry `data-setting` paths into `OFFENSE_DEFAULTS` (e.g. `moveLab.moveGapMinMs`, `moveLab.getSetMs.CATCH.minMs`), read and written with `getPath` / `setPath`. Session inputs carry `data-training` keys into `TRAINING_DEFAULTS`, read by `readTrainingSettings()` into `settings.training`. `wireSteppers(root)` makes each − / + button inside `root` (the offense panel and the set log) step its input by the input's `step`, clamped to its `min` / `max`, and fires `input` so the value is handled like typing. `buildWeightTables()` (once per drill), `buildGetSetFields()`, `fillOffenseDefaults()`, `readOffenseSettings()` (empty fields become `NaN` so validation catches them), `saveSettings()` / `loadSettings()`.
 - **`updateView`, `selectMode`, `selectDrill`**: show the right panels, labels and subtitle for the mode and drill.
 - **`startGame` / `stopGame`**: validate (the Min/Max fields only for Defense and Drive, then the drill's `validate`, then `validateSession`; `showError` puts the message in the right place via `ERROR_TARGETS`), prime speech, switch screens, show the session clock and set/rep line only in Offense, start a new session record (Offense), start or stop the active mode, and cancel speech. `stopGame` ends the session and writes its end time to the log if it has saved sets. `stopPressed` (the Stop button) halts the set and opens the partial-set log instead when an Offense set has at least one finished rep.
-- **Adaptive difficulty**: `levels` (from `reactionCaller.levels` via `normalizeLevels`) and `autoLevel` hold the state. `updateLevelView()` shows the levels and toggle, and with Auto on calls `lockInput()` on every setting or weight input whose path a level sets (it keeps the manual value in `data-manual-value`, makes the input read-only and adds the "set by Level N" note); `unlockInput()` restores it. `renderFlags()` / `wireFlags()` draw and handle the on / off toggles (a locked toggle is disabled). `manualValue(input)` is what `saveSettings()` and `readOffenseSettings()` use, so level values are never saved as your own. `startGame` keeps the manual settings in `runBaseSettings` and applies the level on top (`settings.level`, or `null` with Auto off). After a set is committed, `adjustLevel(set)` runs `levelDecision`, stores the new level and prepares the rest-screen line; `applyCurrentLevel()` (in the **Next set** tap) re-applies the level to `runBaseSettings` for the next set, keeping the spoken lengths validated at Start (if those settings don't validate, the previous ones are kept).
+- **Adaptive difficulty**: `levels` (from `reactionCaller.levels` via `normalizeLevels`) and `autoLevel` hold the state. `updateLevelView()` shows the levels and toggle, and with Auto on calls `lockInput()` on every setting or weight input whose path a level sets (it keeps the manual value in `data-manual-value`, makes the input read-only and adds the "set by Level N" note); `unlockInput()` restores it. `manualValue(input)` is what `saveSettings()` and `readOffenseSettings()` use, so level values are never saved as your own. `startGame` keeps the manual settings in `runBaseSettings` and applies the level on top (`settings.level`, or `null` with Auto off). After a set is committed, `adjustLevel(set)` runs `levelDecision`, stores the new level and prepares the rest-screen line; `applyCurrentLevel()` (in the **Next set** tap) re-applies the level to `runBaseSettings` for the next set, keeping the spoken lengths validated at Start (if those settings don't validate, the previous ones are kept).
 - **Summary, history and backup**: `showSummary(session)` builds one `drillCard` per drill from `summarizeByDrill` and `compareWithPrevious`. `openHistory()` renders `renderTrends()` (one `trendChart(series)` inline SVG per drill, from `trendGeometry`), `renderSessionList()` (rows that expand into `sessionDetail` with the delete confirmation) and `renderLastExport()`. `exportJson()` / `exportCsv()` use `downloadText()` (a `Blob` and an `<a download>` click), falling back to `showBackupText()`. `importText()` parses with `parseImport`, previews with `mergeLogs` and asks via the confirmation box when sessions conflict; `applyImport(replace)` merges and saves. `saveTrainingLog(log)` saves any changed log; `updateBackupReminder()` runs on load and on every return to the start screen (`showStart()`).
-- **Read the D review**: `decisionsOf(repCues)` turns the runner's `repCues` (finished reps only) into decision records; `reviewItems` holds each one's ✓ / ✗ state and pick; `renderReview()` draws the rows, `reviewedDecisions()` reads them back (or shows why it can't), and **All correct** resets them. `commitSet` stores the rest-screen lines (`decisionFeedback`) and `adjustLevel` uses `levelDecisionFor`.
+- **Read the D review** (`js/read-the-d/read-the-d-ui.js`): `readsOf(repCues)` turns the runner's `repCues` (finished reps only) into rep records; `reviewItems` holds each one's ✓ / ✗ state and misread call; `renderReview()` draws the rows and chips, `reviewedReads()` reads them back, and `markAllReadsRight()` is **All correct**. `commitSet` stores the rest-screen lines (`readsFeedback`). The file also sets the Read the D call colors (`PHRASE_CLASS`) and the titles and side labels of its weight tables.
 - **Set log and rest**: `trainingLog` is the state from `TrainingLog.openLog(logStore)` (`logStore` wraps `storageGet` / `storageSet`). `openSetLog(partial)` fills the form for the set that just ended, with its settings snapshot. `commitSet()` validates with `TrainingLog.validateSet`, adds the set to the session and saves the whole log (`persistSession` → `upsertSession` + `saveTrainingLog` → `saveLog`). `showRest()` runs the rest countdown and shows `summarizeSession`; `startNextSet()` primes speech and starts the next set.
 
 ### Self-test page (`js/selftest-page.js`)
@@ -1400,8 +1306,9 @@ Runs only with `?selftest=1`. It hides the app, calls `OffensePlanner.runSelfTes
 - **Move Lab: the get-set time is not checked against how long the sprint really takes you.** Tune the `getSetMs` ranges to your court and speed.
 - **Results are self-reported.** You count shots, lost handles and missed calls yourself and enter them after the set; there is no automatic scoring or reaction-time measurement.
 - **The log lives in one browser, at one address.** Clearing site data (or Safari clearing it after weeks without a visit) deletes it, and `file://`, `http://localhost:8080` and `http://<LAN IP>:8080` each keep a separate log. Export regularly from **History**; importing a backup at a new address merges it in.
-- **Trends are per drill and per session.** Make % and lost handles (and decisions right % for Read the D) are drawn on two axes in one small chart;
-- **Read the D decisions are self-reported.** You mark the reps you got wrong after the set, from memory; with long sets it gets harder to remember each rep. missed calls and clean share are only in the session summary and the session list.
+- **Trends are per drill and per session.** Make % and lost handles (and reads right % for Read the D) are drawn on two axes in one small chart; missed calls and clean share are only in the session summary and the session list.
+- **Read the D reads are self-reported.** You mark the reps you misread after the set, from memory; with long sets it gets harder to remember each rep.
+- **Read the D has no levels.** You tune its timing and chances by hand; there is no automatic progression for it.
 - **Import can't undo.** Replacing conflicting sessions or deleting a session is permanent, unless you have an exported backup.
 - **Next set waits for the rest to finish.** There is no way to cut the rest short except setting **Rest between sets** lower (0 = none).
 - **Levels move one step per logged set**, based on that set alone (no averaging over several sets), and only in Offense with Auto difficulty on. Sets logged with it off have `level: null` and don't move the level.
